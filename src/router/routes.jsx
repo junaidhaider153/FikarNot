@@ -5,6 +5,8 @@ import ProductDetailPage from "../pages/ProductDetailPage";
 import CartPage from "../pages/CartPage";
 import CheckoutPage from "../pages/CheckoutPage";
 import LoginPage from "../pages/LoginPage";
+import AccountPage from "../pages/AccountPage";
+import WishlistPage from "../pages/WishlistPage";
 import AdminPage from "../pages/AdminPage";
 import NotFoundPage from "../pages/NotFoundPage";
 import { STAFF_ROLES, ADMIN_ROLES } from "../config/appConfig";
@@ -28,6 +30,8 @@ export function AppRoutes() {
       <Route path="/cart" element={<CartPage />} />
       <Route path="/checkout" element={<CheckoutPage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
+      <Route path="/wishlist" element={<WishlistPage />} />
 
       <Route path="/admin" element={<ProtectedRoute roles={STAFF_ROLES}><AdminPage tab="dashboard" /></ProtectedRoute>} />
       <Route path="/admin/products" element={<ProtectedRoute roles={STAFF_ROLES}><AdminPage tab="products" /></ProtectedRoute>} />

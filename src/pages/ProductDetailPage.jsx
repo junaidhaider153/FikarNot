@@ -46,6 +46,7 @@ export default function ProductDetailPage() {
 
   const cat = s.categories.find((c) => c.id === p.categoryId);
   const canEdit = s.session && ["admin", "editor"].includes(s.session.role);
+  const isWishlisted = s.wishlist.includes(p.id);
   const related = s.products.filter((x) => x.categoryId === p.categoryId && x.id !== p.id).slice(0, 4);
   const images = (Array.isArray(p.images) && p.images.length ? p.images : [p.image]).filter(Boolean);
   const currentImage = images[Math.min(activeImage, images.length - 1)] || p.image;
@@ -109,6 +110,9 @@ export default function ProductDetailPage() {
             </button>
             <button className="btn btn-lime" disabled={p.stock === 0} onClick={() => { addToCart(); navigate("/checkout"); }}>
               Buy now
+            </button>
+            <button className={`btn btn-ghost wishlist-detail-btn${isWishlisted ? " active" : ""}`} onClick={() => appActions.toggleWishlist(p.id)} aria-pressed={isWishlisted}>
+              <Ic n="heart" s={15} filled={isWishlisted} /> {isWishlisted ? "Saved" : "Wishlist"}
             </button>
             {canEdit && <button className="btn btn-ghost" onClick={() => navigate(`/admin/products?edit=${p.id}`)}><Ic n="edit" s={15} /> Edit</button>}
           </div>

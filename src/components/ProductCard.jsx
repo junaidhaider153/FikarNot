@@ -9,6 +9,7 @@ export function ProductCard({ p }) {
   const s = useApp();
   const cat = s.categories.find((c) => c.id === p.categoryId);
   const canEdit = s.session && ["admin", "editor"].includes(s.session.role);
+  const isWishlisted = s.wishlist.includes(p.id);
   const navigate = useNavigate();
   const images = useMemo(() => {
     const list = Array.isArray(p.images) && p.images.length ? p.images : [p.image];
@@ -42,6 +43,20 @@ export function ProductCard({ p }) {
           <img className="card-img" src={image} alt={p.name} loading="lazy" />
         </Link>
         {cat && <Link className="card-cat" to={`/products?cat=${cat.id}`}>{cat.name}</Link>}
+        <button
+          className={`wishlist-btn${isWishlisted ? " active" : ""}`}
+          type="button"
+          aria-label={isWishlisted ? `Remove ${p.name} from wishlist` : `Add ${p.name} to wishlist`}
+          aria-pressed={isWishlisted}
+          title={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            appActions.toggleWishlist(p.id);
+          }}
+        >
+          <Ic n="heart" s={16} filled={isWishlisted} />
+        </button>
         {canEdit && (
           <div className="card-admin">
             <button

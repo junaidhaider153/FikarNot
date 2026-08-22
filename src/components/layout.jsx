@@ -96,13 +96,18 @@ export function Header() {
           <HeaderSearch />
           {s.session ? (
             <span className="user-chip">
-              <span className="avatar">{s.session.name.split(" ").map((w) => w[0]).join("").slice(0, 2)}</span>
-              <span className="uname">{s.session.name.split(" ")[0]}</span>
+              <Link className="user-link" to="/account" aria-label="Open your account">
+                <span className="avatar">{s.session.name.split(" ").map((w) => w[0]).join("").slice(0, 2)}</span>
+                <span className="uname">{s.session.name.split(" ")[0]}</span>
+              </Link>
               <button className="icon-btn dark" onClick={() => { appActions.logout(); }} aria-label="Sign out" title="Sign out"><Ic n="logout" s={15} /></button>
             </span>
           ) : (
             <NavLink className="hdr-link" to="/login"><Ic n="user" s={15} /> Sign in</NavLink>
           )}
+          <Link className="icon-link dark wishlist-header" to="/wishlist" aria-label={`Wishlist, ${s.wishlist.length} items`} title="Wishlist">
+            <Ic n="heart" s={17} filled={s.wishlist.length > 0} />{s.wishlist.length > 0 && <span className="count-badge">{s.wishlist.length}</span>}
+          </Link>
           <Link className="cart-btn" to="/cart" aria-label={`Cart, ${count} items`}>
             <Ic n="cart" s={17} />{count > 0 && <span className="count-badge">{count}</span>}
           </Link>
@@ -113,8 +118,9 @@ export function Header() {
         <NavLink to="/">Home</NavLink>
         <NavLink to="/products">Shop</NavLink>
         {canEdit && <NavLink to="/admin">Studio</NavLink>}
+        <NavLink to="/wishlist">Wishlist ({s.wishlist.length})</NavLink>
         <NavLink to="/cart">Cart ({count})</NavLink>
-        {!s.session && <NavLink to="/login">Sign in</NavLink>}
+        {s.session ? <NavLink to="/account">My account</NavLink> : <NavLink to="/login">Sign in</NavLink>}
       </nav>
     </header>
   );
@@ -134,7 +140,7 @@ export function Footer() {
             <p style={{ marginTop: 14, fontSize: 13.5, maxWidth: "34ch" }}>Everyday objects, obsessively made. A demo storefront that runs entirely in your browser — no server, no database.</p>
           </div>
           <div><h4>Shop</h4><Link to="/products">All products</Link><Link to="/products?cat=c1">Audio</Link><Link to="/products?cat=c2">Wearables</Link><Link to="/products?cat=c3">Home &amp; Desk</Link><Link to="/products?cat=c4">Carry</Link></div>
-          <div><h4>Account</h4><Link to="/login">Sign in</Link><Link to="/cart">Cart</Link><Link to="/checkout">Checkout</Link><Link to="/admin">Studio</Link></div>
+          <div><h4>Account</h4><Link to="/login">Sign in</Link><Link to="/account">My account</Link><Link to="/wishlist">Wishlist</Link><Link to="/cart">Cart</Link><Link to="/checkout">Checkout</Link><Link to="/admin">Studio</Link></div>
           <div><h4>Help</h4><Link to="/products">FAQ</Link><Link to="/products">Shipping</Link><Link to="/products">Returns</Link></div>
         </div>
         <div className="footer-bottom">

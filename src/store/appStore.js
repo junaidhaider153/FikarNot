@@ -11,6 +11,7 @@ let state = {
   users: [],
   orders: [],
   cart: [],
+  wishlist: [],
   session: null,
   toast: null,
 };
@@ -64,6 +65,7 @@ export const appActions = {
         saveLS(STORAGE_KEYS.users, data.users);
         saveLS(STORAGE_KEYS.orders, data.orders);
         saveLS(STORAGE_KEYS.cart, []);
+        saveLS(STORAGE_KEYS.wishlist, []);
         saveLS(STORAGE_KEYS.seeded, true);
       } else {
         data = {
@@ -72,6 +74,7 @@ export const appActions = {
           users: loadLS(STORAGE_KEYS.users, []),
           orders: loadLS(STORAGE_KEYS.orders, []),
           cart: loadLS(STORAGE_KEYS.cart, []),
+          wishlist: loadLS(STORAGE_KEYS.wishlist, []),
         };
       }
 
@@ -127,6 +130,145 @@ export const appActions = {
     toast("Signed out");
   },
 
+  updateProfile(updates) {
+    if (!state.session) return false;
+    const name = (updates.name ?? state.session.name).trim();
+    const email = (updates.email ?? state.session.email).trim();
+    if (name.length < 2) {
+      toast("Name must be at least 2 characters", "err");
+      return false;
+    }
+    if (!email || !email.includes("@")) {
+      toast("Enter a valid email address", "err");
+      return false;
+    }
+    const duplicate = state.users.find((user) => user.id !== state.session.id && user.email.toLowerCase() === email.toLowerCase());
+    if (duplicate) {
+      toast("That email is already in use", "err");
+      return false;
+    }
+    const previousEmail = state.session.email.toLowerCase();
+    const users = state.users.map((user) => user.id === state.session.id ? { ...user, name, email } : user);
+    const orders = state.orders.map((order) => {
+      if (order.customer?.email?.toLowerCase() !== previousEmail) return order;
+      return { ...order, customer: { ...order.customer, name, email } };
+    });
+    const session = users.find((user) => user.id === state.session.id);
+    setState({ users, orders, session });
+    saveLS(STORAGE_KEYS.users, users);
+    saveLS(STORAGE_KEYS.orders, orders);
+    saveLS(STORAGE_KEYS.session, session);
+    toast("Profile updated");
+    return true;
+  },
+
+  deleteAccount(currentPassword, confirmationText) {
+    if (!state.session) return false;
+    if (["admin", "editor"].includes(state.session.role)) {
+      toast("Staff accounts can't be deleted here", "err");
+      return false;
+    }
+    const currentUser = state.users.find((user) => user.id === state.session.id);
+    if (!currentUser || currentUser.password !== currentPassword) {
+      toast("Current password is incorrect", "err");
+      return false;
+    }
+    if (confirmationText !== "DELETE") {
+      toast('Type DELETE to confirm account removal', "err");
+      return false;
+    }
+
+    const accountEmail = state.session.email.toLowerCase();
+    const deletedAt = Date.now();
+    const users = state.users.filter((user) => user.id !== state.session.id);
+    const orders = state.orders.map((order) => {
+      if (order.customer?.email?.toLowerCase() !== accountEmail) return order;
+      return {
+        ...order,
+        customer: {
+          name: "Deleted Customer",
+          email: `deleted-${deletedAt}@fikarnot.local`,
+        },
+      };
+    });
+
+    setState({ users, orders, cart: [], wishlist: [], session: null });
+    saveLS(STORAGE_KEYS.users, users);
+    saveLS(STORAGE_KEYS.orders, orders);
+    saveLS(STORAGE_KEYS.cart, []);
+    saveLS(STORAGE_KEYS.wishlist, []);
+    saveLS(STORAGE_KEYS.session, null);
+    toast("Your account has been deleted");
+    return true;
+  },
+
+  changePassword(currentPassword, newPassword) {
+    if (!state.session) return false;
+    const currentUser = state.users.find((user) => user.id === state.session.id);
+    if (!currentUser || currentUser.password !== currentPassword) {
+      toast("Current password is incorrect", "err");
+      return false;
+    }
+    if (newPassword.length < 6) {
+      toast("New password must be at least 6 characters", "err");
+      return false;
+    }
+    const users = state.users.map((user) => user.id === state.session.id ? { ...user, password: newPassword } : user);
+    const session = users.find((user) => user.id === state.session.id);
+    setState({ users, session });
+    saveLS(STORAGE_KEYS.users, users);
+    saveLS(STORAGE_KEYS.session, session);
+    toast("Password updated");
+    return true;
+  },
+
+  saveAddress(address) {
+    if (!state.session) return false;
+    const users = state.users.map((user) => {
+      if (user.id !== state.session.id) return user;
+      const current = Array.isArray(user.addresses) ? user.addresses : [];
+      const clean = {
+        id: address.id || `a${uid()}`,
+        label: (address.label || "Home").trim(),
+        name: (address.name || user.name).trim(),
+        line1: (address.line1 || "").trim(),
+        city: (address.city || "").trim(),
+        region: (address.region || "").trim(),
+        postalCode: (address.postalCode || "").trim(),
+        country: (address.country || "").trim(),
+        isDefault: Boolean(address.isDefault),
+      };
+      let next = clean.id && current.some((item) => item.id === clean.id)
+        ? current.map((item) => item.id === clean.id ? clean : item)
+        : [...current, clean];
+      if (clean.isDefault) next = next.map((item) => ({ ...item, isDefault: item.id === clean.id }));
+      if (next.length === 1 && !next[0].isDefault) next = [{ ...next[0], isDefault: true }];
+      return { ...user, addresses: next };
+    });
+    const session = users.find((user) => user.id === state.session.id);
+    setState({ users, session });
+    saveLS(STORAGE_KEYS.users, users);
+    saveLS(STORAGE_KEYS.session, session);
+    toast(address.id ? "Address updated" : "Address saved");
+    return true;
+  },
+
+  deleteAddress(addressId) {
+    if (!state.session) return false;
+    const users = state.users.map((user) => {
+      if (user.id !== state.session.id) return user;
+      const next = (user.addresses || []).filter((address) => address.id !== addressId);
+      if (next.length && !next.some((address) => address.isDefault)) next[0] = { ...next[0], isDefault: true };
+      return { ...user, addresses: next };
+    });
+    const session = users.find((user) => user.id === state.session.id);
+    setState({ users, session });
+    saveLS(STORAGE_KEYS.users, users);
+    saveLS(STORAGE_KEYS.session, session);
+    toast("Address removed");
+    return true;
+  },
+
   addToCart(productId, qty = 1) {
     const product = state.products.find((item) => item.id === productId);
     if (!product) return;
@@ -164,6 +306,26 @@ export const appActions = {
     toast("Removed from cart");
   },
 
+  toggleWishlist(productId) {
+    const product = state.products.find((item) => item.id === productId);
+    if (!product) return false;
+    const exists = state.wishlist.includes(productId);
+    const wishlist = exists
+      ? state.wishlist.filter((id) => id !== productId)
+      : [productId, ...state.wishlist];
+    setState({ wishlist });
+    saveLS(STORAGE_KEYS.wishlist, wishlist);
+    toast(exists ? `${product.name} removed from wishlist` : `${product.name} added to wishlist`);
+    return !exists;
+  },
+
+  clearWishlist() {
+    if (!state.wishlist.length) return;
+    setState({ wishlist: [] });
+    saveLS(STORAGE_KEYS.wishlist, []);
+    toast("Wishlist cleared");
+  },
+
   upsertProduct(product) {
     const list = [...state.products];
     const index = list.findIndex((item) => item.id === product.id);
@@ -177,9 +339,11 @@ export const appActions = {
   deleteProduct(id) {
     const products = state.products.filter((product) => product.id !== id);
     const cart = state.cart.filter((line) => line.productId !== id);
-    setState({ products, cart });
+    const wishlist = state.wishlist.filter((productId) => productId !== id);
+    setState({ products, cart, wishlist });
     saveLS(STORAGE_KEYS.products, products);
     saveLS(STORAGE_KEYS.cart, cart);
+    saveLS(STORAGE_KEYS.wishlist, wishlist);
     toast("Product deleted");
   },
 
