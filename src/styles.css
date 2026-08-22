@@ -379,3 +379,112 @@ button,a,input,select,textarea{touch-action:manipulation}
   .detail-thumb{width:60px;height:60px}
   .image-lightbox{padding:20px}
 }
+
+
+/* Module 4.1 product-card hover gallery */
+.card-media{position:relative}
+.card-media .image-count{position:absolute;right:12px;bottom:12px;background:rgba(23,21,15,.82);color:#fff;border-radius:999px;padding:4px 8px;font:600 11px/1 'Space Grotesk';letter-spacing:.04em;pointer-events:none}
+
+/* ============================ module 5 · cart ============================= */
+.cart-page{padding:40px 0 56px}
+.cart-heading{display:flex;align-items:end;justify-content:space-between;gap:20px;margin-bottom:22px}
+.cart-heading-copy{color:var(--ink2);margin-top:5px}
+.cart-free-shipping{padding:16px 18px;background:#FBF9F4;border-bottom:1px solid var(--line)}
+.cart-free-head{display:flex;justify-content:space-between;gap:12px;font-size:13px;margin-bottom:8px}
+.cart-free-head span{font:700 12px 'Space Grotesk';color:var(--ink2)}
+.cart-free-shipping p{font-size:12px;color:var(--ink2);margin-top:7px}
+.cart-progress{height:7px;background:#E9E3D8;border-radius:999px;overflow:hidden}
+.cart-progress span{display:block;height:100%;background:var(--lime);border-radius:999px;transition:width .25s ease}
+.cart-item-list{display:flex;flex-direction:column}
+.cart-item{display:grid;grid-template-columns:88px minmax(0,1fr) auto;gap:16px;align-items:center;padding:18px 16px;border-bottom:1px solid var(--line)}
+.cart-item:last-child{border-bottom:none}
+.cart-item-media{width:88px;height:88px;border-radius:14px;background:#F2EEE4;overflow:hidden;position:relative;display:block}
+.cart-item-media img{width:100%;height:100%;object-fit:cover}
+.cart-item-image-count{position:absolute;right:7px;bottom:7px;background:rgba(23,21,15,.82);color:#fff;border-radius:999px;padding:4px 7px;font:600 10px/1 'Space Grotesk'}
+.cart-item-info{min-width:0;display:flex;flex-direction:column;gap:7px}
+.cart-item-name{font:700 16px 'Space Grotesk';text-decoration:none}
+.cart-item-name:hover{text-decoration:underline}
+.cart-item-category{font-size:12px;color:var(--ink2);margin-top:2px}
+.cart-item-meta{display:flex;gap:10px;align-items:center;flex-wrap:wrap;font-size:12px;color:var(--ink2)}
+.cart-stock-warning{font-size:12px;color:var(--err);font-weight:600}
+.cart-item-actions{display:flex;gap:12px;align-items:center;flex-wrap:wrap}
+.cart-remove{border:0;background:none;padding:4px 0;color:var(--ink2);font:600 12px 'Inter';cursor:pointer;display:inline-flex;align-items:center;gap:6px}
+.cart-remove:hover{color:var(--err)}
+.cart-item-total{align-self:start;padding-top:2px;white-space:nowrap}
+.cart-summary{min-width:0}
+.cart-summary-heading{display:flex;justify-content:space-between;align-items:baseline;gap:12px;margin-bottom:10px}
+.cart-summary-heading h2{font-size:18px}
+.cart-summary-heading span{font-size:12px;color:var(--ink2)}
+.cart-checkout-btn{width:100%;margin-top:16px;justify-content:space-between}
+.cart-checkout-btn>span:last-child{display:inline-flex;align-items:center;gap:7px}
+.cart-continue-btn{width:100%;margin-top:8px}
+.cart-trust{display:grid;gap:9px;margin-top:18px;padding-top:16px;border-top:1px solid var(--line)}
+.cart-trust div{display:flex;align-items:center;gap:8px;font-size:12px;color:var(--ink2)}
+.cart-trust svg{color:var(--ok);flex:none}
+@media(max-width:720px){
+  .cart-page{padding-top:28px}
+  .cart-heading{align-items:start;flex-direction:column}
+  .cart-heading .btn{align-self:flex-start}
+  .cart-item{grid-template-columns:68px minmax(0,1fr);gap:12px;padding:14px 12px}
+  .cart-item-media{width:68px;height:68px}
+  .cart-item-total{grid-column:2;justify-self:end;margin-top:-4px}
+  .cart-item-actions{gap:9px}
+  .cart-summary{padding:18px}
+}
+/* ============================ checkout v2 ================================= */
+.checkout-page{padding-bottom:40px}
+.checkout-head{display:flex;align-items:end;justify-content:space-between;gap:24px;padding:42px 0 8px}
+.checkout-title{margin-bottom:10px;max-width:14ch}
+.checkout-head .hero-sub{margin-bottom:0}
+.checkout-panel{margin-bottom:16px}
+.payment-methods{display:grid;grid-template-columns:1fr 1fr;gap:12px;margin-bottom:18px}
+.payment-option{display:grid;grid-template-columns:auto 1fr auto;align-items:center;gap:12px;text-align:left;padding:14px;border:1px solid var(--line);background:#fff;border-radius:14px;cursor:pointer;color:var(--ink);transition:.16s}
+.payment-option:hover{border-color:#cfc6b5;background:#fbf9f4}
+.payment-option.selected{border-color:var(--ink);box-shadow:0 0 0 2px var(--ink) inset;background:#fbf9f4}
+.payment-option span:nth-child(2){display:flex;flex-direction:column;gap:2px}
+.payment-option strong{font:700 14px 'Space Grotesk'}
+.payment-option small{color:var(--ink2);font-size:12px}
+.payment-icon{width:36px;height:36px;border-radius:10px;background:#f1ede2;display:grid;place-items:center}
+.payment-check{min-width:20px;height:20px;border-radius:50%;border:1px solid var(--line);display:grid;place-items:center;font-size:11px;font-weight:800}
+.payment-option.selected .payment-check{background:var(--lime);border-color:var(--lime)}
+.payment-fields{margin-top:4px}
+.cod-note{display:flex;align-items:center;gap:14px;background:#fbf9f4;border:1px dashed var(--line);border-radius:14px;padding:16px}
+.cod-note .empty-ic{width:44px;height:44px;margin:0;flex:none;background:#f1ede2}
+.cod-note strong{font:700 14px 'Space Grotesk'}
+.cod-note p{font-size:13px;color:var(--ink2);margin-top:3px}
+.checkout-security{display:flex;flex-wrap:wrap;gap:12px 18px;padding:4px 2px 12px;color:var(--ink2);font-size:12px}
+.checkout-security span{display:inline-flex;align-items:center;gap:6px}
+.checkout-submit{width:100%;justify-content:space-between;padding:14px 18px}
+.checkout-submit>span{display:inline-flex;align-items:center;gap:8px;font-family:'Space Grotesk'}
+.checkout-summary{padding:20px;top:86px}
+.checkout-summary-head{display:flex;justify-content:space-between;align-items:start;gap:12px;margin-bottom:12px}
+.checkout-summary-head h2{font-size:20px;margin-top:3px}
+.checkout-summary-head>a{font-size:13px;font-weight:700;color:var(--ink2)}
+.checkout-lines{display:flex;flex-direction:column;border-top:1px solid var(--line);margin-bottom:10px}
+.checkout-line{display:grid;grid-template-columns:52px 1fr auto;align-items:center;gap:10px;padding:12px 0;border-bottom:1px solid var(--line)}
+.checkout-line img{width:52px;height:52px;border-radius:10px;object-fit:cover;background:#f2eee4}
+.checkout-line div{min-width:0;display:flex;flex-direction:column;gap:2px}
+.checkout-line strong{font:700 13px 'Space Grotesk';white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.checkout-line span{font-size:12px;color:var(--ink2)}
+.checkout-line>b{font:700 13px 'Space Grotesk'}
+.order-confirmation-wrap{padding:55px 0}
+.order-confirmation{max-width:680px;margin:0 auto;padding:44px 36px}
+.confirmation-copy{color:var(--ink2);margin:10px auto 20px;max-width:52ch}
+.confirmation-grid{display:grid;grid-template-columns:repeat(3,1fr);gap:10px;margin:22px 0 14px}
+.confirmation-grid>div{padding:14px 10px;background:#fbf9f4;border:1px solid var(--line);border-radius:12px;display:flex;flex-direction:column;gap:3px}
+.confirmation-grid span,.confirmation-address span{font-size:11px;text-transform:uppercase;letter-spacing:.08em;color:var(--ink2);font-weight:600}
+.confirmation-grid strong{font:700 15px 'Space Grotesk';overflow-wrap:anywhere}
+.confirmation-address{display:flex;flex-direction:column;gap:5px;text-align:left;padding:15px 16px;background:#fbf9f4;border:1px solid var(--line);border-radius:12px}
+.confirmation-address strong{font-size:13px;line-height:1.5}
+.confirmation-actions{display:flex;justify-content:center;gap:10px;margin-top:22px;flex-wrap:wrap}
+@media(max-width:960px){
+  .checkout-head{align-items:start;flex-direction:column}
+  .checkout-summary{position:static}
+}
+@media(max-width:720px){
+  .payment-methods{grid-template-columns:1fr}
+  .checkout-page{padding-bottom:20px}
+  .checkout-head{padding-top:28px}
+  .confirmation-grid{grid-template-columns:1fr}
+  .order-confirmation{padding:36px 22px}
+}

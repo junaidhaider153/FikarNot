@@ -251,7 +251,7 @@ export const appActions = {
   },
 
   placeOrder(customer) {
-    const items = cartLines().map(({ p, qty }) => ({ productId: p.id, name: p.name, price: p.price, qty }));
+    const items = cartLines().map(({ p, qty }) => ({ productId: p.id, name: p.name, price: p.price, qty: Math.min(qty, p.stock) })).filter((item) => item.qty > 0);
     const subtotal = +items.reduce((sum, item) => sum + item.price * item.qty, 0).toFixed(2);
     const shipping = subtotal >= 75 ? 0 : 6.95;
     const order = { id: `o${uid()}`, customer, items, subtotal, shipping, total: +(subtotal + shipping).toFixed(2), status: "paid", createdAt: Date.now() };

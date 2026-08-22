@@ -2,40 +2,88 @@ import { Link } from "react-router-dom";
 import { useApp, appActions, cartLines } from "../store/appStore";
 import { fmt } from "../utils/helpers";
 import { Ic } from "../components/icons";
-import { Empty, Qty } from "../components/common";
+import { Empty } from "../components/common";
+import { CartItem } from "../components/CartItem";
+import { getCartSummary } from "../utils/cart";
 
 export default function CartPage() {
-  const s = useApp();
-  const lines = cartLines(s);
-  const subtotal = +lines.reduce((t, l) => t + l.p.price * l.qty, 0).toFixed(2);
-  const shipping = subtotal === 0 ? 0 : subtotal >= 75 ? 0 : 6.95;
-  if (lines.length === 0) return <div className="container" style={{ padding: "60px 24px" }}><Empty icon="cart" title="Your cart is empty" sub="Fill it with objects you'll actually use." cta={<Link className="btn btn-dark" to="/products">Browse the shop</Link>} /></div>;
-  return (
-    <div className="container cart-layout">
-      <div className="cart-lines">
-        {lines.map((l) => (
-          <div className="line" key={l.p.id}>
-            <img src={l.p.image} alt={l.p.name} />
-            <div className="line-info">
-              <h4><Link to={`/product/${l.p.id}`} style={{ textDecoration: "none" }}>{l.p.name}</Link></h4>
-              <p>{fmt(l.p.price)} each</p>
-            </div>
-            <Qty value={l.qty} set={(v) => appActions.setCartQty(l.p.id, v)} max={Math.max(1, l.p.stock)} />
-            <span className="price" style={{ width: 84, textAlign: "right" }}>{fmt(l.p.price * l.qty)}</span>
-            <button className="icon-btn" aria-label={`Remove ${l.p.name}`} onClick={() => appActions.removeFromCart(l.p.id)}><Ic n="trash" s={15} /></button>
+  const state = useApp();
+  const rawLines = cartLines(state);
+  const summary = getCartSummary(rawLines);
+
+  if (summary.lines.length === 0) {
+    return (
+      <div className="container cart-page">
+        <div className="cart-heading">
+          <div>
+            <p className="eyebrow">Shopping bag</p>
+            <h1 className="sec-title display">Your bag is waiting.</h1>
           </div>
-        ))}
+        </div>
+        <Empty
+          icon="cart"
+          title="Your cart is empty"
+          sub="Find something useful, beautiful, or both."
+          cta={<Link className="btn btn-dark" to="/products">Browse the shop <Ic n="arrow" s={15} /></Link>}
+        />
       </div>
-      <aside className="summary">
-        <h3 className="display">Order summary</h3>
-        <div className="sum-row"><span>Subtotal</span><span>{fmt(subtotal)}</span></div>
-        <div className="sum-row"><span>Shipping</span><span>{shipping === 0 ? "Free" : fmt(shipping)}</span></div>
-        {shipping === 0 && <div className="free-note">You unlocked free shipping ✦</div>}
-        <div className="sum-row total"><span>Total</span><span>{fmt(+(subtotal + shipping).toFixed(2))}</span></div>
-        <Link className="btn btn-lime" style={{ width: "100%", marginTop: 16 }} to="/checkout">Checkout <Ic n="arrow" s={15} /></Link>
-        <Link className="btn btn-ghost" style={{ width: "100%", marginTop: 8 }} to="/products">Continue shopping</Link>
-      </aside>
+    );
+  }
+
+  const clearCart = () => {
+    if (window.confirm("Clear all items from your cart?")) {
+      summary.lines.forEach(({ p }) => appActions.setCartQty(p.id, 0));
+      appActions.toast("Cart cleared");
+    }
+  };
+
+  return (
+    <div className="container cart-page">
+      <div className="cart-heading">
+        <div>
+          <p className="eyebrow">Shopping bag</p>
+          <h1 className="sec-title display">Your cart</h1>
+          <p className="cart-heading-copy">{summary.itemCount} {summary.itemCount === 1 ? "item" : "items"} ready for checkout.</p>
+        </div>
+        <button className="btn btn-ghost btn-sm" type="button" onClick={clearCart}>
+          <Ic n="trash" s={14} /> Clear cart
+        </button>
+      </div>
+
+      <div className="cart-layout">
+        <section className="cart-lines" aria-label="Cart items">
+          <div className="cart-free-shipping">
+            <div className="cart-free-head">
+              <strong>{summary.freeShippingUnlocked ? "Free shipping unlocked" : `You're ${fmt(summary.amountToFreeShipping)} away from free shipping`}</strong>
+              <span>{summary.freeShippingUnlocked ? "✓" : `${summary.progress}%`}</span>
+            </div>
+            <div className="cart-progress" aria-hidden="true"><span style={{ width: `${summary.progress}%` }} /></div>
+            <p>{summary.freeShippingUnlocked ? "Nice choice. Your order qualifies for free standard shipping." : "Spend $75 or more and standard shipping is free."}</p>
+          </div>
+
+          <div className="cart-item-list">
+            {summary.lines.map((line) => <CartItem key={line.p.id} line={line} />)}
+          </div>
+        </section>
+
+        <aside className="summary cart-summary">
+          <div className="cart-summary-heading">
+            <h2 className="display">Order summary</h2>
+            <span>{summary.itemCount} {summary.itemCount === 1 ? "item" : "items"}</span>
+          </div>
+          <div className="sum-row"><span>Subtotal</span><span>{fmt(summary.subtotal)}</span></div>
+          <div className="sum-row"><span>Shipping</span><span>{summary.shipping === 0 ? "Free" : fmt(summary.shipping)}</span></div>
+          {summary.freeShippingUnlocked && <div className="free-note">You unlocked free shipping ✦</div>}
+          <div className="sum-row total"><span>Total</span><span>{fmt(summary.total)}</span></div>
+          <Link className="btn btn-lime cart-checkout-btn" to="/checkout"><span>Checkout</span><span>{fmt(summary.total)} <Ic n="arrow" s={15} /></span></Link>
+          <Link className="btn btn-ghost cart-continue-btn" to="/products">Continue shopping</Link>
+          <div className="cart-trust">
+            <div><Ic n="shield" s={15} /> Secure checkout</div>
+            <div><Ic n="truck" s={15} /> Free shipping over $75</div>
+            <div><Ic n="check" s={15} /> 30-day returns</div>
+          </div>
+        </aside>
+      </div>
     </div>
   );
 }
-

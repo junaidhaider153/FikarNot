@@ -13,7 +13,7 @@ import { ProtectedRoute } from "./ProtectedRoute";
 export function Boot() {
   return (
     <div className="boot" role="status" aria-live="polite">
-      <span className="logo-mark display">K</span>
+      <span className="logo-mark display">F</span>
       <p style={{ color: "var(--ink2)", fontWeight: 600 }}>Loading the shop…</p>
     </div>
   );

@@ -159,7 +159,7 @@ export function ProductsTab() {
   useEffect(() => {
     const editId = query.get("edit");
     if (editId) {
-      const p = state.products.find((x) => x.id === editId);
+      const p = s.products.find((x) => x.id === editId);
       if (p) setEditing(p);
       navigate("/admin/products");
     }

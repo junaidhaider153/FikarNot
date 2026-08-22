@@ -1,5 +1,5 @@
-import { useNavigate } from "react-router-dom";
-import { Link } from "react-router-dom";
+import { useEffect, useMemo, useState } from "react";
+import { useNavigate, Link } from "react-router-dom";
 import { useApp, appActions } from "../store/appStore";
 import { fmt } from "../utils/helpers";
 import { Ic } from "./icons";
@@ -10,16 +10,70 @@ export function ProductCard({ p }) {
   const cat = s.categories.find((c) => c.id === p.categoryId);
   const canEdit = s.session && ["admin", "editor"].includes(s.session.role);
   const navigate = useNavigate();
+  const images = useMemo(() => {
+    const list = Array.isArray(p.images) && p.images.length ? p.images : [p.image];
+    return [...new Set(list.filter(Boolean))];
+  }, [p.images, p.image]);
+  const [activeImage, setActiveImage] = useState(0);
+  const [hovered, setHovered] = useState(false);
+
+  useEffect(() => {
+    setActiveImage(0);
+  }, [p.id]);
+
+  useEffect(() => {
+    if (!hovered || images.length <= 1) return undefined;
+    const timer = window.setInterval(() => {
+      setActiveImage((current) => (current + 1) % images.length);
+    }, 900);
+    return () => window.clearInterval(timer);
+  }, [hovered, images.length]);
+
+  const image = images[activeImage] || images[0];
+
   return (
-    <article className="card">
+    <article
+      className="card"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => { setHovered(false); setActiveImage(0); }}
+    >
       <div className="card-media">
-        <Link to={`/product/${p.id}`} aria-label={p.name}><img className="card-img" src={p.image} alt={p.name} loading="lazy" /></Link>
+        <Link to={`/product/${p.id}`} aria-label={p.name}>
+          <img className="card-img" src={image} alt={p.name} loading="lazy" />
+        </Link>
         {cat && <Link className="card-cat" to={`/products?cat=${cat.id}`}>{cat.name}</Link>}
         {canEdit && (
           <div className="card-admin">
-            <button className="icon-btn" aria-label={`Edit ${p.name}`} title="Edit" onClick={() => navigate(`/admin/products?edit=${p.id}`)}><Ic n="edit" s={14} /></button>
-            <button className="icon-btn" aria-label={`Delete ${p.name}`} title="Delete" onClick={() => { if (window.confirm(`Delete ${p.name}?`)) appActions.deleteProduct(p.id); }}><Ic n="trash" s={14} /></button>
+            <button
+              className="icon-btn"
+              aria-label={`Edit ${p.name}`}
+              title="Edit"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                navigate(`/admin/products?edit=${p.id}`);
+              }}
+            >
+              <Ic n="edit" s={14} />
+            </button>
+            <button
+              className="icon-btn"
+              aria-label={`Delete ${p.name}`}
+              title="Delete"
+              onClick={(event) => {
+                event.preventDefault();
+                event.stopPropagation();
+                if (window.confirm(`Delete ${p.name}?`)) appActions.deleteProduct(p.id);
+              }}
+            >
+              <Ic n="trash" s={14} />
+            </button>
           </div>
+        )}
+        {images.length > 1 && (
+          <span className="image-count" aria-label={`${images.length} product images`}>
+            {activeImage + 1}/{images.length}
+          </span>
         )}
       </div>
       <div className="card-body">
@@ -33,5 +87,3 @@ export function ProductCard({ p }) {
     </article>
   );
 }
-
-/* ============================ pages ====================================== */
