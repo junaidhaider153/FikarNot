@@ -36,9 +36,9 @@ export default function LoginPage() {
   };
 
   const demo = [
-    { label: "Admin", e: "admin@kiosk.shop", p: "admin123" },
-    { label: "Editor", e: "editor@kiosk.shop", p: "editor123" },
-    { label: "Customer", e: "maya@kiosk.shop", p: "maya123" },
+    { label: "Admin", e: "junaid@fikarnot.shop", p: "admin123" },
+    { label: "Editor", e: "editor@fikarnot.shop", p: "editor123" },
+    { label: "Customer", e: "urwa@fikarnot.shop", p: "maya123" },
   ];
 
   return (

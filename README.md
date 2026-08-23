@@ -62,3 +62,7 @@ Added protected customer accounts with profile management, order history, saved 
 
 ## Module 8
 Added persistent wishlist functionality across product cards, product details, customer account, and a dedicated wishlist page.
+
+
+## Module 14
+Inventory management now includes SKUs, configurable low-stock thresholds, quick stock adjustments, inventory KPIs, and a recent inventory activity log.

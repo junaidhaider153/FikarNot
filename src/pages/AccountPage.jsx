@@ -16,6 +16,30 @@ function StatusPill({ status }) {
   return <span className={`account-status ${status}`}>{status}</span>;
 }
 
+const ORDER_STEPS = [
+  { key: "paid", label: "Order placed", note: "Your order has been received." },
+  { key: "processing", label: "Processing", note: "FikarNot is preparing your order." },
+  { key: "shipped", label: "Shipped", note: "Your order is on the way." },
+  { key: "delivered", label: "Delivered", note: "Your order has been delivered." },
+];
+
+function OrderProgress({ status }) {
+  if (status === "cancelled") {
+    return <div className="order-progress cancelled-progress"><div className="order-progress-step active"><span className="step-n">!</span><div><strong>Order cancelled</strong><p>This order was cancelled.</p></div></div></div>;
+  }
+  const currentIndex = Math.max(0, ORDER_STEPS.findIndex((step) => step.key === status));
+  return (
+    <div className="order-progress" aria-label={`Order status: ${status}`}>
+      {ORDER_STEPS.map((step, index) => (
+        <div className={`order-progress-step ${index <= currentIndex ? "active" : ""}`} key={step.key}>
+          <span className="step-n">{index < currentIndex ? "✓" : index + 1}</span>
+          <div><strong>{step.label}</strong><p>{step.note}</p></div>
+        </div>
+      ))}
+    </div>
+  );
+}
+
 export default function AccountPage() {
   const s = useApp();
   const navigate = useNavigate();
@@ -31,7 +55,7 @@ export default function AccountPage() {
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deleteBusy, setDeleteBusy] = useState(false);
 
-  const orders = useMemo(() => s.orders.filter((order) => order.customer?.email?.toLowerCase() === user?.email?.toLowerCase()), [s.orders, user?.email]);
+  const orders = useMemo(() => s.orders.filter((order) => order.customer?.userId === user?.id || (!order.customer?.userId && order.customer?.email?.toLowerCase() === user?.email?.toLowerCase())), [s.orders, user?.id, user?.email]);
   const addresses = Array.isArray(user?.addresses) ? user.addresses : [];
   const totalSpent = orders.reduce((sum, order) => sum + order.total, 0);
 
@@ -165,7 +189,7 @@ export default function AccountPage() {
         {tab === "orders" && (
           <>
             <div className="account-heading"><div><p className="eyebrow">Purchase history</p><h1 className="sec-title display">Your orders</h1><p>Every order placed from this account appears here.</p></div></div>
-            {orders.length === 0 ? <Empty icon="cart" title="No orders yet" sub="Your completed orders will appear here." cta={<Link className="btn btn-dark" to="/products">Start shopping</Link>} /> : <div className="account-order-list">{orders.map((order) => <details key={order.id} className="order-card"><summary><div><strong>#{order.id}</strong><span>{formatDate(order.createdAt)}</span></div><div><StatusPill status={order.status} /><b>{fmt(order.total)}</b></div></summary><div className="order-body"><div className="order-items">{order.items.map((item) => <div key={item.productId} className="order-item"><span>{item.qty} × {item.name}</span><b>{fmt(item.price * item.qty)}</b></div>)}</div><div className="sum-row"><span>Shipping</span><span>{order.shipping === 0 ? "Free" : fmt(order.shipping)}</span></div><div className="sum-row total"><span>Total</span><span>{fmt(order.total)}</span></div></div></details>)}</div>}
+            {orders.length === 0 ? <Empty icon="cart" title="No orders yet" sub="Your completed orders will appear here." cta={<Link className="btn btn-dark" to="/products">Start shopping</Link>} /> : <div className="account-order-list">{orders.map((order) => <details key={order.id} className="order-card"><summary><div><strong>#{order.id}</strong><span>{formatDate(order.createdAt)}</span></div><div><StatusPill status={order.status} /><b>{fmt(order.total)}</b></div></summary><div className="order-body"><OrderProgress status={order.status} /><div className="order-items">{order.items.map((item) => <div key={item.productId} className="order-item"><span>{item.qty} × {item.name}</span><b>{fmt(item.price * item.qty)}</b></div>)}</div><div className="sum-row"><span>Shipping</span><span>{order.shipping === 0 ? "Free" : fmt(order.shipping)}</span></div><div className="sum-row total"><span>Total</span><span>{fmt(order.total)}</span></div>{order.customer?.email && <p className="account-note" style={{ marginTop: 12 }}><Ic n="check" s={15} /> Updates for this order are associated with <b>{order.customer.email}</b>.</p>}</div></details>)}</div>}
           </>
         )}
 

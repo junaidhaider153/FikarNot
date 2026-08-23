@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from "react";
-import { useNavigate, Link } from "react-router-dom";
+import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useApp, appActions } from "../store/appStore";
 import { fmt } from "../utils/helpers";
 import { Ic } from "./icons";
@@ -11,6 +11,7 @@ export function ProductCard({ p }) {
   const canEdit = s.session && ["admin", "editor"].includes(s.session.role);
   const isWishlisted = s.wishlist.includes(p.id);
   const navigate = useNavigate();
+  const location = useLocation();
   const images = useMemo(() => {
     const list = Array.isArray(p.images) && p.images.length ? p.images : [p.image];
     return [...new Set(list.filter(Boolean))];
@@ -52,6 +53,10 @@ export function ProductCard({ p }) {
           onClick={(event) => {
             event.preventDefault();
             event.stopPropagation();
+            if (!s.session) {
+              navigate(`/login?redirect=${encodeURIComponent(`${location.pathname}${location.search}`)}`);
+              return;
+            }
             appActions.toggleWishlist(p.id);
           }}
         >
@@ -93,7 +98,7 @@ export function ProductCard({ p }) {
       </div>
       <div className="card-body">
         <Link className="card-name" to={`/product/${p.id}`}>{p.name}</Link>
-        <div className="card-meta"><Stars v={p.rating} /><span>{p.rating.toFixed(1)}</span>{p.stock === 0 && <span className="low">Out of stock</span>}{p.stock > 0 && p.stock < 10 && <span className="low">Only {p.stock} left</span>}</div>
+        <div className="card-meta"><Stars v={p.rating} /><span>{p.rating.toFixed(1)}</span>{p.stock === 0 && <span className="low">Out of stock</span>}{p.stock > 0 && p.stock <= (p.stockThreshold ?? 10) && <span className="low">Only {p.stock} left</span>}</div>
         <div className="card-foot">
           <span className="price">{fmt(p.price)}</span>
           <button className="btn btn-dark btn-sm" disabled={p.stock === 0} onClick={() => appActions.addToCart(p.id)}><Ic n="cart" s={14} /> Add</button>

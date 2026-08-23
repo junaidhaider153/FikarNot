@@ -19,6 +19,9 @@ const INITIAL_FORM = {
 export default function CheckoutPage() {
   const s = useApp();
   const lines = cartLines(s);
+  const [guestUnlocked, setGuestUnlocked] = useState(Boolean(s.session));
+  const [guestEmail, setGuestEmail] = useState("");
+  const [guestEmailError, setGuestEmailError] = useState("");
   const [form, setForm] = useState(() => ({
     ...INITIAL_FORM,
     name: s.session?.name || "",
@@ -32,13 +35,24 @@ export default function CheckoutPage() {
   const totals = useMemo(() => {
     const subtotal = +lines.reduce((total, line) => total + line.p.price * line.qty, 0).toFixed(2);
     const shipping = subtotal === 0 ? 0 : subtotal >= 75 ? 0 : 6.95;
-    const total = +(subtotal + shipping).toFixed(2);
-    return { subtotal, shipping, total };
+    return { subtotal, shipping, total: +(subtotal + shipping).toFixed(2) };
   }, [lines]);
 
   const set = (key) => (event) => {
     setForm((current) => ({ ...current, [key]: event.target.value }));
     if (errs[key]) setErrs((current) => ({ ...current, [key]: "" }));
+  };
+
+  const continueAsGuest = (event) => {
+    event.preventDefault();
+    const email = guestEmail.trim();
+    if (!/.+@.+\..+/.test(email)) {
+      setGuestEmailError("Enter a valid email so we can send your order confirmation.");
+      return;
+    }
+    setGuestEmailError("");
+    setForm((current) => ({ ...current, email }));
+    setGuestUnlocked(true);
   };
 
   const validate = () => {
@@ -77,6 +91,10 @@ export default function CheckoutPage() {
     });
 
     setBusy(false);
+    if (!order?.id) {
+      appActions.toast("We couldn't create the order. Please try again.", "err");
+      return;
+    }
     setPlaced(order);
   };
 
@@ -85,12 +103,58 @@ export default function CheckoutPage() {
   if (lines.length === 0) {
     return (
       <div className="container" style={{ padding: "60px 24px" }}>
-        <Empty
-          icon="cart"
-          title="Nothing to check out"
-          sub="Your shopping bag is empty. Add something you love first."
-          cta={<Link className="btn btn-dark" to="/products">Go to shop</Link>}
-        />
+        <Empty icon="cart" title="Nothing to check out" sub="Your shopping bag is empty. Add something you love first." cta={<Link className="btn btn-dark" to="/products">Go to shop</Link>} />
+      </div>
+    );
+  }
+
+  if (!s.session && !guestUnlocked) {
+    return (
+      <div className="container checkout-page">
+        <div className="checkout-head">
+          <div>
+            <p className="eyebrow">Checkout</p>
+            <h1 className="h1 checkout-title">One quick step first.</h1>
+            <p className="hero-sub">Sign in for a faster checkout, or continue as a guest with your email address.</p>
+          </div>
+          <Link className="btn btn-ghost" to="/cart"><Ic n="arrow" s={15} /> Back to cart</Link>
+        </div>
+
+        <div className="checkout-grid">
+          <section className="panel checkout-panel">
+            <div className="checkout-access-card">
+              <span className="step-n"><Ic n="mail" s={14} /></span>
+              <div>
+                <h3 className="display">Continue as guest</h3>
+                <p>We need your email to send your order confirmation and keep you updated.</p>
+              </div>
+            </div>
+            <form onSubmit={continueAsGuest} style={{ marginTop: 20 }}>
+              <label className="lbl" htmlFor="guest-email">Email address</label>
+              <input id="guest-email" className="input" type="email" value={guestEmail} onChange={(event) => { setGuestEmail(event.target.value); setGuestEmailError(""); }} autoComplete="email" placeholder="you@example.com" autoFocus />
+              {guestEmailError && <p className="f-err" role="alert">{guestEmailError}</p>}
+              <button className="btn btn-lime" style={{ width: "100%", marginTop: 14 }} type="submit">Continue as guest <Ic n="arrow" s={15} /></button>
+            </form>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "18px 0", color: "var(--ink2)", fontSize: 13 }}><span style={{ height: 1, flex: 1, background: "var(--line)" }} /><span>or</span><span style={{ height: 1, flex: 1, background: "var(--line)" }} /></div>
+            <Link className="btn btn-dark" style={{ width: "100%" }} to={`/login?redirect=${encodeURIComponent("/checkout")}`}>Sign in to checkout <Ic n="arrow" s={15} /></Link>
+          </section>
+
+          <aside className="summary checkout-summary">
+            <div className="checkout-summary-head"><div><span className="eyebrow">Your bag</span><h2 className="display">Order summary</h2></div><Link to="/cart">Edit</Link></div>
+            <div className="checkout-lines">
+              {lines.map((line) => (
+                <div className="checkout-line" key={line.p.id}>
+                  <img src={line.p.images?.[0] || line.p.image} alt="" />
+                  <div><strong>{line.p.name}</strong><span>Qty {line.qty}</span></div>
+                  <b>{fmt(line.p.price * line.qty)}</b>
+                </div>
+              ))}
+            </div>
+            <div className="sum-row"><span>Subtotal</span><span>{fmt(totals.subtotal)}</span></div>
+            <div className="sum-row"><span>Shipping</span><span>{totals.shipping === 0 ? "Free" : fmt(totals.shipping)}</span></div>
+            <div className="sum-row total"><span>Total</span><span>{fmt(totals.total)}</span></div>
+          </aside>
+        </div>
       </div>
     );
   }
@@ -120,8 +184,9 @@ export default function CheckoutPage() {
               </div>
               <div>
                 <label className="lbl" htmlFor="f-email">Email</label>
-                <input id="f-email" className="input" type="email" value={form.email} onChange={set("email")} autoComplete="email" />
+                <input id="f-email" className="input" type="email" value={form.email} onChange={set("email")} autoComplete="email" readOnly={Boolean(s.session)} />
                 {errs.email && <p className="f-err">{errs.email}</p>}
+                <p style={{ marginTop: 5, fontSize: 12, color: "var(--ink2)" }}>{s.session ? "Signed in — this email is linked to your account." : "We'll use this email for your order confirmation."}</p>
               </div>
               <div className="f-full">
                 <label className="lbl" htmlFor="f-addr">Address</label>
@@ -183,7 +248,7 @@ export default function CheckoutPage() {
           </section>
 
           <div className="checkout-security">
-            <span><Ic n="shield" s={15} /> Your details stay in this demo browser</span>
+            <span><Ic n="mail" s={15} /> Confirmation will be associated with {form.email}</span>
             <span><Ic n="check" s={15} /> Stock checked before order creation</span>
           </div>
 
@@ -233,10 +298,11 @@ function OrderConfirmation({ order }) {
         </div>
 
         <div className="confirmation-address"><span>Deliver to</span><strong>{order.customer.address}</strong></div>
+        <div className="confirmation-address"><span>Confirmation email</span><strong>{order.customer.email}</strong></div>
 
         <div className="confirmation-actions">
           <Link className="btn btn-dark" to="/products">Keep shopping</Link>
-          <Link className="btn btn-ghost" to="/">Back home</Link>
+          <Link className="btn btn-ghost" to="/account">View account</Link>
         </div>
       </div>
     </div>

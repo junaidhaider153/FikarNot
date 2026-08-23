@@ -547,6 +547,7 @@ button,a,input,select,textarea{touch-action:manipulation}
 .account-note{display:flex;align-items:center;gap:8px;background:#F1EDE2;border-radius:10px;padding:10px 12px;font-size:13px;color:var(--ink2)}
 .account-status{display:inline-flex;align-items:center;border-radius:999px;padding:4px 10px;font:600 11px 'Space Grotesk';letter-spacing:.04em;text-transform:capitalize;background:#F1EDE2;color:var(--ink2)}
 .account-status.paid{background:#EDF7EE;color:var(--ok)}
+.account-status.processing{background:#FFF2D6;color:#8A5A00}
 .account-status.shipped{background:#E4E9FF;color:#3C4FC3}
 .account-status.delivered{background:#EDF7EE;color:var(--ok)}
 .account-status.cancelled{background:#FBE8E2;color:var(--err)}
@@ -559,6 +560,13 @@ button,a,input,select,textarea{touch-action:manipulation}
 .order-card summary span:not(.account-status){font-size:12px;color:var(--ink2)}
 .order-card summary b{font:700 15px 'Space Grotesk'}
 .order-body{border-top:1px solid var(--line);padding:16px 18px}
+.order-progress{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;padding:14px 0 18px;margin-bottom:12px;border-bottom:1px solid var(--line)}
+.order-progress-step{display:flex;gap:9px;align-items:flex-start;min-width:0;opacity:.45}
+.order-progress-step.active{opacity:1}
+.order-progress-step .step-n{margin-top:1px;width:25px;height:25px;border-radius:8px;flex:none}
+.order-progress-step strong{display:block;font:700 13px 'Space Grotesk'}
+.order-progress-step p{font-size:11px;color:var(--ink2);margin-top:2px}
+.cancelled-progress{grid-template-columns:1fr}
 .order-items{margin-bottom:8px}
 .order-item{display:flex;justify-content:space-between;gap:12px;padding:6px 0;font-size:13px}
 .address-grid{display:grid;grid-template-columns:repeat(2,1fr);gap:14px}
@@ -596,3 +604,63 @@ button,a,input,select,textarea{touch-action:manipulation}
 .delete-account-warning .empty-ic{background:#FBE8E2;color:var(--err);margin-bottom:10px}
 .delete-account-warning h3{font-size:20px}
 .delete-account-warning p{color:var(--ink2);font-size:13px;margin-top:6px}
+
+.checkout-access-card{display:flex;align-items:flex-start;gap:14px;padding:16px;background:#F7F4EC;border:1px solid var(--line);border-radius:14px}
+.checkout-access-card h3{margin:0 0 4px;font:700 18px 'Space Grotesk'}
+.checkout-access-card p{margin:0;color:var(--ink2);font-size:13.5px}
+
+/* Module 11 — reviews */
+.review-section{margin-top:8px}
+.review-summary-grid{display:grid;grid-template-columns:220px 1fr;gap:24px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:22px}
+.review-score-card{display:flex;flex-direction:column;align-items:flex-start;justify-content:center;gap:8px}
+.review-score-card strong{font:700 44px/1 'Space Grotesk'}
+.review-score-card>span{font-size:12px;color:var(--ink2)}
+.review-bars{display:flex;flex-direction:column;justify-content:center;gap:8px}
+.review-bar{display:grid;grid-template-columns:38px 1fr 24px;align-items:center;gap:10px;font-size:12px;color:var(--ink2)}
+.review-bar>div{height:8px;background:#eee8dc;border-radius:99px;overflow:hidden}
+.review-bar>div>span{display:block;height:100%;background:var(--ink);border-radius:99px}
+.review-bar b{text-align:right;font-size:11px}
+.review-list{display:grid;gap:12px;margin-top:14px}
+.review-card{background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:18px}
+.review-card-top{display:flex;justify-content:space-between;gap:16px}
+.review-card-top>div:first-child{min-width:0}
+.review-card-top strong{font:700 15px 'Space Grotesk'}
+.review-card-top time{font-size:12px;color:var(--ink2);white-space:nowrap}
+.review-card p{margin:10px 0 12px;color:var(--ink2)}
+.review-meta{display:flex;align-items:center;gap:8px;flex-wrap:wrap;margin-top:5px;font-size:12px;color:var(--ink2)}
+.verified-review{background:#edf7ee;color:var(--ok);padding:3px 8px;border-radius:999px;font-weight:700}
+.review-star-picker{display:flex;gap:4px}
+.review-star-picker button{border:0;background:none;cursor:pointer;padding:4px;color:#ddd6c7}
+.review-star-picker button.active{color:#e9a13b}
+@media(max-width:720px){
+  .review-summary-grid{grid-template-columns:1fr}
+  .review-card-top{flex-direction:column}
+}
+
+/* Module 14 — inventory */
+.inventory-toolbar{margin-top:14px}
+.inventory-filter{width:190px}
+.inventory-stats .stat{min-height:130px}
+.sku-pill{display:inline-flex;align-items:center;padding:4px 8px;border-radius:8px;background:#F1EDE2;color:var(--ink2);font:600 11px 'Space Grotesk';letter-spacing:.04em}
+.inventory-status{display:inline-flex;align-items:center;padding:5px 10px;border-radius:999px;font:600 11px 'Space Grotesk'}
+.inventory-status.healthy{background:#EDF7EE;color:var(--ok)}
+.inventory-status.low{background:#FFF3E2;color:#9A5B00}
+.inventory-status.out{background:#FBE8E2;color:var(--err)}
+.inventory-log-card{margin-top:22px;background:var(--surface);border:1px solid var(--line);border-radius:var(--r);padding:20px}
+.inventory-log{display:grid;gap:0;border-top:1px solid var(--line)}
+.inventory-log-row{display:grid;grid-template-columns:minmax(0,1fr) auto minmax(160px,auto);gap:18px;align-items:center;padding:13px 0;border-bottom:1px solid var(--line)}
+.inventory-log-row>div:first-child{display:flex;flex-direction:column;gap:2px;min-width:0}
+.inventory-log-row span{font-size:12px;color:var(--ink2)}
+.inventory-log-row time{font-size:12px;color:var(--ink2);text-align:right}
+.inventory-plus,.inventory-minus{font:700 14px 'Space Grotesk'}
+.inventory-plus{color:var(--ok)}
+.inventory-minus{color:var(--err)}
+.stock-adjust-preview{display:grid;grid-template-columns:1fr auto;gap:4px 12px;padding:14px;background:#F7F3EA;border:1px solid var(--line);border-radius:14px}
+.stock-adjust-preview strong{font:700 28px 'Space Grotesk';grid-row:span 2;align-self:center}
+.stock-adjust-preview span:last-child{font-size:12px;color:var(--ink2)}
+.quick-adjusts{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+@media(max-width:720px){
+ .inventory-filter{width:100%}
+ .inventory-log-row{grid-template-columns:1fr auto}
+ .inventory-log-row time{grid-column:1/-1;text-align:left}
+}

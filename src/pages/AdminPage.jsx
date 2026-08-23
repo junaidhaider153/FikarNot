@@ -5,14 +5,14 @@ import { useApp, appActions } from "../store/appStore";
 import { GALLERY, SWATCHES } from "../assets/assets";
 import { fmt, uid } from "../utils/helpers";
 import { Ic } from "../components/icons";
-import { Modal, Empty } from "../components/common";
+import { Modal, Empty, Stars } from "../components/common";
 import { ImageUploader } from "../components/ImageUploader";
 
 export function ProductEditor({ initial, onClose }) {
   const s = useApp();
   const [f, setF] = useState(() => ({
     name: initial?.name || "", categoryId: initial?.categoryId || s.categories[0]?.id || "",
-    price: initial?.price ?? "", stock: initial?.stock ?? "", rating: initial?.rating ?? 4.5,
+    sku: initial?.sku || "", price: initial?.price ?? "", stock: initial?.stock ?? "", stockThreshold: initial?.stockThreshold ?? 10, rating: initial?.rating ?? 4.5,
     description: initial?.description || "", images: initial?.images?.length ? initial.images : [initial?.image || GALLERY[0][1]],
     tags: (initial?.tags || []).join(", "), featured: initial?.featured || false,
   }));
@@ -21,27 +21,31 @@ export function ProductEditor({ initial, onClose }) {
     e.preventDefault();
     const er = {};
     if (!f.name.trim()) er.name = "Required";
+    if (!f.sku.trim()) er.sku = "Required";
     if (!(+f.price > 0)) er.price = "Must be > 0";
     if (f.stock === "" || +f.stock < 0) er.stock = "≥ 0";
+    if (f.stockThreshold === "" || +f.stockThreshold < 0) er.stockThreshold = "≥ 0";
     if (!f.categoryId) er.categoryId = "Required";
     setErrs(er); if (Object.keys(er).length) return;
-    appActions.upsertProduct({
-      id: initial?.id || "p" + uid(), name: f.name.trim(), categoryId: f.categoryId,
-      price: +(+f.price).toFixed(2), stock: Math.floor(+f.stock), rating: Math.min(5, Math.max(0, +f.rating || 0)),
+    const saved = appActions.upsertProduct({
+      id: initial?.id || "p" + uid(), name: f.name.trim(), sku: f.sku.trim().toUpperCase(), categoryId: f.categoryId,
+      price: +(+f.price).toFixed(2), stock: Math.floor(+f.stock), stockThreshold: Math.floor(+f.stockThreshold), rating: Math.min(5, Math.max(0, +f.rating || 0)),
       description: f.description.trim(), images: f.images, image: f.images[0] || "", tags: f.tags.split(",").map((t) => t.trim()).filter(Boolean),
       featured: !!f.featured,
     });
-    onClose();
+    if (saved) onClose();
   };
   return (
     <Modal title={initial ? "Edit product" : "New product"} onClose={onClose} wide>
       <form onSubmit={save}>
         <div className="f-grid">
           <div className="f-full"><label className="lbl">Name</label><input className="input" autoFocus value={f.name} onChange={(e) => setF({ ...f, name: e.target.value })} />{errs.name && <p className="f-err">{errs.name}</p>}</div>
+          <div><label className="lbl">SKU</label><input className="input" value={f.sku} onChange={(e) => setF({ ...f, sku: e.target.value.toUpperCase() })} placeholder="FKN-AUD-001" />{errs.sku && <p className="f-err">{errs.sku}</p>}</div>
           <div><label className="lbl">Category</label><select className="select" value={f.categoryId} onChange={(e) => setF({ ...f, categoryId: e.target.value })}>{s.categories.map((c) => <option key={c.id} value={c.id}>{c.name}</option>)}</select></div>
           <div><label className="lbl">Rating (0–5)</label><input className="input" type="number" step="0.1" min="0" max="5" value={f.rating} onChange={(e) => setF({ ...f, rating: e.target.value })} /></div>
           <div><label className="lbl">Price (USD)</label><input className="input" type="number" step="0.01" min="0" value={f.price} onChange={(e) => setF({ ...f, price: e.target.value })} />{errs.price && <p className="f-err">{errs.price}</p>}</div>
           <div><label className="lbl">Stock</label><input className="input" type="number" min="0" value={f.stock} onChange={(e) => setF({ ...f, stock: e.target.value })} />{errs.stock && <p className="f-err">{errs.stock}</p>}</div>
+          <div><label className="lbl">Low-stock threshold</label><input className="input" type="number" min="0" value={f.stockThreshold} onChange={(e) => setF({ ...f, stockThreshold: e.target.value })} />{errs.stockThreshold && <p className="f-err">{errs.stockThreshold}</p>}</div>
           <div className="f-full"><label className="lbl">Description</label><textarea className="textarea" value={f.description} onChange={(e) => setF({ ...f, description: e.target.value })} /></div>
           <div className="f-full"><label className="lbl">Tags (comma separated)</label><input className="input" value={f.tags} onChange={(e) => setF({ ...f, tags: e.target.value })} placeholder="wireless, anc" /></div>
           <div className="f-full">
@@ -176,14 +180,15 @@ export function ProductsTab() {
       </div>
       <div className="table-wrap">
         <table className="tbl">
-          <thead><tr><th>Product</th><th>Category</th><th>Price</th><th>Stock</th><th>Featured</th><th style={{ textAlign: "right" }}>Actions</th></tr></thead>
+          <thead><tr><th>Product</th><th>SKU</th><th>Category</th><th>Price</th><th>Stock</th><th>Featured</th><th style={{ textAlign: "right" }}>Actions</th></tr></thead>
           <tbody>
             {list.map((p) => (
               <tr key={p.id}>
                 <td><div style={{ display: "flex", alignItems: "center", gap: 12 }}><img className="thumb" src={p.image} alt="" /><div><b>{p.name}</b><div style={{ fontSize: 12, color: "var(--ink2)" }}>{p.tags.map((t) => "#" + t).join(" ")}</div></div></div></td>
+                <td><span className="sku-pill">{p.sku || "—"}</span></td>
                 <td>{catName(p.categoryId)}</td>
                 <td>{fmt(p.price)}</td>
-                <td>{p.stock === 0 ? <span className="low">Out</span> : p.stock < 10 ? <span className="low">{p.stock} low</span> : p.stock}</td>
+                <td>{p.stock === 0 ? <span className="low">Out</span> : p.stock <= (p.stockThreshold ?? 10) ? <span className="low">{p.stock} low</span> : p.stock}</td>
                 <td><button className="icon-btn" title={p.featured ? "Unfeature" : "Feature on homepage"} aria-label="Toggle featured" onClick={() => appActions.toggleFeatured(p.id)} style={p.featured ? { background: "var(--lime)", borderColor: "var(--lime)" } : {}}><Ic n="star" s={14} filled={p.featured} /></button></td>
                 <td style={{ textAlign: "right" }}>
                   <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
@@ -200,6 +205,85 @@ export function ProductsTab() {
     </>
   );
 }
+export function InventoryTab() {
+  const s = useApp();
+  const [q, setQ] = useState("");
+  const [filter, setFilter] = useState("all");
+  const [editing, setEditing] = useState(null);
+  const products = s.products.filter((p) => {
+    const haystack = `${p.name} ${p.sku || ""}`.toLowerCase();
+    if (q.trim() && !haystack.includes(q.toLowerCase().trim())) return false;
+    if (filter === "out") return p.stock === 0;
+    if (filter === "low") return p.stock > 0 && p.stock <= (p.stockThreshold ?? 10);
+    if (filter === "healthy") return p.stock > (p.stockThreshold ?? 10);
+    return true;
+  });
+  const totalUnits = s.products.reduce((sum, p) => sum + p.stock, 0);
+  const outCount = s.products.filter((p) => p.stock === 0).length;
+  const lowCount = s.products.filter((p) => p.stock > 0 && p.stock <= (p.stockThreshold ?? 10)).length;
+  const inventoryValue = s.products.reduce((sum, p) => sum + p.price * p.stock, 0);
+  return (
+    <>
+      <div className="stat-grid inventory-stats">
+        <div className="stat"><span className="ic"><Ic n="box" s={17} /></span><b>{totalUnits}</b><span>Units on hand</span></div>
+        <div className="stat"><span className="ic"><Ic n="alert" s={17} /></span><b>{lowCount}</b><span>Low stock</span></div>
+        <div className="stat"><span className="ic"><Ic n="x" s={17} /></span><b>{outCount}</b><span>Out of stock</span></div>
+        <div className="stat"><span className="ic"><Ic n="chart" s={17} /></span><b>{fmt(inventoryValue)}</b><span>Stock value</span></div>
+      </div>
+      <div className="toolbar inventory-toolbar">
+        <label className="search-box"><Ic n="search" s={15} /><input value={q} onChange={(e) => setQ(e.target.value)} placeholder="Search product or SKU…" aria-label="Search inventory" /></label>
+        <select className="select inventory-filter" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Inventory filter">
+          <option value="all">All inventory</option><option value="low">Low stock</option><option value="out">Out of stock</option><option value="healthy">Healthy stock</option>
+        </select>
+        <span className="result-count">{products.length} products</span>
+      </div>
+      <div className="table-wrap">
+        <table className="tbl"><thead><tr><th>Product</th><th>SKU</th><th>On hand</th><th>Threshold</th><th>Status</th><th style={{ textAlign: "right" }}>Action</th></tr></thead>
+          <tbody>{products.map((p) => {
+            const threshold = p.stockThreshold ?? 10;
+            const status = p.stock === 0 ? "Out of stock" : p.stock <= threshold ? "Low stock" : "Healthy";
+            return <tr key={p.id}>
+              <td><div style={{ display: "flex", alignItems: "center", gap: 12 }}><img className="thumb" src={p.image} alt="" /><div><b>{p.name}</b><div style={{ fontSize: 12, color: "var(--ink2)" }}>{fmt(p.price)} each</div></div></div></td>
+              <td><span className="sku-pill">{p.sku || "—"}</span></td>
+              <td><strong>{p.stock}</strong></td><td>{threshold}</td>
+              <td><span className={"inventory-status " + (status === "Healthy" ? "healthy" : status === "Low stock" ? "low" : "out")}>{status}</span></td>
+              <td style={{ textAlign: "right" }}><button className="btn btn-ghost btn-sm" onClick={() => setEditing(p)}><Ic n="plus" s={13} /> Adjust stock</button></td>
+            </tr>;
+          })}</tbody>
+        </table>
+      </div>
+      {editing && <StockAdjuster product={editing} onClose={() => setEditing(null)} />}
+      <div className="inventory-log-card">
+        <div className="sec-hd"><div><span className="eyebrow">Recent changes</span><h3 className="sec-title display">Inventory activity</h3></div></div>
+        {!s.inventoryLog?.length ? <Empty icon="box" title="No inventory changes yet" sub="Stock adjustments and completed orders will appear here." /> : (
+          <div className="inventory-log">{s.inventoryLog.slice(0, 8).map((entry) => <div className="inventory-log-row" key={entry.id}>
+            <div><strong>{entry.productName}</strong><span>{entry.reason}</span></div>
+            <div className={entry.change > 0 ? "inventory-plus" : "inventory-minus"}>{entry.change > 0 ? `+${entry.change}` : entry.change}</div>
+            <time>{new Date(entry.createdAt).toLocaleString()}</time>
+          </div>)}</div>
+        )}
+      </div>
+    </>
+  );
+}
+
+function StockAdjuster({ product, onClose }) {
+  const [nextStock, setNextStock] = useState(String(product.stock));
+  const [reason, setReason] = useState("Manual stock adjustment");
+  const save = (e) => { e.preventDefault(); if (appActions.adjustStock(product.id, nextStock, reason.trim() || "Manual stock adjustment")) onClose(); };
+  return <Modal title={`Adjust stock — ${product.name}`} onClose={onClose}>
+    <form onSubmit={save}>
+      <div className="stock-adjust-preview"><span>Current stock</span><strong>{product.stock}</strong><span>Threshold: {product.stockThreshold ?? 10}</span></div>
+      <div className="quick-adjusts">
+        {[-10,-1,1,10].map((delta) => <button key={delta} type="button" className="btn btn-ghost btn-sm" onClick={() => setNextStock(String(Math.max(0, Number(nextStock || 0) + delta)))}>{delta > 0 ? `+${delta}` : delta}</button>)}
+      </div>
+      <div style={{ marginTop: 14 }}><label className="lbl">New stock level</label><input className="input" type="number" min="0" value={nextStock} onChange={(e) => setNextStock(e.target.value)} autoFocus /></div>
+      <div style={{ marginTop: 14 }}><label className="lbl">Reason</label><input className="input" value={reason} onChange={(e) => setReason(e.target.value)} maxLength={80} /></div>
+      <div className="form-actions"><button type="button" className="btn btn-ghost" onClick={onClose}>Cancel</button><button className="btn btn-dark"><Ic n="check" s={15} /> Save adjustment</button></div>
+    </form>
+  </Modal>;
+}
+
 export function CategoriesTab() {
   const s = useApp();
   const [editing, setEditing] = useState(null);
@@ -279,7 +363,7 @@ export function OrdersTab() {
               <td style={{ maxWidth: 260 }}>{o.items.map((i) => `${i.qty}× ${i.name}`).join(", ")}</td>
               <td>{fmt(o.total)}</td>
               <td style={{ color: "var(--ink2)" }}>{new Date(o.createdAt).toLocaleDateString()}</td>
-              <td><select className="status-sel" value={o.status} aria-label={`Status for order ${o.id}`} onChange={(e) => appActions.setOrderStatus(o.id, e.target.value)}><option>paid</option><option>shipped</option><option>delivered</option><option>cancelled</option></select></td>
+              <td><select className="status-sel" value={o.status} aria-label={`Status for order ${o.id}`} onChange={(e) => appActions.setOrderStatus(o.id, e.target.value)}><option>paid</option><option>processing</option><option>shipped</option><option>delivered</option><option>cancelled</option></select></td>
             </tr>
           ))}
         </tbody>
@@ -287,13 +371,37 @@ export function OrdersTab() {
     </div>
   );
 }
+function ReviewsTab() {
+  const s = useApp();
+  const reviews = (s.reviews || []).slice().sort((a, b) => b.createdAt - a.createdAt);
+  return (
+    <div>
+      <div className="sec-hd"><div><p className="eyebrow">Customer voice</p><h2 className="sec-title display">Reviews</h2></div></div>
+      {!reviews.length ? <Empty icon="star" title="No reviews yet" sub="Customer reviews will appear here after purchases." /> : (
+        <div className="table-wrap"><table className="tbl"><thead><tr><th>Product</th><th>Customer</th><th>Rating</th><th>Review</th><th>Date</th><th>Action</th></tr></thead><tbody>
+          {reviews.map((review) => { const product = s.products.find((p) => p.id === review.productId); return <tr key={review.id}>
+            <td><strong>{product?.name || review.productId}</strong></td>
+            <td><div>{review.authorName}</div><div style={{ fontSize: 12, color: "var(--ink2)" }}>{review.verifiedPurchase ? "Verified purchase" : "Customer"}</div></td>
+            <td><Stars v={review.rating} size={13} /></td>
+            <td style={{ maxWidth: 320 }}><strong>{review.title}</strong><div style={{ fontSize: 12, color: "var(--ink2)" }}>{review.body}</div></td>
+            <td>{new Date(review.createdAt).toLocaleDateString()}</td>
+            <td><button className="btn btn-danger btn-sm" onClick={() => { if (window.confirm("Remove this review?")) appActions.deleteReview(review.id); }}><Ic n="trash" s={13} /> Remove</button></td>
+          </tr>; })}
+        </tbody></table></div>
+      )}
+    </div>
+  );
+}
+
 export default function AdminPage({ tab }) {
   const s = useApp();
   const tabs = [
     { id: "dashboard", path: "/admin", label: "Dashboard", icon: "chart" },
     { id: "products", path: "/admin/products", label: "Products", icon: "box", n: s.products.length },
+    { id: "inventory", path: "/admin/inventory", label: "Inventory", icon: "box", n: s.products.filter((p) => p.stock <= (p.stockThreshold ?? 10)).length },
     { id: "categories", path: "/admin/categories", label: "Categories", icon: "tag", n: s.categories.length },
     { id: "orders", path: "/admin/orders", label: "Orders", icon: "cart", n: s.orders.length },
+    { id: "reviews", path: "/admin/reviews", label: "Reviews", icon: "star", n: s.reviews?.filter((review) => review.status === "published").length || 0 },
     ...(s.session.role === "admin" ? [{ id: "users", path: "/admin/users", label: "Users", icon: "users", n: s.users.length }] : []),
   ];
   const activeTab = tabs.find((t) => t.id === tab);
@@ -310,8 +418,10 @@ export default function AdminPage({ tab }) {
         <div className="sec-hd"><h1 className="sec-title display">{activeTab ? activeTab.label : "Dashboard"}</h1></div>
         {tab === "dashboard" && <DashboardTab />}
         {tab === "products" && <ProductsTab />}
+        {tab === "inventory" && <InventoryTab />}
         {tab === "categories" && <CategoriesTab />}
         {tab === "orders" && <OrdersTab />}
+        {tab === "reviews" && <ReviewsTab />}
         {tab === "users" && s.session.role === "admin" && <UsersTab />}
       </main>
     </div>

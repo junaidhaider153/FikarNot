@@ -31,12 +31,14 @@ export function AppRoutes() {
       <Route path="/checkout" element={<CheckoutPage />} />
       <Route path="/login" element={<LoginPage />} />
       <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
-      <Route path="/wishlist" element={<WishlistPage />} />
+      <Route path="/wishlist" element={<ProtectedRoute><WishlistPage /></ProtectedRoute>} />
 
       <Route path="/admin" element={<ProtectedRoute roles={STAFF_ROLES}><AdminPage tab="dashboard" /></ProtectedRoute>} />
       <Route path="/admin/products" element={<ProtectedRoute roles={STAFF_ROLES}><AdminPage tab="products" /></ProtectedRoute>} />
+      <Route path="/admin/inventory" element={<ProtectedRoute roles={STAFF_ROLES}><AdminPage tab="inventory" /></ProtectedRoute>} />
       <Route path="/admin/categories" element={<ProtectedRoute roles={STAFF_ROLES}><AdminPage tab="categories" /></ProtectedRoute>} />
       <Route path="/admin/orders" element={<ProtectedRoute roles={STAFF_ROLES}><AdminPage tab="orders" /></ProtectedRoute>} />
+      <Route path="/admin/reviews" element={<ProtectedRoute roles={STAFF_ROLES}><AdminPage tab="reviews" /></ProtectedRoute>} />
       <Route path="/admin/users" element={<ProtectedRoute roles={ADMIN_ROLES}><AdminPage tab="users" /></ProtectedRoute>} />
 
       <Route path="*" element={<NotFoundPage />} />
