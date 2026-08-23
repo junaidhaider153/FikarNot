@@ -28,12 +28,21 @@ export function ProductFilters({
         <label className="search-box product-search">
           <Ic n="search" s={15} />
           <span className="sr-only">Search products</span>
-          <input value={query} onChange={(e) => setQuery(e.target.value)} placeholder="Search products, tags, or features…" aria-label="Search products" />
+          <input
+            value={query}
+            onChange={(e) => setQuery(e.target.value)}
+            placeholder="Search products, tags, or features…"
+            aria-label="Search products"
+          />
         </label>
 
         <select className="select" value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Filter by category">
           <option value="all">All categories</option>
-          {categories.map((item) => <option key={item.id} value={item.id}>{item.name}</option>)}
+          {categories.map((item) => (
+            <option key={item.id} value={item.id}>
+              {item.name}
+            </option>
+          ))}
         </select>
 
         <select className="select" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort products">
@@ -45,7 +54,12 @@ export function ProductFilters({
           <option value="name">Name: A–Z</option>
         </select>
 
-        <select className="select" value={String(minRating)} onChange={(e) => setMinRating(Number(e.target.value))} aria-label="Filter by minimum rating">
+        <select
+          className="select"
+          value={String(minRating)}
+          onChange={(e) => setMinRating(Number(e.target.value))}
+          aria-label="Filter by minimum rating"
+        >
           <option value="0">Any rating</option>
           <option value="3">3★ & up</option>
           <option value="4">4★ & up</option>
@@ -54,7 +68,15 @@ export function ProductFilters({
 
         <label className="range-wrap product-range">
           <span>Up to {fmt(priceCap)}</span>
-          <input type="range" min={10} max={maxPrice} step={5} value={priceCap} onChange={(e) => setPriceCap(Number(e.target.value))} aria-label="Maximum price" />
+          <input
+            type="range"
+            min={10}
+            max={maxPrice}
+            step={5}
+            value={priceCap}
+            onChange={(e) => setPriceCap(Number(e.target.value))}
+            aria-label="Maximum price"
+          />
         </label>
 
         <label className="chk">
@@ -62,11 +84,18 @@ export function ProductFilters({
           In stock
         </label>
 
-        {hasFilters && <button className="btn btn-ghost btn-sm" onClick={onClear}><Ic n="x" s={13} /> Clear</button>}
+        {hasFilters && (
+          <button className="btn btn-ghost btn-sm" onClick={onClear}>
+            <Ic n="x" s={13} /> Clear
+          </button>
+        )}
       </div>
 
       <div className="catalog-meta">
-        <p><strong>{filtered}</strong> {filtered === 1 ? "product" : "products"}{searching ? " found" : " available"}</p>
+        <p>
+          <strong>{filtered}</strong> {filtered === 1 ? "product" : "products"}
+          {searching ? " found" : " available"}
+        </p>
         <span>{total} total in catalogue</span>
       </div>
     </>

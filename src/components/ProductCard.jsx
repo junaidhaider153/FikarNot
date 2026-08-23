@@ -37,13 +37,20 @@ export function ProductCard({ p }) {
     <article
       className="card"
       onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => { setHovered(false); setActiveImage(0); }}
+      onMouseLeave={() => {
+        setHovered(false);
+        setActiveImage(0);
+      }}
     >
       <div className="card-media">
         <Link to={`/product/${p.id}`} aria-label={p.name}>
           <img className="card-img" src={image} alt={p.name} loading="lazy" />
         </Link>
-        {cat && <Link className="card-cat" to={`/products?cat=${cat.id}`}>{cat.name}</Link>}
+        {cat && (
+          <Link className="card-cat" to={`/products?cat=${cat.id}`}>
+            {cat.name}
+          </Link>
+        )}
         <button
           className={`wishlist-btn${isWishlisted ? " active" : ""}`}
           type="button"
@@ -97,11 +104,20 @@ export function ProductCard({ p }) {
         )}
       </div>
       <div className="card-body">
-        <Link className="card-name" to={`/product/${p.id}`}>{p.name}</Link>
-        <div className="card-meta"><Stars v={p.rating} /><span>{p.rating.toFixed(1)}</span>{p.stock === 0 && <span className="low">Out of stock</span>}{p.stock > 0 && p.stock <= (p.stockThreshold ?? 10) && <span className="low">Only {p.stock} left</span>}</div>
+        <Link className="card-name" to={`/product/${p.id}`}>
+          {p.name}
+        </Link>
+        <div className="card-meta">
+          <Stars v={p.rating} />
+          <span>{p.rating.toFixed(1)}</span>
+          {p.stock === 0 && <span className="low">Out of stock</span>}
+          {p.stock > 0 && p.stock <= (p.stockThreshold ?? 10) && <span className="low">Only {p.stock} left</span>}
+        </div>
         <div className="card-foot">
           <span className="price">{fmt(p.price)}</span>
-          <button className="btn btn-dark btn-sm" disabled={p.stock === 0} onClick={() => appActions.addToCart(p.id)}><Ic n="cart" s={14} /> Add</button>
+          <button className="btn btn-dark btn-sm" disabled={p.stock === 0} onClick={() => appActions.addToCart(p.id)}>
+            <Ic n="cart" s={14} /> Add
+          </button>
         </div>
       </div>
     </article>

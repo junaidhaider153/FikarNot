@@ -22,10 +22,7 @@ export class ErrorBoundary extends React.Component {
 
     return (
       <div className="container page-pad">
-        <ErrorCard
-          message={this.state.error?.message || "An unexpected error occurred."}
-          onRetry={this.reset}
-        />
+        <ErrorCard message={this.state.error?.message || "An unexpected error occurred."} onRetry={this.reset} />
       </div>
     );
   }

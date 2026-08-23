@@ -4,10 +4,12 @@ import { useApp } from "../store/appStore";
 import { api } from "../api/storeApi";
 import { useAsync } from "../hooks/useAsync";
 import { useDebounced } from "../hooks/useDebounced";
-import { ErrorCard, Empty, SkelGrid } from "../components/common";
+import { ErrorCard, Empty, SkelGrid, Pagination } from "../components/common";
 import { ProductCard } from "../components/ProductCard";
 import { ProductFilters } from "../components/ProductFilters";
 import { searchProducts } from "../utils/search";
+import { useDocumentMeta } from "../hooks/useDocumentMeta";
+import { usePagination } from "../hooks/usePagination";
 
 const SORTS = new Set(["featured", "newest", "rating", "price-asc", "price-desc", "name"]);
 const RATINGS = new Set([0, 3, 4, 4.5]);
@@ -17,6 +19,10 @@ export default function ProductsPage() {
   const [params, setParams] = useSearchParams();
   const { data, loading, error, retry } = useAsync(() => api.listProducts(), []);
   const products = data || [];
+  useDocumentMeta({
+    title: "Shop all products",
+    description: "Browse the full FikarNot catalogue — audio, wearables, home & desk, and carry essentials.",
+  });
 
   const [q, setQ] = useState(params.get("q") || "");
   const [category, setCategory] = useState(params.get("cat") || "all");
@@ -78,7 +84,7 @@ export default function ProductsPage() {
     if (dq.trim()) return out;
 
     const by = {
-      featured: (a, b) => (Number(b.featured) - Number(a.featured)) || (b.rating - a.rating),
+      featured: (a, b) => Number(b.featured) - Number(a.featured) || b.rating - a.rating,
       newest: (a, b) => b.createdAt - a.createdAt,
       rating: (a, b) => b.rating - a.rating,
       "price-asc": (a, b) => a.price - b.price,
@@ -87,7 +93,10 @@ export default function ProductsPage() {
     };
 
     return [...out].sort(by[sort] || by.featured);
-  }, [products, dq, category, priceCap, inStock, minRating, sort]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps -- depending on `data`, not the derived `products` (a fresh array reference every render), so this actually memoizes.
+  }, [data, dq, category, priceCap, inStock, minRating, sort]);
+
+  const { page, pageCount, pageItems, setPage, start, end, total } = usePagination(list, 12);
 
   const clear = () => {
     setQ("");
@@ -114,16 +123,31 @@ export default function ProductsPage() {
         query={q}
         setQuery={setQ}
         category={category}
-        setCategory={(value) => { setCategory(value); updateParam("cat", value, "all"); }}
+        setCategory={(value) => {
+          setCategory(value);
+          updateParam("cat", value, "all");
+        }}
         sort={sort}
-        setSort={(value) => { setSort(value); updateParam("sort", value, "featured"); }}
+        setSort={(value) => {
+          setSort(value);
+          updateParam("sort", value, "featured");
+        }}
         priceCap={priceCap}
         maxPrice={maxPrice}
-        setPriceCap={(value) => { setPriceCap(value); updateParam("max", value, maxPrice); }}
+        setPriceCap={(value) => {
+          setPriceCap(value);
+          updateParam("max", value, maxPrice);
+        }}
         minRating={minRating}
-        setMinRating={(value) => { setMinRating(value); updateParam("rating", value, 0); }}
+        setMinRating={(value) => {
+          setMinRating(value);
+          updateParam("rating", value, 0);
+        }}
         inStock={inStock}
-        setInStock={(value) => { setInStock(value); updateParam("stock", value ? 1 : 0, 0); }}
+        setInStock={(value) => {
+          setInStock(value);
+          updateParam("stock", value ? 1 : 0, 0);
+        }}
         filtered={!loading ? list.length : 0}
         total={products.length}
         searching={Boolean(dq.trim())}
@@ -140,12 +164,21 @@ export default function ProductsPage() {
           icon="search"
           title="Nothing matches"
           sub="Try a broader search or remove one of your filters."
-          cta={<button className="btn btn-dark" onClick={clear}>Clear filters</button>}
+          cta={
+            <button className="btn btn-dark" onClick={clear}>
+              Clear filters
+            </button>
+          }
         />
       ) : (
-        <div className="prod-grid catalog-grid">
-          {list.map((product) => <ProductCard key={product.id} p={product} />)}
-        </div>
+        <>
+          <div className="prod-grid catalog-grid">
+            {pageItems.map((product) => (
+              <ProductCard key={product.id} p={product} />
+            ))}
+          </div>
+          <Pagination page={page} pageCount={pageCount} setPage={setPage} start={start} end={end} total={total} noun="products" />
+        </>
       )}
     </div>
   );

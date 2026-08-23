@@ -4,6 +4,7 @@ import { useApp, appActions, cartLines } from "../store/appStore";
 import { fmt, delay } from "../utils/helpers";
 import { Ic } from "../components/icons";
 import { Empty } from "../components/common";
+import { useDocumentMeta } from "../hooks/useDocumentMeta";
 
 const INITIAL_FORM = {
   name: "",
@@ -18,6 +19,7 @@ const INITIAL_FORM = {
 
 export default function CheckoutPage() {
   const s = useApp();
+  useDocumentMeta({ title: "Checkout", noindex: true });
   const lines = cartLines(s);
   const [guestUnlocked, setGuestUnlocked] = useState(Boolean(s.session));
   const [guestEmail, setGuestEmail] = useState("");
@@ -103,7 +105,16 @@ export default function CheckoutPage() {
   if (lines.length === 0) {
     return (
       <div className="container" style={{ padding: "60px 24px" }}>
-        <Empty icon="cart" title="Nothing to check out" sub="Your shopping bag is empty. Add something you love first." cta={<Link className="btn btn-dark" to="/products">Go to shop</Link>} />
+        <Empty
+          icon="cart"
+          title="Nothing to check out"
+          sub="Your shopping bag is empty. Add something you love first."
+          cta={
+            <Link className="btn btn-dark" to="/products">
+              Go to shop
+            </Link>
+          }
+        />
       </div>
     );
   }
@@ -117,42 +128,89 @@ export default function CheckoutPage() {
             <h1 className="h1 checkout-title">One quick step first.</h1>
             <p className="hero-sub">Sign in for a faster checkout, or continue as a guest with your email address.</p>
           </div>
-          <Link className="btn btn-ghost" to="/cart"><Ic n="arrow" s={15} /> Back to cart</Link>
+          <Link className="btn btn-ghost" to="/cart">
+            <Ic n="arrow" s={15} /> Back to cart
+          </Link>
         </div>
 
         <div className="checkout-grid">
           <section className="panel checkout-panel">
             <div className="checkout-access-card">
-              <span className="step-n"><Ic n="mail" s={14} /></span>
+              <span className="step-n">
+                <Ic n="mail" s={14} />
+              </span>
               <div>
                 <h3 className="display">Continue as guest</h3>
                 <p>We need your email to send your order confirmation and keep you updated.</p>
               </div>
             </div>
             <form onSubmit={continueAsGuest} style={{ marginTop: 20 }}>
-              <label className="lbl" htmlFor="guest-email">Email address</label>
-              <input id="guest-email" className="input" type="email" value={guestEmail} onChange={(event) => { setGuestEmail(event.target.value); setGuestEmailError(""); }} autoComplete="email" placeholder="you@example.com" autoFocus />
-              {guestEmailError && <p className="f-err" role="alert">{guestEmailError}</p>}
-              <button className="btn btn-lime" style={{ width: "100%", marginTop: 14 }} type="submit">Continue as guest <Ic n="arrow" s={15} /></button>
+              <label className="lbl" htmlFor="guest-email">
+                Email address
+              </label>
+              <input
+                id="guest-email"
+                className="input"
+                type="email"
+                value={guestEmail}
+                onChange={(event) => {
+                  setGuestEmail(event.target.value);
+                  setGuestEmailError("");
+                }}
+                autoComplete="email"
+                placeholder="you@example.com"
+              />
+              {guestEmailError && (
+                <p className="f-err" role="alert">
+                  {guestEmailError}
+                </p>
+              )}
+              <button className="btn btn-lime" style={{ width: "100%", marginTop: 14 }} type="submit">
+                Continue as guest <Ic n="arrow" s={15} />
+              </button>
             </form>
-            <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "18px 0", color: "var(--ink2)", fontSize: 13 }}><span style={{ height: 1, flex: 1, background: "var(--line)" }} /><span>or</span><span style={{ height: 1, flex: 1, background: "var(--line)" }} /></div>
-            <Link className="btn btn-dark" style={{ width: "100%" }} to={`/login?redirect=${encodeURIComponent("/checkout")}`}>Sign in to checkout <Ic n="arrow" s={15} /></Link>
+            <div style={{ display: "flex", alignItems: "center", gap: 10, margin: "18px 0", color: "var(--ink2)", fontSize: 13 }}>
+              <span style={{ height: 1, flex: 1, background: "var(--line)" }} />
+              <span>or</span>
+              <span style={{ height: 1, flex: 1, background: "var(--line)" }} />
+            </div>
+            <Link className="btn btn-dark" style={{ width: "100%" }} to={`/login?redirect=${encodeURIComponent("/checkout")}`}>
+              Sign in to checkout <Ic n="arrow" s={15} />
+            </Link>
           </section>
 
           <aside className="summary checkout-summary">
-            <div className="checkout-summary-head"><div><span className="eyebrow">Your bag</span><h2 className="display">Order summary</h2></div><Link to="/cart">Edit</Link></div>
+            <div className="checkout-summary-head">
+              <div>
+                <span className="eyebrow">Your bag</span>
+                <h2 className="display">Order summary</h2>
+              </div>
+              <Link to="/cart">Edit</Link>
+            </div>
             <div className="checkout-lines">
               {lines.map((line) => (
                 <div className="checkout-line" key={line.p.id}>
                   <img src={line.p.images?.[0] || line.p.image} alt="" />
-                  <div><strong>{line.p.name}</strong><span>Qty {line.qty}</span></div>
+                  <div>
+                    <strong>{line.p.name}</strong>
+                    <span>Qty {line.qty}</span>
+                  </div>
                   <b>{fmt(line.p.price * line.qty)}</b>
                 </div>
               ))}
             </div>
-            <div className="sum-row"><span>Subtotal</span><span>{fmt(totals.subtotal)}</span></div>
-            <div className="sum-row"><span>Shipping</span><span>{totals.shipping === 0 ? "Free" : fmt(totals.shipping)}</span></div>
-            <div className="sum-row total"><span>Total</span><span>{fmt(totals.total)}</span></div>
+            <div className="sum-row">
+              <span>Subtotal</span>
+              <span>{fmt(totals.subtotal)}</span>
+            </div>
+            <div className="sum-row">
+              <span>Shipping</span>
+              <span>{totals.shipping === 0 ? "Free" : fmt(totals.shipping)}</span>
+            </div>
+            <div className="sum-row total">
+              <span>Total</span>
+              <span>{fmt(totals.total)}</span>
+            </div>
           </aside>
         </div>
       </div>
@@ -167,39 +225,70 @@ export default function CheckoutPage() {
         <div>
           <p className="eyebrow">Secure checkout</p>
           <h1 className="h1 checkout-title">Finish your order.</h1>
-          <p className="hero-sub">A simple, focused checkout with everything you need and nothing you don't.</p>
+          <p className="hero-sub">A simple, focused checkout with everything you need and nothing you don&apos;t.</p>
         </div>
-        <Link className="btn btn-ghost" to="/cart"><Ic n="arrow" s={15} /> Back to cart</Link>
+        <Link className="btn btn-ghost" to="/cart">
+          <Ic n="arrow" s={15} /> Back to cart
+        </Link>
       </div>
 
       <div className="checkout-grid">
         <form onSubmit={submit} noValidate>
           <section className="panel checkout-panel">
-            <h3><span className="step-n">1</span> Contact &amp; shipping</h3>
+            <h3>
+              <span className="step-n">1</span> Contact &amp; shipping
+            </h3>
             <div className="f-grid">
               <div>
-                <label className="lbl" htmlFor="f-name">Full name</label>
+                <label className="lbl" htmlFor="f-name">
+                  Full name
+                </label>
                 <input id="f-name" className="input" value={form.name} onChange={set("name")} autoComplete="name" />
                 {errs.name && <p className="f-err">{errs.name}</p>}
               </div>
               <div>
-                <label className="lbl" htmlFor="f-email">Email</label>
-                <input id="f-email" className="input" type="email" value={form.email} onChange={set("email")} autoComplete="email" readOnly={Boolean(s.session)} />
+                <label className="lbl" htmlFor="f-email">
+                  Email
+                </label>
+                <input
+                  id="f-email"
+                  className="input"
+                  type="email"
+                  value={form.email}
+                  onChange={set("email")}
+                  autoComplete="email"
+                  readOnly={Boolean(s.session)}
+                />
                 {errs.email && <p className="f-err">{errs.email}</p>}
-                <p style={{ marginTop: 5, fontSize: 12, color: "var(--ink2)" }}>{s.session ? "Signed in — this email is linked to your account." : "We'll use this email for your order confirmation."}</p>
+                <p style={{ marginTop: 5, fontSize: 12, color: "var(--ink2)" }}>
+                  {s.session ? "Signed in — this email is linked to your account." : "We'll use this email for your order confirmation."}
+                </p>
               </div>
               <div className="f-full">
-                <label className="lbl" htmlFor="f-addr">Address</label>
-                <input id="f-addr" className="input" value={form.address} onChange={set("address")} autoComplete="street-address" placeholder="House number, street and area" />
+                <label className="lbl" htmlFor="f-addr">
+                  Address
+                </label>
+                <input
+                  id="f-addr"
+                  className="input"
+                  value={form.address}
+                  onChange={set("address")}
+                  autoComplete="street-address"
+                  placeholder="House number, street and area"
+                />
                 {errs.address && <p className="f-err">{errs.address}</p>}
               </div>
               <div>
-                <label className="lbl" htmlFor="f-city">City</label>
+                <label className="lbl" htmlFor="f-city">
+                  City
+                </label>
                 <input id="f-city" className="input" value={form.city} onChange={set("city")} autoComplete="address-level2" />
                 {errs.city && <p className="f-err">{errs.city}</p>}
               </div>
               <div>
-                <label className="lbl" htmlFor="f-zip">ZIP / postal code</label>
+                <label className="lbl" htmlFor="f-zip">
+                  ZIP / postal code
+                </label>
                 <input id="f-zip" className="input" value={form.zip} onChange={set("zip")} autoComplete="postal-code" />
                 {errs.zip && <p className="f-err">{errs.zip}</p>}
               </div>
@@ -207,16 +296,38 @@ export default function CheckoutPage() {
           </section>
 
           <section className="panel checkout-panel">
-            <h3><span className="step-n">2</span> Payment method</h3>
+            <h3>
+              <span className="step-n">2</span> Payment method
+            </h3>
             <div className="payment-methods" role="radiogroup" aria-label="Payment method">
-              <button type="button" className={`payment-option${paymentMethod === "card" ? " selected" : ""}`} onClick={() => setPaymentMethod("card")} aria-pressed={paymentMethod === "card"}>
-                <span className="payment-icon"><Ic n="shield" s={18} /></span>
-                <span><strong>Card</strong><small>Mock secure card payment</small></span>
+              <button
+                type="button"
+                className={`payment-option${paymentMethod === "card" ? " selected" : ""}`}
+                onClick={() => setPaymentMethod("card")}
+                aria-pressed={paymentMethod === "card"}
+              >
+                <span className="payment-icon">
+                  <Ic n="shield" s={18} />
+                </span>
+                <span>
+                  <strong>Card</strong>
+                  <small>Mock secure card payment</small>
+                </span>
                 <span className="payment-check">{paymentMethod === "card" ? "✓" : ""}</span>
               </button>
-              <button type="button" className={`payment-option${paymentMethod === "cod" ? " selected" : ""}`} onClick={() => setPaymentMethod("cod")} aria-pressed={paymentMethod === "cod"}>
-                <span className="payment-icon"><Ic n="truck" s={18} /></span>
-                <span><strong>Cash on delivery</strong><small>Pay when your order arrives</small></span>
+              <button
+                type="button"
+                className={`payment-option${paymentMethod === "cod" ? " selected" : ""}`}
+                onClick={() => setPaymentMethod("cod")}
+                aria-pressed={paymentMethod === "cod"}
+              >
+                <span className="payment-icon">
+                  <Ic n="truck" s={18} />
+                </span>
+                <span>
+                  <strong>Cash on delivery</strong>
+                  <small>Pay when your order arrives</small>
+                </span>
                 <span className="payment-check">{paymentMethod === "cod" ? "✓" : ""}</span>
               </button>
             </div>
@@ -224,55 +335,129 @@ export default function CheckoutPage() {
             {paymentMethod === "card" ? (
               <div className="f-grid payment-fields">
                 <div className="f-full">
-                  <label className="lbl" htmlFor="f-card">Card number</label>
-                  <input id="f-card" className="input" inputMode="numeric" autoComplete="cc-number" placeholder="4242 4242 4242 4242" value={form.card} onChange={(event) => setForm((current) => ({ ...current, card: event.target.value.replace(/\D/g, "").slice(0, 16).replace(/(.{4})/g, "$1 ").trim() }))} />
+                  <label className="lbl" htmlFor="f-card">
+                    Card number
+                  </label>
+                  <input
+                    id="f-card"
+                    className="input"
+                    inputMode="numeric"
+                    autoComplete="cc-number"
+                    placeholder="4242 4242 4242 4242"
+                    value={form.card}
+                    onChange={(event) =>
+                      setForm((current) => ({
+                        ...current,
+                        card: event.target.value
+                          .replace(/\D/g, "")
+                          .slice(0, 16)
+                          .replace(/(.{4})/g, "$1 ")
+                          .trim(),
+                      }))
+                    }
+                  />
                   {errs.card && <p className="f-err">{errs.card}</p>}
                 </div>
                 <div>
-                  <label className="lbl" htmlFor="f-exp">Expiry</label>
-                  <input id="f-exp" className="input" inputMode="numeric" autoComplete="cc-exp" placeholder="MM/YY" value={form.exp} onChange={(event) => { let value = event.target.value.replace(/\D/g, "").slice(0, 4); if (value.length > 2) value = `${value.slice(0, 2)}/${value.slice(2)}`; setForm((current) => ({ ...current, exp: value })); }} />
+                  <label className="lbl" htmlFor="f-exp">
+                    Expiry
+                  </label>
+                  <input
+                    id="f-exp"
+                    className="input"
+                    inputMode="numeric"
+                    autoComplete="cc-exp"
+                    placeholder="MM/YY"
+                    value={form.exp}
+                    onChange={(event) => {
+                      let value = event.target.value.replace(/\D/g, "").slice(0, 4);
+                      if (value.length > 2) value = `${value.slice(0, 2)}/${value.slice(2)}`;
+                      setForm((current) => ({ ...current, exp: value }));
+                    }}
+                  />
                   {errs.exp && <p className="f-err">{errs.exp}</p>}
                 </div>
                 <div>
-                  <label className="lbl" htmlFor="f-cvc">CVC</label>
-                  <input id="f-cvc" className="input" inputMode="numeric" autoComplete="cc-csc" placeholder="123" value={form.cvc} onChange={(event) => setForm((current) => ({ ...current, cvc: event.target.value.replace(/\D/g, "").slice(0, 3) }))} />
+                  <label className="lbl" htmlFor="f-cvc">
+                    CVC
+                  </label>
+                  <input
+                    id="f-cvc"
+                    className="input"
+                    inputMode="numeric"
+                    autoComplete="cc-csc"
+                    placeholder="123"
+                    value={form.cvc}
+                    onChange={(event) => setForm((current) => ({ ...current, cvc: event.target.value.replace(/\D/g, "").slice(0, 3) }))}
+                  />
                   {errs.cvc && <p className="f-err">{errs.cvc}</p>}
                 </div>
               </div>
             ) : (
               <div className="cod-note">
-                <span className="empty-ic"><Ic n="truck" s={22} /></span>
-                <div><strong>Cash on delivery selected</strong><p>You'll pay when the package arrives. This is a demo checkout for FikarNot.</p></div>
+                <span className="empty-ic">
+                  <Ic n="truck" s={22} />
+                </span>
+                <div>
+                  <strong>Cash on delivery selected</strong>
+                  <p>You&apos;ll pay when the package arrives. This is a demo checkout for FikarNot.</p>
+                </div>
               </div>
             )}
           </section>
 
           <div className="checkout-security">
-            <span><Ic n="mail" s={15} /> Confirmation will be associated with {form.email}</span>
-            <span><Ic n="check" s={15} /> Stock checked before order creation</span>
+            <span>
+              <Ic n="mail" s={15} /> Confirmation will be associated with {form.email}
+            </span>
+            <span>
+              <Ic n="check" s={15} /> Stock checked before order creation
+            </span>
           </div>
 
           <button className="btn btn-lime checkout-submit" disabled={busy}>
             {busy ? "Placing your order…" : paymentLabel}
-            {!busy && <span>{fmt(totals.total)} <Ic n="arrow" s={15} /></span>}
+            {!busy && (
+              <span>
+                {fmt(totals.total)} <Ic n="arrow" s={15} />
+              </span>
+            )}
           </button>
         </form>
 
         <aside className="summary checkout-summary">
-          <div className="checkout-summary-head"><div><span className="eyebrow">Your bag</span><h2 className="display">Order summary</h2></div><Link to="/cart">Edit</Link></div>
+          <div className="checkout-summary-head">
+            <div>
+              <span className="eyebrow">Your bag</span>
+              <h2 className="display">Order summary</h2>
+            </div>
+            <Link to="/cart">Edit</Link>
+          </div>
           <div className="checkout-lines">
             {lines.map((line) => (
               <div className="checkout-line" key={line.p.id}>
                 <img src={line.p.images?.[0] || line.p.image} alt="" />
-                <div><strong>{line.p.name}</strong><span>Qty {line.qty}</span></div>
+                <div>
+                  <strong>{line.p.name}</strong>
+                  <span>Qty {line.qty}</span>
+                </div>
                 <b>{fmt(line.p.price * line.qty)}</b>
               </div>
             ))}
           </div>
-          <div className="sum-row"><span>Subtotal</span><span>{fmt(totals.subtotal)}</span></div>
-          <div className="sum-row"><span>Shipping</span><span>{totals.shipping === 0 ? "Free" : fmt(totals.shipping)}</span></div>
+          <div className="sum-row">
+            <span>Subtotal</span>
+            <span>{fmt(totals.subtotal)}</span>
+          </div>
+          <div className="sum-row">
+            <span>Shipping</span>
+            <span>{totals.shipping === 0 ? "Free" : fmt(totals.shipping)}</span>
+          </div>
           {totals.shipping > 0 && <div className="free-note">Add {fmt(75 - totals.subtotal)} more to unlock free shipping.</div>}
-          <div className="sum-row total"><span>Total</span><span>{fmt(totals.total)}</span></div>
+          <div className="sum-row total">
+            <span>Total</span>
+            <span>{fmt(totals.total)}</span>
+          </div>
         </aside>
       </div>
     </div>
@@ -286,23 +471,50 @@ function OrderConfirmation({ order }) {
   return (
     <div className="container order-confirmation-wrap">
       <div className="success order-confirmation">
-        <div className="success-ic"><Ic n="check" s={28} /></div>
-        <p className="eyebrow" style={{ justifyContent: "center" }}>FikarNot order confirmed</p>
-        <h1 className="display" style={{ fontSize: 32 }}>Thanks for your order.</h1>
-        <p className="confirmation-copy">Your order <strong>{order.id}</strong> has been created for <strong>{order.customer.name}</strong>.</p>
+        <div className="success-ic">
+          <Ic n="check" s={28} />
+        </div>
+        <p className="eyebrow" style={{ justifyContent: "center" }}>
+          FikarNot order confirmed
+        </p>
+        <h1 className="display" style={{ fontSize: 32 }}>
+          Thanks for your order.
+        </h1>
+        <p className="confirmation-copy">
+          Your order <strong>{order.id}</strong> has been created for <strong>{order.customer.name}</strong>.
+        </p>
 
         <div className="confirmation-grid">
-          <div><span>Items</span><strong>{totalItems}</strong></div>
-          <div><span>Total</span><strong>{fmt(order.total)}</strong></div>
-          <div><span>Payment</span><strong>{paymentLabel}</strong></div>
+          <div>
+            <span>Items</span>
+            <strong>{totalItems}</strong>
+          </div>
+          <div>
+            <span>Total</span>
+            <strong>{fmt(order.total)}</strong>
+          </div>
+          <div>
+            <span>Payment</span>
+            <strong>{paymentLabel}</strong>
+          </div>
         </div>
 
-        <div className="confirmation-address"><span>Deliver to</span><strong>{order.customer.address}</strong></div>
-        <div className="confirmation-address"><span>Confirmation email</span><strong>{order.customer.email}</strong></div>
+        <div className="confirmation-address">
+          <span>Deliver to</span>
+          <strong>{order.customer.address}</strong>
+        </div>
+        <div className="confirmation-address">
+          <span>Confirmation email</span>
+          <strong>{order.customer.email}</strong>
+        </div>
 
         <div className="confirmation-actions">
-          <Link className="btn btn-dark" to="/products">Keep shopping</Link>
-          <Link className="btn btn-ghost" to="/account">View account</Link>
+          <Link className="btn btn-dark" to="/products">
+            Keep shopping
+          </Link>
+          <Link className="btn btn-ghost" to="/account">
+            View account
+          </Link>
         </div>
       </div>
     </div>

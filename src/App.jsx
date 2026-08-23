@@ -16,10 +16,7 @@ export default function App() {
   if (state.bootError) {
     return (
       <div className="container page-pad">
-        <ErrorCard
-          message={state.bootError}
-          onRetry={() => void appActions.bootstrap()}
-        />
+        <ErrorCard message={state.bootError} onRetry={() => void appActions.bootstrap()} />
       </div>
     );
   }

@@ -70,7 +70,9 @@ export function ImageUploader({ images = [], onChange }) {
 
       <form className="image-url-row" onSubmit={addUrl}>
         <input className="input" value={url} onChange={(e) => setUrl(e.target.value)} placeholder="Or paste an image URL" />
-        <button className="btn btn-ghost btn-sm" type="submit" disabled={!url.trim()}><Ic n="plus" s={14} /> Add URL</button>
+        <button className="btn btn-ghost btn-sm" type="submit" disabled={!url.trim()}>
+          <Ic n="plus" s={14} /> Add URL
+        </button>
       </form>
 
       {err && <p className="f-err">{err}</p>}
@@ -84,7 +86,13 @@ export function ImageUploader({ images = [], onChange }) {
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => makePrimary(index)} disabled={index === 0}>
                   {index === 0 ? "Primary" : "Make primary"}
                 </button>
-                <button type="button" className="icon-btn" onClick={() => remove(index)} aria-label={`Remove image ${index + 1}`} title="Remove image">
+                <button
+                  type="button"
+                  className="icon-btn"
+                  onClick={() => remove(index)}
+                  aria-label={`Remove image ${index + 1}`}
+                  title="Remove image"
+                >
                   <Ic n="trash" s={14} />
                 </button>
               </div>
@@ -93,7 +101,9 @@ export function ImageUploader({ images = [], onChange }) {
         </div>
       ) : (
         <div className="upload-empty">
-          <span className="empty-ic"><Ic n="box" s={24} /></span>
+          <span className="empty-ic">
+            <Ic n="box" s={24} />
+          </span>
           <strong>No product images yet</strong>
           <span>Add one from your device or paste an image URL.</span>
         </div>

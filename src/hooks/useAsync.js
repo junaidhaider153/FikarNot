@@ -10,11 +10,17 @@ export function useAsync(fn, deps = []) {
 
     Promise.resolve()
       .then(() => fn())
-      .then((data) => { if (alive) setState({ loading: false, error: null, data }); })
-      .catch((error) => { if (alive) setState({ loading: false, error, data: null }); });
+      .then((data) => {
+        if (alive) setState({ loading: false, error: null, data });
+      })
+      .catch((error) => {
+        if (alive) setState({ loading: false, error, data: null });
+      });
 
-    return () => { alive = false; };
-  // eslint-disable-next-line react-hooks/exhaustive-deps
+    return () => {
+      alive = false;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [...deps, tick]);
 
   const retry = useCallback(() => setTick((value) => value + 1), []);

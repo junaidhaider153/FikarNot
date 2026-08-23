@@ -24,8 +24,15 @@ export function CartItem({ line }) {
       </Link>
       <div className="cart-item-info">
         <div>
-          <Link className="cart-item-name" to={`/product/${p.id}`}>{p.name}</Link>
-          <p className="cart-item-category">{p.tags?.slice(0, 2).map((tag) => `#${tag}`).join(" · ") || "Everyday essential"}</p>
+          <Link className="cart-item-name" to={`/product/${p.id}`}>
+            {p.name}
+          </Link>
+          <p className="cart-item-category">
+            {p.tags
+              ?.slice(0, 2)
+              .map((tag) => `#${tag}`)
+              .join(" · ") || "Everyday essential"}
+          </p>
         </div>
         <div className="cart-item-meta">
           <span>{fmt(p.price)} each</span>

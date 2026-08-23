@@ -7,9 +7,10 @@ import { Ic } from "../components/icons";
 
 export default function WishlistPage() {
   const s = useApp();
-  const products = useMemo(() => s.wishlist
-    .map((id) => s.products.find((product) => product.id === id))
-    .filter(Boolean), [s.wishlist, s.products]);
+  const products = useMemo(
+    () => s.wishlist.map((id) => s.products.find((product) => product.id === id)).filter(Boolean),
+    [s.wishlist, s.products],
+  );
 
   return (
     <div className="container page-pad wishlist-page">
@@ -31,16 +32,26 @@ export default function WishlistPage() {
           icon="heart"
           title="Your wishlist is empty"
           sub="Save products you want to compare or come back to later."
-          cta={<Link className="btn btn-dark" to="/products">Explore products</Link>}
+          cta={
+            <Link className="btn btn-dark" to="/products">
+              Explore products
+            </Link>
+          }
         />
       ) : (
         <>
           <div className="wishlist-meta">
-            <span>{products.length} saved {products.length === 1 ? "item" : "items"}</span>
-            <Link className="sec-link" to="/products">Continue shopping <Ic n="arrow" s={14} /></Link>
+            <span>
+              {products.length} saved {products.length === 1 ? "item" : "items"}
+            </span>
+            <Link className="sec-link" to="/products">
+              Continue shopping <Ic n="arrow" s={14} />
+            </Link>
           </div>
           <div className="prod-grid">
-            {products.map((product) => <ProductCard key={product.id} p={product} />)}
+            {products.map((product) => (
+              <ProductCard key={product.id} p={product} />
+            ))}
           </div>
         </>
       )}

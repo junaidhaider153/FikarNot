@@ -65,7 +65,10 @@ const mergeCart = (base, incoming, products) => {
 const normalizeEmail = (value = "") => String(value).trim().toLowerCase();
 
 const ORDER_ID_PREFIX = "FN";
-const makeFallbackSku = (productId) => `FKN-${String(productId || "PROD").replace(/[^a-z0-9]/gi, "").toUpperCase()}`;
+const makeFallbackSku = (productId) =>
+  `FKN-${String(productId || "PROD")
+    .replace(/[^a-z0-9]/gi, "")
+    .toUpperCase()}`;
 const getNextOrderNumber = (orders) => {
   const max = orders.reduce((highest, order) => {
     const match = String(order.id || "").match(/^FN-(\d{4,})$/i);
@@ -84,9 +87,10 @@ const migrateOrderData = (orders, users, emailMigrations) => {
     if (migratedEmail) {
       next.customer.email = migratedEmail;
     }
-    const user = users.find((item) => item.id === next.customer.userId)
-      || users.find((item) => normalizeEmail(item.email) === normalizeEmail(next.customer.email))
-      || users.find((item) => normalizeEmail(item.email) === rawEmail);
+    const user =
+      users.find((item) => item.id === next.customer.userId) ||
+      users.find((item) => normalizeEmail(item.email) === normalizeEmail(next.customer.email)) ||
+      users.find((item) => normalizeEmail(item.email) === rawEmail);
     if (user && !next.customer.userId) next.customer.userId = user.id;
 
     const normalizedId = String(next.id || "");
@@ -130,9 +134,10 @@ const toast = (msg, kind = "ok") => {
   }, 2600);
 };
 
-export const cartLines = (snapshot = state) => snapshot.cart
-  .map((line) => ({ p: snapshot.products.find((product) => product.id === line.productId), qty: line.qty }))
-  .filter((line) => line.p);
+export const cartLines = (snapshot = state) =>
+  snapshot.cart
+    .map((line) => ({ p: snapshot.products.find((product) => product.id === line.productId), qty: line.qty }))
+    .filter((line) => line.p);
 
 export const appActions = {
   toast,
@@ -146,96 +151,99 @@ export const appActions = {
       try {
         await delay(400);
         let data;
-      if (!loadLS(STORAGE_KEYS.seeded, false)) {
-        data = seedData();
-        saveLS(STORAGE_KEYS.products, data.products);
-        saveLS(STORAGE_KEYS.categories, data.categories);
-        saveLS(STORAGE_KEYS.users, data.users);
-        saveLS(STORAGE_KEYS.orders, data.orders);
-        saveLS(STORAGE_KEYS.reviews, data.reviews || []);
-        saveLS(STORAGE_KEYS.customerCarts, {});
-        saveLS(STORAGE_KEYS.customerWishlists, {});
+        if (!loadLS(STORAGE_KEYS.seeded, false)) {
+          data = seedData();
+          saveLS(STORAGE_KEYS.products, data.products);
+          saveLS(STORAGE_KEYS.categories, data.categories);
+          saveLS(STORAGE_KEYS.users, data.users);
+          saveLS(STORAGE_KEYS.orders, data.orders);
+          saveLS(STORAGE_KEYS.reviews, data.reviews || []);
+          saveLS(STORAGE_KEYS.customerCarts, {});
+          saveLS(STORAGE_KEYS.customerWishlists, {});
+          localStorage.removeItem(STORAGE_KEYS.cart);
+          localStorage.removeItem(STORAGE_KEYS.wishlist);
+          saveLS(STORAGE_KEYS.seeded, true);
+        } else {
+          const storedReviews = loadLS(STORAGE_KEYS.reviews, null);
+          data = {
+            products: loadLS(STORAGE_KEYS.products, []),
+            categories: loadLS(STORAGE_KEYS.categories, []),
+            users: loadLS(STORAGE_KEYS.users, []),
+            orders: loadLS(STORAGE_KEYS.orders, []),
+            reviews: Array.isArray(storedReviews) ? storedReviews : seedData().reviews,
+          };
+          if (!Array.isArray(storedReviews)) saveLS(STORAGE_KEYS.reviews, data.reviews);
+        }
+
+        if (!Array.isArray(data.reviews)) data.reviews = [];
+        if (!Array.isArray(data.inventoryLog)) data.inventoryLog = [];
+
+        let productsChanged = false;
+        const existingSkus = new Set();
+        data.products = data.products.map((product) => {
+          let next = { ...product };
+          const fallbackThreshold = 10;
+          if (!next.sku) {
+            next.sku = makeFallbackSku(next.id);
+            productsChanged = true;
+          }
+          if (!Number.isFinite(+next.stockThreshold) || +next.stockThreshold < 0) {
+            next.stockThreshold = fallbackThreshold;
+            productsChanged = true;
+          }
+          let sku = String(next.sku).trim().toUpperCase();
+          if (existingSkus.has(sku)) {
+            sku = makeFallbackSku(`${next.id}-X`);
+            productsChanged = true;
+          }
+          next.sku = sku;
+          next.stockThreshold = Math.floor(+next.stockThreshold);
+          existingSkus.add(next.sku);
+          return next;
+        });
+        if (productsChanged) saveLS(STORAGE_KEYS.products, data.products);
+
+        // Keep demo branding/accounts consistent for fresh and existing installations.
+        const emailMigrations = {
+          "admin@kiosk.shop": "junaid@fikarnot.shop",
+          "editor@kiosk.shop": "editor@fikarnot.shop",
+          "maya@kiosk.shop": "urwa@fikarnot.shop",
+        };
+        let usersChanged = false;
+        data.users = data.users.map((user) => {
+          const migratedEmail = emailMigrations[normalizeEmail(user.email)];
+          if (!migratedEmail || normalizeEmail(user.email) === migratedEmail) return user;
+          usersChanged = true;
+          return { ...user, email: migratedEmail };
+        });
+        const migratedOrders = migrateOrderData(data.orders, data.users, emailMigrations);
+        const ordersChanged = JSON.stringify(migratedOrders) !== JSON.stringify(data.orders);
+        data.orders = migratedOrders;
+        if (usersChanged) saveLS(STORAGE_KEYS.users, data.users);
+        if (ordersChanged) saveLS(STORAGE_KEYS.orders, data.orders);
+
+        const sessionRaw = loadLS(STORAGE_KEYS.session, null);
+        const session = sessionRaw?.id ? data.users.find((user) => user.id === sessionRaw.id) || null : null;
+        if (session && (usersChanged || session.email !== sessionRaw.email || session.name !== sessionRaw.name))
+          saveLS(STORAGE_KEYS.session, session);
+        const legacyCart = loadLS(STORAGE_KEYS.cart, []);
+        const legacyWishlist = loadLS(STORAGE_KEYS.wishlist, []);
+        let cart = [];
+        let wishlist = [];
+        if (session?.id) {
+          const savedCart = readAccountBucket(STORAGE_KEYS.customerCarts, session.id);
+          const savedWishlist = readAccountBucket(STORAGE_KEYS.customerWishlists, session.id);
+          cart = savedCart.length ? savedCart : mergeCart([], legacyCart, data.products);
+          wishlist = savedWishlist.length
+            ? savedWishlist
+            : legacyWishlist.filter((id) => data.products.some((product) => product.id === id));
+          if (cart.length && !savedCart.length) writeAccountBucket(STORAGE_KEYS.customerCarts, session.id, cart);
+          if (wishlist.length && !savedWishlist.length) writeAccountBucket(STORAGE_KEYS.customerWishlists, session.id, wishlist);
+        }
         localStorage.removeItem(STORAGE_KEYS.cart);
         localStorage.removeItem(STORAGE_KEYS.wishlist);
-        saveLS(STORAGE_KEYS.seeded, true);
-      } else {
-        const storedReviews = loadLS(STORAGE_KEYS.reviews, null);
-        data = {
-          products: loadLS(STORAGE_KEYS.products, []),
-          categories: loadLS(STORAGE_KEYS.categories, []),
-          users: loadLS(STORAGE_KEYS.users, []),
-          orders: loadLS(STORAGE_KEYS.orders, []),
-          reviews: Array.isArray(storedReviews) ? storedReviews : seedData().reviews,
-        };
-        if (!Array.isArray(storedReviews)) saveLS(STORAGE_KEYS.reviews, data.reviews);
-      }
-
-      if (!Array.isArray(data.reviews)) data.reviews = [];
-      if (!Array.isArray(data.inventoryLog)) data.inventoryLog = [];
-
-      let productsChanged = false;
-      const existingSkus = new Set();
-      data.products = data.products.map((product) => {
-        let next = { ...product };
-        const fallbackThreshold = 10;
-        if (!next.sku) {
-          next.sku = makeFallbackSku(next.id);
-          productsChanged = true;
-        }
-        if (!Number.isFinite(+next.stockThreshold) || +next.stockThreshold < 0) {
-          next.stockThreshold = fallbackThreshold;
-          productsChanged = true;
-        }
-        let sku = String(next.sku).trim().toUpperCase();
-        if (existingSkus.has(sku)) {
-          sku = makeFallbackSku(`${next.id}-X`);
-          productsChanged = true;
-        }
-        next.sku = sku;
-        next.stockThreshold = Math.floor(+next.stockThreshold);
-        existingSkus.add(next.sku);
-        return next;
-      });
-      if (productsChanged) saveLS(STORAGE_KEYS.products, data.products);
-
-      // Keep demo branding/accounts consistent for fresh and existing installations.
-      const emailMigrations = {
-        "admin@kiosk.shop": "junaid@fikarnot.shop",
-        "editor@kiosk.shop": "editor@fikarnot.shop",
-        "maya@kiosk.shop": "urwa@fikarnot.shop",
-      };
-      let usersChanged = false;
-      data.users = data.users.map((user) => {
-        const migratedEmail = emailMigrations[normalizeEmail(user.email)];
-        if (!migratedEmail || normalizeEmail(user.email) === migratedEmail) return user;
-        usersChanged = true;
-        return { ...user, email: migratedEmail };
-      });
-      const migratedOrders = migrateOrderData(data.orders, data.users, emailMigrations);
-      const ordersChanged = JSON.stringify(migratedOrders) !== JSON.stringify(data.orders);
-      data.orders = migratedOrders;
-      if (usersChanged) saveLS(STORAGE_KEYS.users, data.users);
-      if (ordersChanged) saveLS(STORAGE_KEYS.orders, data.orders);
-
-      const sessionRaw = loadLS(STORAGE_KEYS.session, null);
-      const session = sessionRaw?.id ? (data.users.find((user) => user.id === sessionRaw.id) || null) : null;
-      if (session && (usersChanged || session.email !== sessionRaw.email || session.name !== sessionRaw.name)) saveLS(STORAGE_KEYS.session, session);
-      const legacyCart = loadLS(STORAGE_KEYS.cart, []);
-      const legacyWishlist = loadLS(STORAGE_KEYS.wishlist, []);
-      let cart = [];
-      let wishlist = [];
-      if (session?.id) {
-        const savedCart = readAccountBucket(STORAGE_KEYS.customerCarts, session.id);
-        const savedWishlist = readAccountBucket(STORAGE_KEYS.customerWishlists, session.id);
-        cart = savedCart.length ? savedCart : mergeCart([], legacyCart, data.products);
-        wishlist = savedWishlist.length ? savedWishlist : legacyWishlist.filter((id) => data.products.some((product) => product.id === id));
-        if (cart.length && !savedCart.length) writeAccountBucket(STORAGE_KEYS.customerCarts, session.id, cart);
-        if (wishlist.length && !savedWishlist.length) writeAccountBucket(STORAGE_KEYS.customerWishlists, session.id, wishlist);
-      }
-      localStorage.removeItem(STORAGE_KEYS.cart);
-      localStorage.removeItem(STORAGE_KEYS.wishlist);
-      saveLS(STORAGE_KEYS.inventoryLog, data.inventoryLog);
-      setState({ ...data, cart, wishlist, session, ready: true });
+        saveLS(STORAGE_KEYS.inventoryLog, data.inventoryLog);
+        setState({ ...data, cart, wishlist, session, ready: true });
       } catch (error) {
         setState({ bootError: error?.message || "Failed to load store data" });
       } finally {
@@ -260,7 +268,9 @@ export const appActions = {
     }
     const guestCart = state.session ? [] : state.cart;
     const accountCart = readAccountBucket(STORAGE_KEYS.customerCarts, user.id);
-    const accountWishlist = readAccountBucket(STORAGE_KEYS.customerWishlists, user.id).filter((id) => state.products.some((product) => product.id === id));
+    const accountWishlist = readAccountBucket(STORAGE_KEYS.customerWishlists, user.id).filter((id) =>
+      state.products.some((product) => product.id === id),
+    );
     const cart = mergeCart(accountCart, guestCart, state.products);
     setState({ session: user, cart, wishlist: accountWishlist });
     writeAccountBucket(STORAGE_KEYS.customerCarts, user.id, cart);
@@ -320,9 +330,11 @@ export const appActions = {
       toast("That email is already in use", "err");
       return false;
     }
-    const users = state.users.map((user) => user.id === state.session.id ? { ...user, name, email } : user);
+    const users = state.users.map((user) => (user.id === state.session.id ? { ...user, name, email } : user));
     const orders = state.orders.map((order) => {
-      const belongsToUser = order.customer?.userId === state.session.id || (!order.customer?.userId && normalizeEmail(order.customer?.email) === normalizeEmail(state.session.email));
+      const belongsToUser =
+        order.customer?.userId === state.session.id ||
+        (!order.customer?.userId && normalizeEmail(order.customer?.email) === normalizeEmail(state.session.email));
       if (!belongsToUser) return order;
       return { ...order, customer: { ...order.customer, userId: state.session.id, name, email } };
     });
@@ -336,34 +348,69 @@ export const appActions = {
   },
 
   submitReview({ productId, rating, title, body }) {
-    if (!state.session) { toast("Please sign in to leave a review", "err"); return false; }
+    if (!state.session) {
+      toast("Please sign in to leave a review", "err");
+      return false;
+    }
     const product = state.products.find((item) => item.id === productId);
-    if (!product) { toast("Product not found", "err"); return false; }
+    if (!product) {
+      toast("Product not found", "err");
+      return false;
+    }
     const userId = state.session.id;
     const hasPurchased = state.orders.some((order) => {
-      const belongsToUser = order.customer?.userId === state.session.id || (!order.customer?.userId && normalizeEmail(order.customer?.email) === normalizeEmail(state.session.email));
+      const belongsToUser =
+        order.customer?.userId === state.session.id ||
+        (!order.customer?.userId && normalizeEmail(order.customer?.email) === normalizeEmail(state.session.email));
       return belongsToUser && order.items?.some((item) => item.productId === productId);
     });
-    if (!hasPurchased) { toast("Only customers who purchased this product can review it", "err"); return false; }
+    if (!hasPurchased) {
+      toast("Only customers who purchased this product can review it", "err");
+      return false;
+    }
     const cleanRating = Math.round(Number(rating));
     const cleanTitle = String(title || "").trim();
     const cleanBody = String(body || "").trim();
-    if (cleanRating < 1 || cleanRating > 5) { toast("Choose a rating from 1 to 5", "err"); return false; }
-    if (cleanTitle.length < 3) { toast("Add a short review title", "err"); return false; }
-    if (cleanBody.length < 10) { toast("Your review should be at least 10 characters", "err"); return false; }
+    if (cleanRating < 1 || cleanRating > 5) {
+      toast("Choose a rating from 1 to 5", "err");
+      return false;
+    }
+    if (cleanTitle.length < 3) {
+      toast("Add a short review title", "err");
+      return false;
+    }
+    if (cleanBody.length < 10) {
+      toast("Your review should be at least 10 characters", "err");
+      return false;
+    }
     const existing = state.reviews.find((review) => review.productId === productId && review.userId === userId);
     let reviews;
     if (existing) {
-      reviews = state.reviews.map((review) => review.id === existing.id ? { ...review, rating: cleanRating, title: cleanTitle, body: cleanBody, status: "published", createdAt: Date.now() } : review);
+      reviews = state.reviews.map((review) =>
+        review.id === existing.id
+          ? { ...review, rating: cleanRating, title: cleanTitle, body: cleanBody, status: "published", createdAt: Date.now() }
+          : review,
+      );
       toast("Review updated");
     } else {
-      const review = { id: `r${uid()}`, productId, userId, authorName: state.session.name, rating: cleanRating, title: cleanTitle, body: cleanBody, status: "published", verifiedPurchase: true, createdAt: Date.now() };
+      const review = {
+        id: `r${uid()}`,
+        productId,
+        userId,
+        authorName: state.session.name,
+        rating: cleanRating,
+        title: cleanTitle,
+        body: cleanBody,
+        status: "published",
+        verifiedPurchase: true,
+        createdAt: Date.now(),
+      };
       reviews = [review, ...state.reviews];
       toast("Thanks for sharing your review");
     }
     const productReviews = reviews.filter((review) => review.productId === productId && review.status === "published");
     const ratingAverage = +(productReviews.reduce((sum, review) => sum + review.rating, 0) / productReviews.length).toFixed(1);
-    const products = state.products.map((item) => item.id === productId ? { ...item, rating: ratingAverage } : item);
+    const products = state.products.map((item) => (item.id === productId ? { ...item, rating: ratingAverage } : item));
     setState({ reviews, products });
     saveLS(STORAGE_KEYS.reviews, reviews);
     saveLS(STORAGE_KEYS.products, products);
@@ -374,12 +421,19 @@ export const appActions = {
     if (!state.session) return false;
     const review = state.reviews.find((item) => item.id === reviewId);
     if (!review) return false;
-    if (review.userId !== state.session.id && !["admin", "editor"].includes(state.session.role)) { toast("You can't remove this review", "err"); return false; }
+    if (review.userId !== state.session.id && !["admin", "editor"].includes(state.session.role)) {
+      toast("You can't remove this review", "err");
+      return false;
+    }
     const reviews = state.reviews.filter((item) => item.id !== reviewId);
     const productReviews = reviews.filter((item) => item.productId === review.productId && item.status === "published");
     const product = state.products.find((item) => item.id === review.productId);
-    const ratingAverage = productReviews.length ? +(productReviews.reduce((sum, item) => sum + item.rating, 0) / productReviews.length).toFixed(1) : (product?.rating || 0);
-    const products = product ? state.products.map((item) => item.id === product.id ? { ...item, rating: ratingAverage } : item) : state.products;
+    const ratingAverage = productReviews.length
+      ? +(productReviews.reduce((sum, item) => sum + item.rating, 0) / productReviews.length).toFixed(1)
+      : product?.rating || 0;
+    const products = product
+      ? state.products.map((item) => (item.id === product.id ? { ...item, rating: ratingAverage } : item))
+      : state.products;
     setState({ reviews, products });
     saveLS(STORAGE_KEYS.reviews, reviews);
     saveLS(STORAGE_KEYS.products, products);
@@ -399,7 +453,7 @@ export const appActions = {
       return false;
     }
     if (confirmationText !== "DELETE") {
-      toast('Type DELETE to confirm account removal', "err");
+      toast("Type DELETE to confirm account removal", "err");
       return false;
     }
 
@@ -407,9 +461,12 @@ export const appActions = {
     const accountEmail = normalizeEmail(state.session.email);
     const deletedAt = Date.now();
     const users = state.users.filter((user) => user.id !== accountId);
-    const reviews = state.reviews.map((review) => review.userId === accountId ? { ...review, userId: `deleted-${deletedAt}`, authorName: "Deleted Customer" } : review);
+    const reviews = state.reviews.map((review) =>
+      review.userId === accountId ? { ...review, userId: `deleted-${deletedAt}`, authorName: "Deleted Customer" } : review,
+    );
     const orders = state.orders.map((order) => {
-      const belongsToUser = order.customer?.userId === accountId || (!order.customer?.userId && normalizeEmail(order.customer?.email) === accountEmail);
+      const belongsToUser =
+        order.customer?.userId === accountId || (!order.customer?.userId && normalizeEmail(order.customer?.email) === accountEmail);
       if (!belongsToUser) return order;
       return {
         ...order,
@@ -446,7 +503,7 @@ export const appActions = {
       toast("New password must be at least 6 characters", "err");
       return false;
     }
-    const users = state.users.map((user) => user.id === state.session.id ? { ...user, password: newPassword } : user);
+    const users = state.users.map((user) => (user.id === state.session.id ? { ...user, password: newPassword } : user));
     const session = users.find((user) => user.id === state.session.id);
     setState({ users, session });
     saveLS(STORAGE_KEYS.users, users);
@@ -471,9 +528,10 @@ export const appActions = {
         country: (address.country || "").trim(),
         isDefault: Boolean(address.isDefault),
       };
-      let next = clean.id && current.some((item) => item.id === clean.id)
-        ? current.map((item) => item.id === clean.id ? clean : item)
-        : [...current, clean];
+      let next =
+        clean.id && current.some((item) => item.id === clean.id)
+          ? current.map((item) => (item.id === clean.id ? clean : item))
+          : [...current, clean];
       if (clean.isDefault) next = next.map((item) => ({ ...item, isDefault: item.id === clean.id }));
       if (next.length === 1 && !next[0].isDefault) next = [{ ...next[0], isDefault: true }];
       return { ...user, addresses: next };
@@ -514,7 +572,7 @@ export const appActions = {
     }
 
     const cart = existing
-      ? state.cart.map((line) => line.productId === productId ? { ...line, qty: nextQty } : line)
+      ? state.cart.map((line) => (line.productId === productId ? { ...line, qty: nextQty } : line))
       : [...state.cart, { productId, qty: nextQty }];
 
     setState({ cart });
@@ -526,9 +584,10 @@ export const appActions = {
     const product = state.products.find((item) => item.id === productId);
     if (!product) return;
 
-    const cart = qty <= 0
-      ? state.cart.filter((line) => line.productId !== productId)
-      : state.cart.map((line) => line.productId === productId ? { ...line, qty: Math.min(qty, product.stock) } : line);
+    const cart =
+      qty <= 0
+        ? state.cart.filter((line) => line.productId !== productId)
+        : state.cart.map((line) => (line.productId === productId ? { ...line, qty: Math.min(qty, product.stock) } : line));
 
     setState({ cart });
     if (state.session?.id) writeAccountBucket(STORAGE_KEYS.customerCarts, state.session.id, cart);
@@ -547,9 +606,7 @@ export const appActions = {
       return false;
     }
     const exists = state.wishlist.includes(productId);
-    const wishlist = exists
-      ? state.wishlist.filter((id) => id !== productId)
-      : [productId, ...state.wishlist];
+    const wishlist = exists ? state.wishlist.filter((id) => id !== productId) : [productId, ...state.wishlist];
     setState({ wishlist });
     writeAccountBucket(STORAGE_KEYS.customerWishlists, state.session.id, wishlist);
     toast(exists ? `${product.name} removed from wishlist` : `${product.name} added to wishlist`);
@@ -564,7 +621,9 @@ export const appActions = {
   },
 
   upsertProduct(product) {
-    const sku = String(product.sku || makeFallbackSku(product.id)).trim().toUpperCase();
+    const sku = String(product.sku || makeFallbackSku(product.id))
+      .trim()
+      .toUpperCase();
     const duplicate = state.products.find((item) => item.id !== product.id && String(item.sku || "").toLowerCase() === sku.toLowerCase());
     if (duplicate) {
       toast(`SKU ${sku} is already used by ${duplicate.name}`, "err");
@@ -590,9 +649,19 @@ export const appActions = {
       return false;
     }
     if (value === product.stock) return true;
-    const products = state.products.map((item) => item.id === productId ? { ...item, stock: value } : item);
+    const products = state.products.map((item) => (item.id === productId ? { ...item, stock: value } : item));
     const inventoryLog = [
-      { id: uid(), productId, productName: product.name, previousStock: product.stock, nextStock: value, change: value - product.stock, reason, createdAt: Date.now(), userId: state.session?.id || null },
+      {
+        id: uid(),
+        productId,
+        productName: product.name,
+        previousStock: product.stock,
+        nextStock: value,
+        change: value - product.stock,
+        reason,
+        createdAt: Date.now(),
+        userId: state.session?.id || null,
+      },
       ...state.inventoryLog,
     ].slice(0, 100);
     setState({ products, inventoryLog });
@@ -616,7 +685,7 @@ export const appActions = {
   },
 
   toggleFeatured(id) {
-    const products = state.products.map((product) => product.id === id ? { ...product, featured: !product.featured } : product);
+    const products = state.products.map((product) => (product.id === id ? { ...product, featured: !product.featured } : product));
     setState({ products });
     saveLS(STORAGE_KEYS.products, products);
   },
@@ -674,7 +743,7 @@ export const appActions = {
   },
 
   setRole(id, role) {
-    const users = state.users.map((user) => user.id === id ? { ...user, role } : user);
+    const users = state.users.map((user) => (user.id === id ? { ...user, role } : user));
     const session = state.session?.id === id ? users.find((user) => user.id === id) : state.session;
     setState({ users, session });
     saveLS(STORAGE_KEYS.users, users);
@@ -683,7 +752,9 @@ export const appActions = {
   },
 
   placeOrder(customer) {
-    const items = cartLines().map(({ p, qty }) => ({ productId: p.id, name: p.name, price: p.price, qty: Math.min(qty, p.stock) })).filter((item) => item.qty > 0);
+    const items = cartLines()
+      .map(({ p, qty }) => ({ productId: p.id, name: p.name, price: p.price, qty: Math.min(qty, p.stock) }))
+      .filter((item) => item.qty > 0);
     if (!items.length) {
       toast("Your cart is empty or the selected products are out of stock", "err");
       return null;
@@ -709,10 +780,24 @@ export const appActions = {
     });
     const orders = [order, ...state.orders];
     const inventoryLog = [
-      ...items.map((item) => {
-        const product = state.products.find((entry) => entry.id === item.productId);
-        return product ? { id: uid(), productId: product.id, productName: product.name, previousStock: product.stock, nextStock: Math.max(0, product.stock - item.qty), change: -item.qty, reason: `Order ${order.id}`, createdAt: Date.now(), userId: state.session?.id || null } : null;
-      }).filter(Boolean),
+      ...items
+        .map((item) => {
+          const product = state.products.find((entry) => entry.id === item.productId);
+          return product
+            ? {
+                id: uid(),
+                productId: product.id,
+                productName: product.name,
+                previousStock: product.stock,
+                nextStock: Math.max(0, product.stock - item.qty),
+                change: -item.qty,
+                reason: `Order ${order.id}`,
+                createdAt: Date.now(),
+                userId: state.session?.id || null,
+              }
+            : null;
+        })
+        .filter(Boolean),
       ...state.inventoryLog,
     ].slice(0, 100);
     setState({ orders, products, cart: [], inventoryLog });
@@ -724,7 +809,7 @@ export const appActions = {
   },
 
   setOrderStatus(id, status) {
-    const orders = state.orders.map((order) => order.id === id ? { ...order, status } : order);
+    const orders = state.orders.map((order) => (order.id === id ? { ...order, status } : order));
     setState({ orders });
     saveLS(STORAGE_KEYS.orders, orders);
     toast("Order status updated");

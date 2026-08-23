@@ -5,10 +5,11 @@ export const uid = () => {
 
 export const delay = (ms = 250) => new Promise((resolve) => setTimeout(resolve, ms));
 
-export const fmt = (n) => new Intl.NumberFormat("en-US", {
-  style: "currency",
-  currency: "USD",
-}).format(n);
+export const fmt = (n) =>
+  new Intl.NumberFormat("en-US", {
+    style: "currency",
+    currency: "USD",
+  }).format(n);
 
 export const loadLS = (key, fallback) => {
   try {

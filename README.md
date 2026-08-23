@@ -5,6 +5,7 @@
 This version builds directly on the latest verified Module 8 project.
 
 ### Module 9 improvements
+
 - Added a customer self-service account deletion flow under Account → Security.
 - Requires the current password plus typing `DELETE` to confirm.
 - Prevents admin/editor self-deletion from the customer account area.
@@ -17,6 +18,7 @@ This version builds directly on the latest verified Module 8 project.
 This version builds directly on the latest verified Module 7 project.
 
 ### Module 8 improvements
+
 - Added persistent wishlist state with localStorage support.
 - Added wishlist toggle on product cards and product detail pages.
 - Added dedicated `/wishlist` page with clear-wishlist action.
@@ -26,6 +28,7 @@ This version builds directly on the latest verified Module 7 project.
 - Added heart icon and responsive wishlist styling.
 
 ### Module 7 improvements
+
 - Reworked checkout into a clearer two-step flow.
 - Added contact and shipping validation with field-level feedback.
 - Added Card (mock) and Cash on Delivery payment options.
@@ -39,6 +42,7 @@ This version builds directly on the latest verified Module 7 project.
 - Fixed the loading logo in the router boot state to use FikarNot branding.
 
 ### Important demo limitation
+
 Payment is still simulated. No real card details are sent to a payment provider or server. Local uploads, products, users, carts, and orders remain browser/localStorage-based for this personal project.
 
 ## Run
@@ -49,6 +53,7 @@ npm run dev
 ```
 
 ## Pre-release verification performed
+
 - Relative import scan: passed (87 local import references checked, 0 missing).
 - Checkout route reference check: passed.
 - Product-detail route regression reference: passed.
@@ -56,13 +61,14 @@ npm run dev
 - Store order-creation logic reviewed for stock-safe quantities.
 - Full `npm install` / Vite production build could not be completed in the packaging environment because dependency installation timed out.
 
-
 ## Module 7
+
 Added protected customer accounts with profile management, order history, saved addresses, and password change flows.
 
 ## Module 8
+
 Added persistent wishlist functionality across product cards, product details, customer account, and a dedicated wishlist page.
 
-
 ## Module 14
+
 Inventory management now includes SKUs, configurable low-stock thresholds, quick stock adjustments, inventory KPIs, and a recent inventory activity log.

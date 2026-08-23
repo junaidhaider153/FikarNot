@@ -1,3 +1,4 @@
+import { lazy, Suspense } from "react";
 import { Route, Routes } from "react-router-dom";
 import HomePage from "../pages/HomePage";
 import ProductsPage from "../pages/ProductsPage";
@@ -7,10 +8,23 @@ import CheckoutPage from "../pages/CheckoutPage";
 import LoginPage from "../pages/LoginPage";
 import AccountPage from "../pages/AccountPage";
 import WishlistPage from "../pages/WishlistPage";
-import AdminPage from "../pages/AdminPage";
 import NotFoundPage from "../pages/NotFoundPage";
 import { STAFF_ROLES, ADMIN_ROLES } from "../config/appConfig";
 import { ProtectedRoute } from "./ProtectedRoute";
+
+// Lazy-loaded: pulls the admin UI *and* recharts out of the main bundle so
+// anonymous shoppers never download Studio-only code.
+const AdminPage = lazy(() => import("../pages/AdminPage"));
+
+function AdminRoute({ tab, roles }) {
+  return (
+    <ProtectedRoute roles={roles}>
+      <Suspense fallback={<Boot />}>
+        <AdminPage tab={tab} />
+      </Suspense>
+    </ProtectedRoute>
+  );
+}
 
 export function Boot() {
   return (
@@ -30,16 +44,30 @@ export function AppRoutes() {
       <Route path="/cart" element={<CartPage />} />
       <Route path="/checkout" element={<CheckoutPage />} />
       <Route path="/login" element={<LoginPage />} />
-      <Route path="/account" element={<ProtectedRoute><AccountPage /></ProtectedRoute>} />
-      <Route path="/wishlist" element={<ProtectedRoute><WishlistPage /></ProtectedRoute>} />
+      <Route
+        path="/account"
+        element={
+          <ProtectedRoute>
+            <AccountPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route
+        path="/wishlist"
+        element={
+          <ProtectedRoute>
+            <WishlistPage />
+          </ProtectedRoute>
+        }
+      />
 
-      <Route path="/admin" element={<ProtectedRoute roles={STAFF_ROLES}><AdminPage tab="dashboard" /></ProtectedRoute>} />
-      <Route path="/admin/products" element={<ProtectedRoute roles={STAFF_ROLES}><AdminPage tab="products" /></ProtectedRoute>} />
-      <Route path="/admin/inventory" element={<ProtectedRoute roles={STAFF_ROLES}><AdminPage tab="inventory" /></ProtectedRoute>} />
-      <Route path="/admin/categories" element={<ProtectedRoute roles={STAFF_ROLES}><AdminPage tab="categories" /></ProtectedRoute>} />
-      <Route path="/admin/orders" element={<ProtectedRoute roles={STAFF_ROLES}><AdminPage tab="orders" /></ProtectedRoute>} />
-      <Route path="/admin/reviews" element={<ProtectedRoute roles={STAFF_ROLES}><AdminPage tab="reviews" /></ProtectedRoute>} />
-      <Route path="/admin/users" element={<ProtectedRoute roles={ADMIN_ROLES}><AdminPage tab="users" /></ProtectedRoute>} />
+      <Route path="/admin" element={<AdminRoute tab="dashboard" roles={STAFF_ROLES} />} />
+      <Route path="/admin/products" element={<AdminRoute tab="products" roles={STAFF_ROLES} />} />
+      <Route path="/admin/inventory" element={<AdminRoute tab="inventory" roles={STAFF_ROLES} />} />
+      <Route path="/admin/categories" element={<AdminRoute tab="categories" roles={STAFF_ROLES} />} />
+      <Route path="/admin/orders" element={<AdminRoute tab="orders" roles={STAFF_ROLES} />} />
+      <Route path="/admin/reviews" element={<AdminRoute tab="reviews" roles={STAFF_ROLES} />} />
+      <Route path="/admin/users" element={<AdminRoute tab="users" roles={ADMIN_ROLES} />} />
 
       <Route path="*" element={<NotFoundPage />} />
     </Routes>

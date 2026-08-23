@@ -10,7 +10,11 @@ export default function NotFoundPage() {
         icon="alert"
         title="404 — page not found"
         sub={`There is nothing at ${location.pathname}. It may have moved or never existed.`}
-        cta={<Link className="btn btn-dark" to="/">Back home</Link>}
+        cta={
+          <Link className="btn btn-dark" to="/">
+            Back home
+          </Link>
+        }
       />
     </div>
   );
