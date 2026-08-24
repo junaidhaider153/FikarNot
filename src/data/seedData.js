@@ -140,9 +140,9 @@ export function seedData() {
   ];
 
   const users = [
-    { id: "u1", name: "Ari Admin", email: "junaid@fikarnot.shop", password: "admin123", role: "admin", createdAt: now - 9e8 },
-    { id: "u2", name: "Noor Haddad", email: "editor@fikarnot.shop", password: "editor123", role: "editor", createdAt: now - 8e8 },
-    { id: "u3", name: "Maya Chen", email: "urwa@fikarnot.shop", password: "maya123", role: "customer", createdAt: now - 7e8 },
+    { id: "u1", name: "Junaid Haider", email: "junaid@fikarnot.shop", role: "admin", createdAt: now - 9e8 },
+    { id: "u2", name: "FikarNot Editor", email: "editor@fikarnot.shop", role: "editor", createdAt: now - 8e8 },
+    { id: "u3", name: "Urwa", email: "urwa@fikarnot.shop", role: "customer", createdAt: now - 7e8 },
   ];
 
   const mk = (id, name, email, items, days, status) => {
@@ -225,5 +225,43 @@ export function seedData() {
     },
   ];
 
-  return { products, categories, users, orders, reviews, cart: [] };
+  const coupons = [
+    {
+      id: "cp1",
+      code: "WELCOME10",
+      type: "percent",
+      value: 10,
+      minSubtotal: 50,
+      maxUses: 100,
+      usedCount: 0,
+      active: true,
+      expiresAt: now + 30 * 864e5,
+      description: "10% off orders over $50.",
+    },
+    {
+      id: "cp2",
+      code: "FREESHIP",
+      type: "free_shipping",
+      value: 0,
+      minSubtotal: 50,
+      maxUses: 0,
+      usedCount: 0,
+      active: true,
+      expiresAt: now + 60 * 864e5,
+      description: "Free standard shipping on orders over $50.",
+    },
+    {
+      id: "cp3",
+      code: "SAVE20",
+      type: "fixed",
+      value: 20,
+      minSubtotal: 120,
+      maxUses: 50,
+      usedCount: 0,
+      active: true,
+      expiresAt: now + 45 * 864e5,
+      description: "$20 off orders over $120.",
+    },
+  ];
+  return { products, categories, users, orders, reviews, coupons, cart: [] };
 }

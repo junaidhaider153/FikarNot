@@ -10,5 +10,11 @@ export const STORAGE_KEYS = Object.freeze({
   session: "fikarnot_session",
   reviews: "fikarnot_reviews",
   inventoryLog: "fikarnot_inventory_log",
+  coupons: "fikarnot_coupons",
+  recentlyViewed: "fikarnot_recently_viewed",
+  customerNotifications: "fikarnot_customer_notifications",
+  supportTickets: "fikarnot_support_tickets",
+  returnRequests: "fikarnot_return_requests",
+  comparison: "fikarnot_comparison",
   seeded: "fikarnot_seeded_v3",
 });

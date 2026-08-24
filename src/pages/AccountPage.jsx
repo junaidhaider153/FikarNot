@@ -3,6 +3,7 @@ import { Link, useNavigate } from "react-router-dom";
 import { useApp, appActions } from "../store/appStore";
 import { fmt } from "../utils/helpers";
 import { Empty, Modal } from "../components/common";
+import { RETURN_REASONS, canCancelOrder, canRequestReturn } from "../utils/returns";
 import { ProductCard } from "../components/ProductCard";
 import { Ic } from "../components/icons";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
@@ -72,6 +73,9 @@ export default function AccountPage() {
   const [deletePassword, setDeletePassword] = useState("");
   const [deleteConfirmation, setDeleteConfirmation] = useState("");
   const [deleteBusy, setDeleteBusy] = useState(false);
+  const [returnOrder, setReturnOrder] = useState(null);
+  const [returnReason, setReturnReason] = useState(RETURN_REASONS[0]);
+  const [returnNote, setReturnNote] = useState("");
 
   const orders = useMemo(
     () =>
@@ -87,19 +91,19 @@ export default function AccountPage() {
 
   if (!user) return null;
 
-  const saveProfile = (e) => {
+  const saveProfile = async (e) => {
     e.preventDefault();
-    const ok = appActions.updateProfile(profile);
+    const ok = await appActions.updateProfile(profile);
     if (ok) setTab("overview");
   };
 
-  const savePassword = (e) => {
+  const savePassword = async (e) => {
     e.preventDefault();
     if (passwords.next !== passwords.confirm) {
       appActions.toast("New passwords do not match", "err");
       return;
     }
-    if (appActions.changePassword(passwords.current, passwords.next)) {
+    if (await appActions.changePassword(passwords.current, passwords.next)) {
       setPasswords({ current: "", next: "", confirm: "" });
     }
   };
@@ -143,14 +147,24 @@ export default function AccountPage() {
     setDeleteConfirmation("");
   };
 
-  const confirmDeleteAccount = (e) => {
+  const confirmDeleteAccount = async (e) => {
     e.preventDefault();
     setDeleteBusy(true);
-    const ok = appActions.deleteAccount(deletePassword, deleteConfirmation);
+    const ok = await appActions.deleteAccount(deletePassword, deleteConfirmation);
     setDeleteBusy(false);
     if (ok) {
       setShowDeleteAccount(false);
       navigate("/", { replace: true });
+    }
+  };
+
+  const submitReturn = (e) => {
+    e.preventDefault();
+    if (!returnOrder) return;
+    if (appActions.requestReturn(returnOrder.id, returnReason, returnNote)) {
+      setReturnOrder(null);
+      setReturnReason(RETURN_REASONS[0]);
+      setReturnNote("");
     }
   };
 
@@ -195,6 +209,13 @@ export default function AccountPage() {
               {item.count != null && <span className="account-count">{item.count}</span>}
             </button>
           ))}
+          <Link className="account-nav-btn account-nav-link" to="/notifications">
+            <Ic n="bell" s={16} />
+            <span>Notifications</span>
+            {(s.notifications?.filter((item) => !item.read).length || 0) > 0 && (
+              <span className="account-count">{s.notifications.filter((item) => !item.read).length}</span>
+            )}
+          </Link>
           <button className="account-nav-btn danger" onClick={logout}>
             <Ic n="logout" s={16} />
             <span>Sign out</span>
@@ -390,6 +411,12 @@ export default function AccountPage() {
                         <span>Shipping</span>
                         <span>{order.shipping === 0 ? "Free" : fmt(order.shipping)}</span>
                       </div>
+                      {order.discount > 0 && (
+                        <div className="sum-row coupon-discount-row">
+                          <span>Discount {order.coupon?.code ? `(${order.coupon.code})` : ""}</span>
+                          <span>-{fmt(order.discount)}</span>
+                        </div>
+                      )}
                       <div className="sum-row total">
                         <span>Total</span>
                         <span>{fmt(order.total)}</span>
@@ -399,6 +426,30 @@ export default function AccountPage() {
                           <Ic n="check" s={15} /> Updates for this order are associated with <b>{order.customer.email}</b>.
                         </p>
                       )}
+                      {order.returnRequest && (
+                        <div className="return-request-note">
+                          <Ic n="refresh" s={15} /> Return request:{" "}
+                          <b>{(s.returnRequests || []).find((item) => item.id === order.returnRequest)?.status || "requested"}</b>
+                        </div>
+                      )}
+                      <div className="order-actions">
+                        {canCancelOrder(order) && (
+                          <button
+                            className="btn btn-danger btn-sm"
+                            onClick={() => {
+                              if (window.confirm(`Cancel order ${order.id}? The items will be returned to stock.`))
+                                appActions.cancelOrder(order.id);
+                            }}
+                          >
+                            Cancel order
+                          </button>
+                        )}
+                        {canRequestReturn(order) && (
+                          <button className="btn btn-ghost btn-sm" onClick={() => setReturnOrder(order)}>
+                            Request return
+                          </button>
+                        )}
+                      </div>
                     </div>
                   </details>
                 ))}
@@ -719,6 +770,44 @@ export default function AccountPage() {
           </>
         )}
       </main>
+      {returnOrder && (
+        <Modal title={`Request a return · ${returnOrder.id}`} onClose={() => setReturnOrder(null)}>
+          <form onSubmit={submitReturn}>
+            <p className="account-muted">Returns are available for delivered orders within 30 days in this demo.</p>
+            <div style={{ marginBottom: 14 }}>
+              <label className="lbl" htmlFor="return-reason">
+                Reason
+              </label>
+              <select id="return-reason" className="select" value={returnReason} onChange={(e) => setReturnReason(e.target.value)}>
+                {RETURN_REASONS.map((reason) => (
+                  <option key={reason}>{reason}</option>
+                ))}
+              </select>
+            </div>
+            <div style={{ marginBottom: 18 }}>
+              <label className="lbl" htmlFor="return-note">
+                Additional details
+              </label>
+              <textarea
+                id="return-note"
+                className="textarea"
+                value={returnNote}
+                onChange={(e) => setReturnNote(e.target.value)}
+                placeholder="Tell us anything that will help us review the request."
+                maxLength={500}
+              />
+            </div>
+            <div className="form-actions">
+              <button type="button" className="btn btn-ghost" onClick={() => setReturnOrder(null)}>
+                Cancel
+              </button>
+              <button className="btn btn-dark">
+                <Ic n="check" s={15} /> Submit return request
+              </button>
+            </div>
+          </form>
+        </Modal>
+      )}
       {showDeleteAccount && (
         <Modal title="Delete your account" onClose={closeDeleteAccount}>
           <div className="delete-account-warning">

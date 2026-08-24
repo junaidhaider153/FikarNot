@@ -1,14 +1,17 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useApp, appActions } from "../store/appStore";
-import { IMG } from "../assets/assets";
+import { IMG, GALLERY } from "../assets/assets";
 import { Ic } from "../components/icons";
 import { ProductCard } from "../components/ProductCard";
+import { HeroSlider } from "../components/HeroSlider";
 import { Empty, SkelGrid } from "../components/common";
 import { api } from "../api/storeApi";
 import { useAsync } from "../hooks/useAsync";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
 import { APP_DESCRIPTION } from "../config/appConfig";
+import { couponDescription, isCouponUsable } from "../utils/coupons";
+import { resolveRecentlyViewed } from "../utils/recommendations";
 
 const PRINCIPLES = [
   {
@@ -43,6 +46,17 @@ export default function HomePage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps -- depending on `products`, not the derived `list` (a fresh array reference every render), so this actually memoizes.
   }, [products]);
   const countFor = (id) => s.products.filter((p) => p.categoryId === id).length;
+  const activeOffers = (s.coupons || []).filter((coupon) => isCouponUsable(coupon)).slice(0, 3);
+  const recent = resolveRecentlyViewed(s.recentlyViewed, list, 4);
+
+  // Hero slider: opens on the existing hero shot, then cycles a few catalogue images.
+  // To add a real video slide once you have footage, drop the file in `public/media/`
+  // and add an entry here, e.g.:
+  //   { id: "video", type: "video", src: "/media/hero-loop.mp4", poster: IMG.hero }
+  const heroSlides = [
+    { id: "hero", type: "image", src: IMG.hero, alt: "FikarNot products arranged on a warm cream surface" },
+    ...GALLERY.slice(0, 3).map(([key, url]) => ({ id: key, type: "image", src: url, alt: `${key} from the FikarNot catalogue` })),
+  ];
 
   const subscribe = (event) => {
     event.preventDefault();
@@ -57,16 +71,17 @@ export default function HomePage() {
 
   return (
     <>
-      <section className="container hero">
+      <section className="container hero hero-modern">
         <div className="hero-copy">
+          <span className="hero-kicker">Curated essentials · Free shipping over $75</span>
           <span className="eyebrow">FikarNot — objects for the everyday</span>
           <h1 className="h1">
-            Good tools.
+            Everyday essentials,
             <br />
-            <em>Quiet design.</em>
+            <em>beautifully chosen.</em>
           </h1>
           <p className="hero-sub">
-            A tightly edited catalogue of audio, carry and desk goods. Every product earns its place — or it doesn&apos;t ship.
+            Discover a refined mix of tech, desk and everyday carry — selected for utility, character and the way they fit into real life.
           </p>
           <div className="hero-cta">
             <Link className="btn btn-dark" to="/products">
@@ -75,6 +90,17 @@ export default function HomePage() {
             <Link className="btn btn-ghost" to="/products?cat=c1">
               Browse audio
             </Link>
+          </div>
+          <div className="hero-proof-row" aria-label="Store benefits">
+            <span>
+              <b>4.8</b> average rating
+            </span>
+            <span>
+              <b>30-day</b> easy returns
+            </span>
+            <span>
+              <b>Secure</b> checkout
+            </span>
           </div>
           <div className="hero-stats" aria-label="Store highlights">
             <div>
@@ -88,13 +114,29 @@ export default function HomePage() {
             </div>
           </div>
         </div>
-        <div className="hero-media">
-          <img className="hero-img" src={IMG.hero} alt="FikarNot products arranged on a warm cream surface" />
+        <div className="hero-media hero-visual">
+          <span className="hero-orb hero-orb-a" aria-hidden="true" />
+          <span className="hero-orb hero-orb-b" aria-hidden="true" />
+          <HeroSlider slides={heroSlides} />
           <span className="sticker">NEW SEASON DROP</span>
+          <div className="hero-float-card hero-float-card-top">
+            <span className="hero-float-icon">✦</span>
+            <div>
+              <strong>Thoughtfully picked</strong>
+              <small>less clutter, better finds</small>
+            </div>
+          </div>
+          <div className="hero-float-card hero-float-card-bottom">
+            <span className="hero-float-score">4.8</span>
+            <div>
+              <strong>Customer favourite</strong>
+              <small>across the catalogue</small>
+            </div>
+          </div>
         </div>
       </section>
 
-      <section className="container section" style={{ paddingTop: 8 }}>
+      <section className="container section home-section section-categories" style={{ paddingTop: 8 }}>
         <div className="sec-hd">
           <div>
             <span className="eyebrow">Start somewhere</span>
@@ -116,7 +158,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="container section">
+      <section className="container section home-section section-featured">
         <div className="sec-hd">
           <div>
             <span className="eyebrow">Hand-picked</span>
@@ -139,7 +181,47 @@ export default function HomePage() {
         )}
       </section>
 
-      <section className="container section">
+      {activeOffers.length > 0 && (
+        <section className="container section offers-section home-section">
+          <div className="sec-hd">
+            <div>
+              <span className="eyebrow">Small offers, no noise</span>
+              <h2 className="sec-title display">Current FikarNot offers</h2>
+            </div>
+            <Link className="sec-link" to="/checkout">
+              Use at checkout <Ic n="arrow" s={14} />
+            </Link>
+          </div>
+          <div className="offer-grid">
+            {activeOffers.map((coupon) => (
+              <article className="offer-card" key={coupon.id}>
+                <div>
+                  <span className="offer-code">{coupon.code}</span>
+                  <strong>{couponDescription(coupon)}</strong>
+                  <p>{coupon.description || "Apply this code at checkout."}</p>
+                </div>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  onClick={async () => {
+                    try {
+                      if (!navigator.clipboard) throw new Error("Clipboard unavailable");
+                      await navigator.clipboard.writeText(coupon.code);
+                      appActions.toast(`${coupon.code} copied ✦`);
+                    } catch {
+                      appActions.toast(`Use code ${coupon.code}`);
+                    }
+                  }}
+                >
+                  Copy code
+                </button>
+              </article>
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="container section home-section">
         <div className="principles">
           <div className="principles-copy">
             <span className="eyebrow">The FikarNot idea</span>
@@ -170,7 +252,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="container section">
+      <section className="container section home-section">
         <div className="promo">
           <div>
             <span className="eyebrow eyebrow-light">Made for daily use</span>
@@ -203,7 +285,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <section className="container section">
+      <section className="container section home-section">
         <div className="sec-hd">
           <div>
             <span className="eyebrow">Highest rated</span>
@@ -224,7 +306,7 @@ export default function HomePage() {
         )}
       </section>
 
-      <section className="container section">
+      <section className="container section home-section">
         <div className="sec-hd">
           <div>
             <span className="eyebrow">Fresh from the catalogue</span>
@@ -245,7 +327,26 @@ export default function HomePage() {
         )}
       </section>
 
-      <section className="container section section-last">
+      {recent.length > 0 && (
+        <section className="container section home-section">
+          <div className="sec-hd">
+            <div>
+              <span className="eyebrow">Pick up where you left off</span>
+              <h2 className="sec-title display">Recently viewed</h2>
+            </div>
+            <Link className="sec-link" to="/recently-viewed">
+              View history <Ic n="arrow" s={14} />
+            </Link>
+          </div>
+          <div className="prod-grid">
+            {recent.map((p) => (
+              <ProductCard key={p.id} p={p} />
+            ))}
+          </div>
+        </section>
+      )}
+
+      <section className="container section section-last home-section">
         <div className="newsletter">
           <div>
             <span className="eyebrow">Stay in the loop</span>

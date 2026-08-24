@@ -178,6 +178,19 @@ export function Header() {
               <Ic n="user" s={15} /> Sign in
             </NavLink>
           )}
+          {s.session && (
+            <Link
+              className="icon-link dark notification-header"
+              to="/notifications"
+              aria-label={`Notifications, ${s.notifications?.filter((item) => !item.read).length || 0} unread`}
+              title="Notifications"
+            >
+              <Ic n="bell" s={17} />
+              {(s.notifications?.filter((item) => !item.read).length || 0) > 0 && (
+                <span className="count-badge">{s.notifications.filter((item) => !item.read).length}</span>
+              )}
+            </Link>
+          )}
           <Link
             className="icon-link dark wishlist-header"
             to="/wishlist"
@@ -186,6 +199,9 @@ export function Header() {
           >
             <Ic n="heart" s={17} filled={s.wishlist.length > 0} />
             {s.wishlist.length > 0 && <span className="count-badge">{s.wishlist.length}</span>}
+          </Link>
+          <Link className="icon-link dark" to="/recently-viewed" aria-label="Recently viewed products" title="Recently viewed">
+            <Ic n="clock" s={17} />
           </Link>
           <Link className="cart-btn" to="/cart" aria-label={`Cart, ${count} items`}>
             <Ic n="cart" s={17} />
@@ -200,7 +216,17 @@ export function Header() {
         <NavLink to="/">Home</NavLink>
         <NavLink to="/products">Shop</NavLink>
         {canEdit && <NavLink to="/admin">Studio</NavLink>}
+        <NavLink to="/compare">Compare ({s.comparison.length})</NavLink>
         <NavLink to="/wishlist">Wishlist ({s.wishlist.length})</NavLink>
+        <NavLink to="/recently-viewed">Recently viewed</NavLink>
+        {s.session && (
+          <NavLink to="/notifications">
+            Notifications
+            {(s.notifications?.filter((item) => !item.read).length || 0) > 0
+              ? ` (${s.notifications.filter((item) => !item.read).length})`
+              : ""}
+          </NavLink>
+        )}
         <NavLink to="/cart">Cart ({count})</NavLink>
         {s.session ? <NavLink to="/account">My account</NavLink> : <NavLink to="/login">Sign in</NavLink>}
       </nav>
@@ -251,9 +277,11 @@ export function Footer() {
           </div>
           <div>
             <h4>Help</h4>
-            <Link to="/products">FAQ</Link>
-            <Link to="/products">Shipping</Link>
-            <Link to="/products">Returns</Link>
+            <Link to="/help">Help Center</Link>
+            <Link to="/shipping">Shipping</Link>
+            <Link to="/returns">Returns</Link>
+            <Link to="/about">About</Link>
+            <Link to="/privacy">Privacy</Link>
           </div>
         </div>
         <div className="footer-bottom">

@@ -21,6 +21,8 @@ import { Modal, Empty, Stars, Pagination } from "../components/common";
 import { ImageUploader } from "../components/ImageUploader";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
 import { usePagination } from "../hooks/usePagination";
+import { RETURN_STATUSES } from "../utils/returns";
+import { AnalyticsTab } from "../components/admin/AnalyticsTab";
 
 export function ProductEditor({ initial, onClose }) {
   const s = useApp();
@@ -38,7 +40,7 @@ export function ProductEditor({ initial, onClose }) {
     featured: initial?.featured || false,
   }));
   const [errs, setErrs] = useState({});
-  const save = (e) => {
+  const save = async (e) => {
     e.preventDefault();
     const er = {};
     if (!f.name.trim()) er.name = "Required";
@@ -49,7 +51,7 @@ export function ProductEditor({ initial, onClose }) {
     if (!f.categoryId) er.categoryId = "Required";
     setErrs(er);
     if (Object.keys(er).length) return;
-    const saved = appActions.upsertProduct({
+    const saved = await appActions.upsertProduct({
       id: initial?.id || "p" + uid(),
       name: f.name.trim(),
       sku: f.sku.trim().toUpperCase(),
@@ -221,14 +223,19 @@ export function CategoryEditor({ initial, onClose }) {
     color: initial?.color || SWATCHES[0],
   }));
   const [err, setErr] = useState("");
-  const save = (e) => {
+  const save = async (e) => {
     e.preventDefault();
     if (!f.name.trim()) {
       setErr("Required");
       return;
     }
-    appActions.upsertCategory({ id: initial?.id || "c" + uid(), name: f.name.trim(), description: f.description.trim(), color: f.color });
-    onClose();
+    const saved = await appActions.upsertCategory({
+      id: initial?.id || "c" + uid(),
+      name: f.name.trim(),
+      description: f.description.trim(),
+      color: f.color,
+    });
+    if (saved) onClose();
   };
   return (
     <Modal title={initial ? "Edit category" : "New category"} onClose={onClose}>
@@ -357,6 +364,263 @@ export function UserEditor({ initial, onClose }) {
     </Modal>
   );
 }
+
+export function CouponEditor({ initial, onClose }) {
+  const [f, setF] = useState(() => ({
+    code: initial?.code || "",
+    type: initial?.type || "percent",
+    value: initial?.value ?? 10,
+    minSubtotal: initial?.minSubtotal ?? 0,
+    maxUses: initial?.maxUses ?? 0,
+    expiresAt: initial?.expiresAt ? new Date(initial.expiresAt).toISOString().slice(0, 10) : "",
+    active: initial?.active !== false,
+    description: initial?.description || "",
+  }));
+  const [errs, setErrs] = useState({});
+  const save = (event) => {
+    event.preventDefault();
+    const next = {};
+    if (!f.code.trim()) next.code = "Required";
+    if (f.type !== "free_shipping" && !(+f.value > 0)) next.value = "Must be > 0";
+    if (f.type === "percent" && +f.value > 100) next.value = "Cannot exceed 100";
+    if (+f.minSubtotal < 0) next.minSubtotal = "Cannot be negative";
+    if (+f.maxUses < 0) next.maxUses = "Cannot be negative";
+    setErrs(next);
+    if (Object.keys(next).length) return;
+    const saved = appActions.upsertCoupon({
+      id: initial?.id,
+      code: f.code,
+      type: f.type,
+      value: +f.value || 0,
+      minSubtotal: +f.minSubtotal || 0,
+      maxUses: +f.maxUses || 0,
+      usedCount: initial?.usedCount || 0,
+      active: f.active,
+      expiresAt: f.expiresAt ? new Date(`${f.expiresAt}T23:59:59`).getTime() : null,
+      description: f.description,
+    });
+    if (saved) onClose();
+  };
+  return (
+    <Modal title={initial ? "Edit coupon" : "New coupon"} onClose={onClose}>
+      <form onSubmit={save}>
+        <div className="f-grid">
+          <div>
+            <label className="lbl" htmlFor="cp-code">
+              Code
+            </label>
+            <input
+              id="cp-code"
+              className="input"
+              value={f.code}
+              onChange={(e) => setF({ ...f, code: e.target.value.toUpperCase() })}
+              placeholder="WELCOME10"
+            />
+            {errs.code && <p className="f-err">{errs.code}</p>}
+          </div>
+          <div>
+            <label className="lbl" htmlFor="cp-type">
+              Discount type
+            </label>
+            <select id="cp-type" className="select" value={f.type} onChange={(e) => setF({ ...f, type: e.target.value })}>
+              <option value="percent">Percentage</option>
+              <option value="fixed">Fixed amount</option>
+              <option value="free_shipping">Free shipping</option>
+            </select>
+          </div>
+          <div>
+            <label className="lbl" htmlFor="cp-value">
+              Value
+            </label>
+            <input
+              id="cp-value"
+              className="input"
+              type="number"
+              min="0"
+              step="0.01"
+              disabled={f.type === "free_shipping"}
+              value={f.type === "free_shipping" ? 0 : f.value}
+              onChange={(e) => setF({ ...f, value: e.target.value })}
+            />
+            {errs.value && <p className="f-err">{errs.value}</p>}
+          </div>
+          <div>
+            <label className="lbl" htmlFor="cp-min">
+              Minimum subtotal
+            </label>
+            <input
+              id="cp-min"
+              className="input"
+              type="number"
+              min="0"
+              step="0.01"
+              value={f.minSubtotal}
+              onChange={(e) => setF({ ...f, minSubtotal: e.target.value })}
+            />
+            {errs.minSubtotal && <p className="f-err">{errs.minSubtotal}</p>}
+          </div>
+          <div>
+            <label className="lbl" htmlFor="cp-uses">
+              Maximum uses
+            </label>
+            <input
+              id="cp-uses"
+              className="input"
+              type="number"
+              min="0"
+              step="1"
+              value={f.maxUses}
+              onChange={(e) => setF({ ...f, maxUses: e.target.value })}
+            />
+            <p className="form-hint">Use 0 for unlimited.</p>
+            {errs.maxUses && <p className="f-err">{errs.maxUses}</p>}
+          </div>
+          <div>
+            <label className="lbl" htmlFor="cp-expiry">
+              Expiry date
+            </label>
+            <input
+              id="cp-expiry"
+              className="input"
+              type="date"
+              value={f.expiresAt}
+              onChange={(e) => setF({ ...f, expiresAt: e.target.value })}
+            />
+          </div>
+          <div className="f-full">
+            <label className="lbl" htmlFor="cp-desc">
+              Description
+            </label>
+            <input
+              id="cp-desc"
+              className="input"
+              value={f.description}
+              onChange={(e) => setF({ ...f, description: e.target.value })}
+              placeholder="10% off your first order over $50."
+            />
+          </div>
+          <label className="chk f-full">
+            <input type="checkbox" checked={f.active} onChange={(e) => setF({ ...f, active: e.target.checked })} /> Coupon active
+          </label>
+        </div>
+        <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 20 }}>
+          <button type="button" className="btn btn-ghost" onClick={onClose}>
+            Cancel
+          </button>
+          <button className="btn btn-dark">
+            <Ic n="check" s={15} /> Save coupon
+          </button>
+        </div>
+      </form>
+    </Modal>
+  );
+}
+
+export function CouponsTab() {
+  const s = useApp();
+  const [editing, setEditing] = useState(null);
+  const [now] = useState(() => Date.now());
+  const coupons = (s.coupons || [])
+    .slice()
+    .sort((a, b) => Number(b.active) - Number(a.active) || String(a.code).localeCompare(String(b.code)));
+  const { page, pageCount, pageItems, setPage, start, end, total } = usePagination(coupons, 10);
+  return (
+    <div>
+      <div className="admin-tab-actions">
+        <div>
+          <p style={{ color: "var(--ink2)", marginTop: 4 }}>Create simple promotions your customers can redeem at checkout.</p>
+        </div>
+        <button className="btn btn-dark" onClick={() => setEditing({})}>
+          <Ic n="plus" s={15} /> New coupon
+        </button>
+      </div>
+      {!coupons.length ? (
+        <Empty icon="tag" title="No coupons yet" sub="Create your first promotion to make checkout more flexible." />
+      ) : (
+        <div className="table-wrap coupon-table-wrap">
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Code</th>
+                <th>Offer</th>
+                <th>Minimum</th>
+                <th>Uses</th>
+                <th>Expires</th>
+                <th>Status</th>
+                <th>Actions</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pageItems.map((coupon) => {
+                const expired = coupon.expiresAt && coupon.expiresAt < now;
+                const status = expired ? "Expired" : coupon.active ? "Active" : "Paused";
+                const offer =
+                  coupon.type === "percent"
+                    ? `${coupon.value}% off`
+                    : coupon.type === "fixed"
+                      ? `${fmt(coupon.value)} off`
+                      : "Free shipping";
+                return (
+                  <tr key={coupon.id}>
+                    <td>
+                      <strong>{coupon.code}</strong>
+                      <div style={{ fontSize: 12, color: "var(--ink2)" }}>{coupon.description || "—"}</div>
+                    </td>
+                    <td>{offer}</td>
+                    <td>{coupon.minSubtotal ? fmt(coupon.minSubtotal) : "No minimum"}</td>
+                    <td>
+                      {coupon.usedCount}
+                      {coupon.maxUses ? ` / ${coupon.maxUses}` : " / ∞"}
+                    </td>
+                    <td>{coupon.expiresAt ? new Date(coupon.expiresAt).toLocaleDateString() : "No expiry"}</td>
+                    <td>
+                      <span className={`coupon-status ${status.toLowerCase()}`}>{status}</span>
+                    </td>
+                    <td>
+                      <div className="table-actions">
+                        <button
+                          className="icon-btn"
+                          title="Edit coupon"
+                          aria-label={`Edit ${coupon.code}`}
+                          onClick={() => setEditing(coupon)}
+                        >
+                          <Ic n="edit" s={14} />
+                        </button>
+                        {!expired && (
+                          <button
+                            className="icon-btn"
+                            title={coupon.active ? "Pause coupon" : "Activate coupon"}
+                            aria-label={`${coupon.active ? "Pause" : "Activate"} ${coupon.code}`}
+                            onClick={() => appActions.toggleCoupon(coupon.id)}
+                          >
+                            <Ic n="check" s={14} />
+                          </button>
+                        )}
+                        <button
+                          className="icon-btn"
+                          title="Delete coupon"
+                          aria-label={`Delete ${coupon.code}`}
+                          onClick={() => {
+                            if (window.confirm(`Delete coupon ${coupon.code}?`)) appActions.deleteCoupon(coupon.id);
+                          }}
+                        >
+                          <Ic n="trash" s={14} />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <Pagination page={page} pageCount={pageCount} setPage={setPage} start={start} end={end} total={total} noun="coupons" />
+      {editing && <CouponEditor initial={editing.id ? editing : null} onClose={() => setEditing(null)} />}
+    </div>
+  );
+}
+
 export function DashboardTab() {
   const s = useApp();
   const revenue = s.orders.reduce((t, o) => t + o.total, 0);
@@ -729,9 +993,9 @@ export function InventoryTab() {
 function StockAdjuster({ product, onClose }) {
   const [nextStock, setNextStock] = useState(String(product.stock));
   const [reason, setReason] = useState("Manual stock adjustment");
-  const save = (e) => {
+  const save = async (e) => {
     e.preventDefault();
-    if (appActions.adjustStock(product.id, nextStock, reason.trim() || "Manual stock adjustment")) onClose();
+    if (await appActions.adjustStock(product.id, nextStock, reason.trim() || "Manual stock adjustment")) onClose();
   };
   return (
     <Modal title={`Adjust stock — ${product.name}`} onClose={onClose}>
@@ -1052,11 +1316,235 @@ function ReviewsTab() {
   );
 }
 
+export function ReturnsTab() {
+  const s = useApp();
+  const requests = (s.returnRequests || []).slice().sort((a, b) => b.createdAt - a.createdAt);
+  return (
+    <div>
+      <div className="sec-hd">
+        <div>
+          <p className="eyebrow">After-sales</p>
+          <h2 className="sec-title display">Returns</h2>
+        </div>
+      </div>
+      {!requests.length ? (
+        <Empty
+          icon="refresh"
+          title="No return requests"
+          sub="Customer return requests will appear here after an eligible delivered order is submitted."
+        />
+      ) : (
+        <div className="table-wrap">
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Request</th>
+                <th>Order</th>
+                <th>Customer</th>
+                <th>Reason</th>
+                <th>Date</th>
+                <th>Status</th>
+              </tr>
+            </thead>
+            <tbody>
+              {requests.map((request) => {
+                const order = s.orders.find((item) => item.id === request.orderId);
+                return (
+                  <tr key={request.id}>
+                    <td>
+                      <b>#{request.id.replace(/^ret-/, "RET-")}</b>
+                      <div style={{ fontSize: 12, color: "var(--ink2)" }}>{request.note || "No additional note"}</div>
+                    </td>
+                    <td>
+                      <b>{request.orderId}</b>
+                      <div style={{ fontSize: 12, color: "var(--ink2)" }}>{order ? fmt(order.total) : "Order unavailable"}</div>
+                    </td>
+                    <td>
+                      <div>{order?.customer?.name || "Customer"}</div>
+                      <div style={{ fontSize: 12, color: "var(--ink2)" }}>{order?.customer?.email || "—"}</div>
+                    </td>
+                    <td>{request.reason}</td>
+                    <td>{new Date(request.createdAt).toLocaleDateString()}</td>
+                    <td>
+                      <select
+                        className="status-sel"
+                        value={request.status}
+                        aria-label={`Status for return ${request.id}`}
+                        onChange={(e) => appActions.setReturnStatus(request.id, e.target.value)}
+                      >
+                        {Object.values(RETURN_STATUSES).map((status) => (
+                          <option key={status}>{status}</option>
+                        ))}
+                      </select>
+                    </td>
+                  </tr>
+                );
+              })}
+            </tbody>
+          </table>
+        </div>
+      )}
+    </div>
+  );
+}
+
+export function SupportTab() {
+  const s = useApp();
+  const [filter, setFilter] = useState("all");
+  const [selected, setSelected] = useState(null);
+  const all = s.supportTickets || [];
+  const tickets = all
+    .filter((t) => filter === "all" || t.status === filter)
+    .slice()
+    .sort((a, b) => b.createdAt - a.createdAt);
+  const open = all.filter((t) => t.status === "open").length;
+  const progress = all.filter((t) => t.status === "in_progress").length;
+  const resolved = all.filter((t) => t.status === "resolved").length;
+  const { page, pageCount, pageItems, setPage, start, end, total } = usePagination(tickets, 10);
+  return (
+    <div>
+      <div className="stat-grid">
+        <div className="stat">
+          <span className="ic">
+            <Ic n="mail" s={17} />
+          </span>
+          <b>{all.length}</b>
+          <span>Total requests</span>
+        </div>
+        <div className="stat">
+          <span className="ic">
+            <Ic n="alert" s={17} />
+          </span>
+          <b>{open}</b>
+          <span>Open</span>
+        </div>
+        <div className="stat">
+          <span className="ic">
+            <Ic n="refresh" s={17} />
+          </span>
+          <b>{progress}</b>
+          <span>In progress</span>
+        </div>
+        <div className="stat">
+          <span className="ic">
+            <Ic n="check" s={17} />
+          </span>
+          <b>{resolved}</b>
+          <span>Resolved</span>
+        </div>
+      </div>
+      <div className="toolbar support-toolbar">
+        <select className="select" value={filter} onChange={(e) => setFilter(e.target.value)} aria-label="Filter support requests">
+          <option value="all">All requests</option>
+          <option value="open">Open</option>
+          <option value="in_progress">In progress</option>
+          <option value="resolved">Resolved</option>
+        </select>
+        <span className="result-count">{tickets.length} requests</span>
+      </div>
+      {!tickets.length ? (
+        <Empty icon="mail" title="No support requests" sub="Customer messages will appear here when they contact FikarNot." />
+      ) : (
+        <div className="table-wrap">
+          <table className="tbl">
+            <thead>
+              <tr>
+                <th>Ticket</th>
+                <th>Customer</th>
+                <th>Subject</th>
+                <th>Category</th>
+                <th>Date</th>
+                <th>Status</th>
+                <th>Action</th>
+              </tr>
+            </thead>
+            <tbody>
+              {pageItems.map((ticket) => (
+                <tr key={ticket.id}>
+                  <td>
+                    <strong>{ticket.id}</strong>
+                  </td>
+                  <td>
+                    <div>
+                      <b>{ticket.name}</b>
+                      <div style={{ fontSize: 12, color: "var(--ink2)" }}>{ticket.email}</div>
+                    </div>
+                  </td>
+                  <td style={{ maxWidth: 260 }}>{ticket.subject}</td>
+                  <td style={{ textTransform: "capitalize" }}>{ticket.category}</td>
+                  <td>{new Date(ticket.createdAt).toLocaleDateString()}</td>
+                  <td>
+                    <select
+                      className="status-sel"
+                      value={ticket.status}
+                      onChange={(e) => appActions.setSupportTicketStatus(ticket.id, e.target.value)}
+                      aria-label={`Status for ${ticket.id}`}
+                    >
+                      <option value="open">open</option>
+                      <option value="in_progress">in progress</option>
+                      <option value="resolved">resolved</option>
+                    </select>
+                  </td>
+                  <td>
+                    <button className="btn btn-ghost btn-sm" onClick={() => setSelected(ticket)}>
+                      View
+                    </button>
+                  </td>
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      )}
+      <Pagination page={page} pageCount={pageCount} setPage={setPage} start={start} end={end} total={total} noun="requests" />
+      {selected && (
+        <Modal title={`${selected.id} · ${selected.subject}`} onClose={() => setSelected(null)} wide>
+          <div className="support-detail">
+            <div className="support-detail-meta">
+              <strong>{selected.name}</strong>
+              <span>{selected.email}</span>
+              <span>{new Date(selected.createdAt).toLocaleString()}</span>
+            </div>
+            <div className="support-detail-message">{selected.message}</div>
+            <div className="support-detail-actions">
+              <select
+                className="select"
+                value={selected.status}
+                onChange={(e) => {
+                  appActions.setSupportTicketStatus(selected.id, e.target.value);
+                  setSelected({ ...selected, status: e.target.value });
+                }}
+              >
+                <option value="open">Open</option>
+                <option value="in_progress">In progress</option>
+                <option value="resolved">Resolved</option>
+              </select>
+              <button
+                className="btn btn-danger"
+                onClick={() => {
+                  if (window.confirm(`Delete ${selected.id}?`)) {
+                    appActions.deleteSupportTicket(selected.id);
+                    setSelected(null);
+                  }
+                }}
+              >
+                Delete request
+              </button>
+            </div>
+          </div>
+        </Modal>
+      )}
+    </div>
+  );
+}
+
 export default function AdminPage({ tab }) {
   const s = useApp();
   useDocumentMeta({ title: "Studio", noindex: true });
+  const [now] = useState(() => Date.now());
   const tabs = [
     { id: "dashboard", path: "/admin", label: "Dashboard", icon: "chart" },
+    { id: "analytics", path: "/admin/analytics", label: "Analytics", icon: "chart" },
     { id: "products", path: "/admin/products", label: "Products", icon: "box", n: s.products.length },
     {
       id: "inventory",
@@ -1068,11 +1556,32 @@ export default function AdminPage({ tab }) {
     { id: "categories", path: "/admin/categories", label: "Categories", icon: "tag", n: s.categories.length },
     { id: "orders", path: "/admin/orders", label: "Orders", icon: "cart", n: s.orders.length },
     {
+      id: "returns",
+      path: "/admin/returns",
+      label: "Returns",
+      icon: "refresh",
+      n: s.returnRequests?.filter((item) => item.status === "requested").length || 0,
+    },
+    {
+      id: "coupons",
+      path: "/admin/coupons",
+      label: "Coupons",
+      icon: "tag",
+      n: s.coupons?.filter((coupon) => coupon.active && (!coupon.expiresAt || coupon.expiresAt > now)).length || 0,
+    },
+    {
       id: "reviews",
       path: "/admin/reviews",
       label: "Reviews",
       icon: "star",
       n: s.reviews?.filter((review) => review.status === "published").length || 0,
+    },
+    {
+      id: "support",
+      path: "/admin/support",
+      label: "Support",
+      icon: "mail",
+      n: s.supportTickets?.filter((ticket) => ticket.status === "open").length || 0,
     },
     ...(s.session.role === "admin" ? [{ id: "users", path: "/admin/users", label: "Users", icon: "users", n: s.users.length }] : []),
   ];
@@ -1092,11 +1601,15 @@ export default function AdminPage({ tab }) {
           <h1 className="sec-title display">{activeTab ? activeTab.label : "Dashboard"}</h1>
         </div>
         {tab === "dashboard" && <DashboardTab />}
+        {tab === "analytics" && <AnalyticsTab />}
         {tab === "products" && <ProductsTab />}
         {tab === "inventory" && <InventoryTab />}
         {tab === "categories" && <CategoriesTab />}
         {tab === "orders" && <OrdersTab />}
+        {tab === "coupons" && <CouponsTab />}
         {tab === "reviews" && <ReviewsTab />}
+        {tab === "support" && <SupportTab />}
+        {tab === "returns" && <ReturnsTab />}
         {tab === "users" && s.session.role === "admin" && <UsersTab />}
       </main>
     </div>

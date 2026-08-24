@@ -3,13 +3,15 @@ import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useApp, appActions } from "../store/appStore";
 import { fmt } from "../utils/helpers";
 import { Ic } from "./icons";
-import { Stars } from "./common";
+import { ConfirmModal, Stars } from "./common";
 
 export function ProductCard({ p }) {
+  const [confirmDelete, setConfirmDelete] = useState(false);
   const s = useApp();
   const cat = s.categories.find((c) => c.id === p.categoryId);
   const canEdit = s.session && ["admin", "editor"].includes(s.session.role);
   const isWishlisted = s.wishlist.includes(p.id);
+  const isCompared = s.comparison.includes(p.id);
   const navigate = useNavigate();
   const location = useLocation();
   const images = useMemo(() => {
@@ -69,6 +71,20 @@ export function ProductCard({ p }) {
         >
           <Ic n="heart" s={16} filled={isWishlisted} />
         </button>
+        <button
+          className={`compare-btn${isCompared ? " active" : ""}`}
+          type="button"
+          aria-label={isCompared ? `Remove ${p.name} from comparison` : `Compare ${p.name}`}
+          aria-pressed={isCompared}
+          title={isCompared ? "Remove from comparison" : "Compare product"}
+          onClick={(event) => {
+            event.preventDefault();
+            event.stopPropagation();
+            appActions.toggleComparison(p.id);
+          }}
+        >
+          <Ic n="chart" s={15} />
+        </button>
         {canEdit && (
           <div className="card-admin">
             <button
@@ -90,7 +106,7 @@ export function ProductCard({ p }) {
               onClick={(event) => {
                 event.preventDefault();
                 event.stopPropagation();
-                if (window.confirm(`Delete ${p.name}?`)) appActions.deleteProduct(p.id);
+                setConfirmDelete(true);
               }}
             >
               <Ic n="trash" s={14} />
@@ -120,6 +136,18 @@ export function ProductCard({ p }) {
           </button>
         </div>
       </div>
+      {confirmDelete && (
+        <ConfirmModal
+          title={`Delete ${p.name}?`}
+          message="This removes the product from the catalogue and associated active shopping lists."
+          confirmLabel="Delete product"
+          onCancel={() => setConfirmDelete(false)}
+          onConfirm={() => {
+            appActions.deleteProduct(p.id);
+            setConfirmDelete(false);
+          }}
+        />
+      )}
     </article>
   );
 }

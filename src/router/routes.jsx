@@ -6,8 +6,15 @@ import ProductDetailPage from "../pages/ProductDetailPage";
 import CartPage from "../pages/CartPage";
 import CheckoutPage from "../pages/CheckoutPage";
 import LoginPage from "../pages/LoginPage";
+import ForgotPasswordPage from "../pages/ForgotPasswordPage";
+import ResetPasswordPage from "../pages/ResetPasswordPage";
 import AccountPage from "../pages/AccountPage";
 import WishlistPage from "../pages/WishlistPage";
+import RecentlyViewedPage from "../pages/RecentlyViewedPage";
+import ComparePage from "../pages/ComparePage";
+import NotificationsPage from "../pages/NotificationsPage";
+import HelpCenterPage from "../pages/HelpCenterPage";
+import StoreInfoPage from "../pages/StoreInfoPage";
 import NotFoundPage from "../pages/NotFoundPage";
 import { STAFF_ROLES, ADMIN_ROLES } from "../config/appConfig";
 import { ProtectedRoute } from "./ProtectedRoute";
@@ -44,6 +51,8 @@ export function AppRoutes() {
       <Route path="/cart" element={<CartPage />} />
       <Route path="/checkout" element={<CheckoutPage />} />
       <Route path="/login" element={<LoginPage />} />
+      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+      <Route path="/reset-password" element={<ResetPasswordPage />} />
       <Route
         path="/account"
         element={
@@ -60,13 +69,33 @@ export function AppRoutes() {
           </ProtectedRoute>
         }
       />
+      <Route path="/recently-viewed" element={<RecentlyViewedPage />} />
+      <Route path="/compare" element={<ComparePage />} />
+      <Route
+        path="/notifications"
+        element={
+          <ProtectedRoute>
+            <NotificationsPage />
+          </ProtectedRoute>
+        }
+      />
+      <Route path="/help" element={<HelpCenterPage />} />
+      <Route path="/about" element={<StoreInfoPage page="about" />} />
+      <Route path="/shipping" element={<StoreInfoPage page="shipping" />} />
+      <Route path="/returns" element={<StoreInfoPage page="returns" />} />
+      <Route path="/privacy" element={<StoreInfoPage page="privacy" />} />
+      <Route path="/terms" element={<StoreInfoPage page="terms" />} />
 
       <Route path="/admin" element={<AdminRoute tab="dashboard" roles={STAFF_ROLES} />} />
+      <Route path="/admin/analytics" element={<AdminRoute tab="analytics" roles={STAFF_ROLES} />} />
       <Route path="/admin/products" element={<AdminRoute tab="products" roles={STAFF_ROLES} />} />
       <Route path="/admin/inventory" element={<AdminRoute tab="inventory" roles={STAFF_ROLES} />} />
       <Route path="/admin/categories" element={<AdminRoute tab="categories" roles={STAFF_ROLES} />} />
       <Route path="/admin/orders" element={<AdminRoute tab="orders" roles={STAFF_ROLES} />} />
+      <Route path="/admin/coupons" element={<AdminRoute tab="coupons" roles={STAFF_ROLES} />} />
       <Route path="/admin/reviews" element={<AdminRoute tab="reviews" roles={STAFF_ROLES} />} />
+      <Route path="/admin/support" element={<AdminRoute tab="support" roles={STAFF_ROLES} />} />
+      <Route path="/admin/returns" element={<AdminRoute tab="returns" roles={STAFF_ROLES} />} />
       <Route path="/admin/users" element={<AdminRoute tab="users" roles={ADMIN_ROLES} />} />
 
       <Route path="*" element={<NotFoundPage />} />

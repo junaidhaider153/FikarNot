@@ -1,13 +1,15 @@
 import { Link } from "react-router-dom";
+import { useState } from "react";
 import { useApp, appActions, cartLines } from "../store/appStore";
 import { fmt } from "../utils/helpers";
 import { Ic } from "../components/icons";
-import { Empty } from "../components/common";
+import { ConfirmModal, Empty } from "../components/common";
 import { CartItem } from "../components/CartItem";
 import { getCartSummary } from "../utils/cart";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
 
 export default function CartPage() {
+  const [confirmClear, setConfirmClear] = useState(false);
   const state = useApp();
   useDocumentMeta({ title: "Your cart", noindex: true });
   const rawLines = cartLines(state);
@@ -36,11 +38,12 @@ export default function CartPage() {
     );
   }
 
-  const clearCart = () => {
-    if (window.confirm("Clear all items from your cart?")) {
-      summary.lines.forEach(({ p }) => appActions.setCartQty(p.id, 0));
-      appActions.toast("Cart cleared");
-    }
+  const clearCart = () => setConfirmClear(true);
+
+  const performClearCart = () => {
+    summary.lines.forEach(({ p }) => appActions.setCartQty(p.id, 0));
+    appActions.toast("Cart cleared");
+    setConfirmClear(false);
   };
 
   return (
@@ -128,6 +131,15 @@ export default function CartPage() {
           </div>
         </aside>
       </div>
+      {confirmClear && (
+        <ConfirmModal
+          title="Clear your cart?"
+          message="All items currently in your cart will be removed. You can add them again later."
+          confirmLabel="Clear cart"
+          onCancel={() => setConfirmClear(false)}
+          onConfirm={performClearCart}
+        />
+      )}
     </div>
   );
 }

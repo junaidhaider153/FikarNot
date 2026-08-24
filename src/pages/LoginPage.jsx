@@ -38,8 +38,8 @@ export default function LoginPage() {
       setErr("Please enter your name");
       return;
     }
-    if (mode === "register" && pass.length < 6) {
-      setErr("Password must be at least 6 characters");
+    if (mode === "register" && pass.length < 8) {
+      setErr("Password must be at least 8 characters");
       return;
     }
     setBusy(true);
@@ -152,6 +152,13 @@ export default function LoginPage() {
             <p className="f-err" role="alert">
               {err}
             </p>
+          )}
+          {mode === "login" && (
+            <div style={{ textAlign: "right", margin: "-4px 0 12px" }}>
+              <Link to="/forgot-password" style={{ fontSize: 13, fontWeight: 600 }}>
+                Forgot password?
+              </Link>
+            </div>
           )}
           <button className="btn btn-dark auth-submit" disabled={busy}>
             {busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"} <Ic n="arrow" s={15} />

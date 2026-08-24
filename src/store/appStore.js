@@ -1,7 +1,11 @@
 import { useSyncExternalStore } from "react";
 import { seedData } from "../data/seedData";
 import { STORAGE_KEYS } from "../config/storageKeys";
-import { delay, loadLS, saveLS, uid } from "../utils/helpers";
+import { delay, fmt, loadLS, saveLS, uid } from "../utils/helpers";
+import { getCouponDiscount, isCouponUsable, normalizeCouponCode } from "../utils/coupons";
+import { RETURN_STATUSES, canCancelOrder, canRequestReturn, normalizeReturnRequest } from "../utils/returns";
+import { authApi } from "../api/authApi";
+import { catalogApi } from "../api/catalogApi";
 
 let state = {
   ready: false,
@@ -13,6 +17,11 @@ let state = {
   reviews: [],
   cart: [],
   wishlist: [],
+  recentlyViewed: [],
+  comparison: [],
+  notifications: [],
+  supportTickets: [],
+  returnRequests: [],
   session: null,
   toast: null,
 };
@@ -48,6 +57,44 @@ const removeAccountBucket = (key, userId) => {
     delete bucket[userId];
     saveLS(key, bucket);
   }
+};
+
+const readNotifications = (userId) => {
+  const bucket = loadLS(STORAGE_KEYS.customerNotifications, {});
+  return Array.isArray(bucket?.[userId]) ? bucket[userId] : [];
+};
+
+const writeNotifications = (userId, notifications) => {
+  const bucket = loadLS(STORAGE_KEYS.customerNotifications, {});
+  bucket[userId] = notifications;
+  saveLS(STORAGE_KEYS.customerNotifications, bucket);
+};
+
+const removeNotifications = (userId) => {
+  const bucket = loadLS(STORAGE_KEYS.customerNotifications, {});
+  if (Object.prototype.hasOwnProperty.call(bucket, userId)) {
+    delete bucket[userId];
+    saveLS(STORAGE_KEYS.customerNotifications, bucket);
+  }
+};
+
+const makeNotification = ({ type, title, message, link = "/account", orderId = null }) => ({
+  id: `n${uid()}`,
+  type,
+  title,
+  message,
+  link,
+  orderId,
+  read: false,
+  createdAt: Date.now(),
+});
+
+const appendNotification = (userId, notification) => {
+  if (!userId) return [];
+  const next = [notification, ...readNotifications(userId)].slice(0, 50);
+  writeNotifications(userId, next);
+  if (state.session?.id === userId) setState({ notifications: next });
+  return next;
 };
 
 const mergeCart = (base, incoming, products) => {
@@ -111,11 +158,33 @@ export const getState = () => state;
 if (typeof window !== "undefined") {
   window.addEventListener("storage", (event) => {
     if (!state.ready || !event.key) return;
-    if ([STORAGE_KEYS.orders, STORAGE_KEYS.products, STORAGE_KEYS.users, STORAGE_KEYS.inventoryLog].includes(event.key)) {
+    if (
+      [
+        STORAGE_KEYS.orders,
+        STORAGE_KEYS.products,
+        STORAGE_KEYS.users,
+        STORAGE_KEYS.inventoryLog,
+        STORAGE_KEYS.coupons,
+        STORAGE_KEYS.customerNotifications,
+        STORAGE_KEYS.supportTickets,
+        STORAGE_KEYS.recentlyViewed,
+        STORAGE_KEYS.comparison,
+      ].includes(event.key)
+    ) {
       const patch = {};
       if (event.key === STORAGE_KEYS.orders) patch.orders = loadLS(STORAGE_KEYS.orders, []);
       if (event.key === STORAGE_KEYS.products) patch.products = loadLS(STORAGE_KEYS.products, []);
       if (event.key === STORAGE_KEYS.inventoryLog) patch.inventoryLog = loadLS(STORAGE_KEYS.inventoryLog, []);
+      if (event.key === STORAGE_KEYS.coupons) patch.coupons = loadLS(STORAGE_KEYS.coupons, []);
+      if (event.key === STORAGE_KEYS.customerNotifications && state.session?.id) patch.notifications = readNotifications(state.session.id);
+      if (event.key === STORAGE_KEYS.supportTickets) patch.supportTickets = loadLS(STORAGE_KEYS.supportTickets, []);
+      if (event.key === STORAGE_KEYS.returnRequests) patch.returnRequests = loadLS(STORAGE_KEYS.returnRequests, []);
+      if (event.key === STORAGE_KEYS.recentlyViewed)
+        patch.recentlyViewed = readAccountBucket(STORAGE_KEYS.recentlyViewed, state.session?.id || "guest");
+      if (event.key === STORAGE_KEYS.comparison)
+        patch.comparison = loadLS(STORAGE_KEYS.comparison, [])
+          .filter((id) => state.products.some((product) => product.id === id))
+          .slice(0, 3);
       if (event.key === STORAGE_KEYS.users) {
         patch.users = loadLS(STORAGE_KEYS.users, []);
         if (state.session?.id) patch.session = patch.users.find((user) => user.id === state.session.id) || null;
@@ -158,8 +227,13 @@ export const appActions = {
           saveLS(STORAGE_KEYS.users, data.users);
           saveLS(STORAGE_KEYS.orders, data.orders);
           saveLS(STORAGE_KEYS.reviews, data.reviews || []);
+          saveLS(STORAGE_KEYS.coupons, data.coupons || []);
+          saveLS(STORAGE_KEYS.recentlyViewed, {});
           saveLS(STORAGE_KEYS.customerCarts, {});
           saveLS(STORAGE_KEYS.customerWishlists, {});
+          saveLS(STORAGE_KEYS.customerNotifications, {});
+          saveLS(STORAGE_KEYS.supportTickets, []);
+          saveLS(STORAGE_KEYS.returnRequests, []);
           localStorage.removeItem(STORAGE_KEYS.cart);
           localStorage.removeItem(STORAGE_KEYS.wishlist);
           saveLS(STORAGE_KEYS.seeded, true);
@@ -171,12 +245,26 @@ export const appActions = {
             users: loadLS(STORAGE_KEYS.users, []),
             orders: loadLS(STORAGE_KEYS.orders, []),
             reviews: Array.isArray(storedReviews) ? storedReviews : seedData().reviews,
+            coupons: loadLS(STORAGE_KEYS.coupons, seedData().coupons || []),
+            supportTickets: loadLS(STORAGE_KEYS.supportTickets, []),
+            returnRequests: loadLS(STORAGE_KEYS.returnRequests, []),
           };
           if (!Array.isArray(storedReviews)) saveLS(STORAGE_KEYS.reviews, data.reviews);
         }
 
         if (!Array.isArray(data.reviews)) data.reviews = [];
         if (!Array.isArray(data.inventoryLog)) data.inventoryLog = [];
+        if (!Array.isArray(data.coupons)) data.coupons = [];
+        if (!Array.isArray(data.supportTickets)) data.supportTickets = [];
+        if (!Array.isArray(data.returnRequests)) data.returnRequests = [];
+        data.returnRequests = data.returnRequests.map(normalizeReturnRequest);
+        saveLS(STORAGE_KEYS.returnRequests, data.returnRequests);
+        data.coupons = data.coupons.map((coupon) => ({
+          ...coupon,
+          code: normalizeCouponCode(coupon.code),
+          usedCount: Number(coupon.usedCount || 0),
+        }));
+        saveLS(STORAGE_KEYS.coupons, data.coupons);
 
         let productsChanged = false;
         const existingSkus = new Set();
@@ -222,17 +310,46 @@ export const appActions = {
         if (usersChanged) saveLS(STORAGE_KEYS.users, data.users);
         if (ordersChanged) saveLS(STORAGE_KEYS.orders, data.orders);
 
-        const sessionRaw = loadLS(STORAGE_KEYS.session, null);
-        const session = sessionRaw?.id ? data.users.find((user) => user.id === sessionRaw.id) || null : null;
-        if (session && (usersChanged || session.email !== sessionRaw.email || session.name !== sessionRaw.name))
-          saveLS(STORAGE_KEYS.session, session);
+        // Authentication is server-backed. Never keep passwords or role authority in browser storage.
+        data.users = data.users.map(({ password: _password, ...user }) => user);
+        saveLS(STORAGE_KEYS.users, data.users);
+        const auth = await authApi.me();
+        const session = auth.authenticated ? auth.user : null;
+        if (session && !data.users.some((user) => user.id === session.id)) data.users = [...data.users, session];
+        if (session) data.users = data.users.map((user) => (user.id === session.id ? { ...user, ...session } : user));
+        saveLS(STORAGE_KEYS.session, null);
+        saveLS(STORAGE_KEYS.users, data.users);
+
+        // Module 27: the server is now the source of truth for catalogue + admin inventory.
+        try {
+          let remoteCatalog = await catalogApi.list();
+          if (session && ["admin", "editor"].includes(session.role) && !remoteCatalog.migrated) {
+            await catalogApi.migrate(data.categories, data.products, data.inventoryLog || []);
+            remoteCatalog = await catalogApi.list();
+          }
+          if (Array.isArray(remoteCatalog.categories) && remoteCatalog.categories.length) data.categories = remoteCatalog.categories;
+          if (Array.isArray(remoteCatalog.products) && remoteCatalog.products.length) data.products = remoteCatalog.products;
+          if (Array.isArray(remoteCatalog.inventoryLog)) data.inventoryLog = remoteCatalog.inventoryLog;
+          saveLS(STORAGE_KEYS.categories, data.categories);
+          saveLS(STORAGE_KEYS.products, data.products);
+          saveLS(STORAGE_KEYS.inventoryLog, data.inventoryLog || []);
+        } catch (catalogError) {
+          console.warn("[FikarNot] Catalogue API unavailable; using local cache for this session.", catalogError);
+        }
+
         const legacyCart = loadLS(STORAGE_KEYS.cart, []);
         const legacyWishlist = loadLS(STORAGE_KEYS.wishlist, []);
         let cart = [];
         let wishlist = [];
+        let notifications = [];
+        const recentlyViewedKey = session?.id || "guest";
+        const recentlyViewed = readAccountBucket(STORAGE_KEYS.recentlyViewed, recentlyViewedKey)
+          .filter((id) => data.products.some((product) => product.id === id))
+          .slice(0, 8);
         if (session?.id) {
           const savedCart = readAccountBucket(STORAGE_KEYS.customerCarts, session.id);
           const savedWishlist = readAccountBucket(STORAGE_KEYS.customerWishlists, session.id);
+          notifications = readNotifications(session.id);
           cart = savedCart.length ? savedCart : mergeCart([], legacyCart, data.products);
           wishlist = savedWishlist.length
             ? savedWishlist
@@ -242,8 +359,13 @@ export const appActions = {
         }
         localStorage.removeItem(STORAGE_KEYS.cart);
         localStorage.removeItem(STORAGE_KEYS.wishlist);
+        writeAccountBucket(STORAGE_KEYS.recentlyViewed, recentlyViewedKey, recentlyViewed);
         saveLS(STORAGE_KEYS.inventoryLog, data.inventoryLog);
-        setState({ ...data, cart, wishlist, session, ready: true });
+        const comparison = loadLS(STORAGE_KEYS.comparison, [])
+          .filter((id) => data.products.some((product) => product.id === id))
+          .slice(0, 3);
+        saveLS(STORAGE_KEYS.comparison, comparison);
+        setState({ ...data, cart, wishlist, recentlyViewed, comparison, notifications, session, ready: true });
       } catch (error) {
         setState({ bootError: error?.message || "Failed to load store data" });
       } finally {
@@ -254,66 +376,167 @@ export const appActions = {
     return bootstrapPromise;
   },
 
+  submitSupportTicket({ name, email, subject, message, category = "general" }) {
+    const cleanName = String(name || "").trim();
+    const cleanEmail = normalizeEmail(email);
+    const cleanSubject = String(subject || "").trim();
+    const cleanMessage = String(message || "").trim();
+    if (!cleanName || !cleanEmail || !cleanSubject || !cleanMessage) {
+      toast("Please complete all support fields", "err");
+      return null;
+    }
+    const nextTicketNumber =
+      (state.supportTickets || []).reduce((max, ticket) => {
+        const match = String(ticket.id || "").match(/^TKT-(\d+)$/i);
+        return match ? Math.max(max, Number(match[1])) : max;
+      }, 0) + 1;
+    const ticket = {
+      id: `TKT-${String(nextTicketNumber).padStart(4, "0")}`,
+      userId: state.session?.id || null,
+      name: cleanName,
+      email: cleanEmail,
+      subject: cleanSubject,
+      message: cleanMessage,
+      category: category || "general",
+      status: "open",
+      createdAt: Date.now(),
+      updatedAt: Date.now(),
+    };
+    const tickets = [ticket, ...(state.supportTickets || [])];
+    setState({ supportTickets: tickets });
+    saveLS(STORAGE_KEYS.supportTickets, tickets);
+    if (state.session?.id) {
+      appendNotification(
+        state.session.id,
+        makeNotification({
+          type: "support",
+          title: "Support request received",
+          message: `We received your request: ${cleanSubject}.`,
+          link: "/help",
+        }),
+      );
+    }
+    toast("Support request sent");
+    return ticket;
+  },
+
+  setSupportTicketStatus(id, status) {
+    const allowed = ["open", "in_progress", "resolved"];
+    if (!allowed.includes(status)) return false;
+    const existing = (state.supportTickets || []).find((ticket) => ticket.id === id);
+    if (!existing) return false;
+    const tickets = (state.supportTickets || []).map((ticket) =>
+      ticket.id === id ? { ...ticket, status, updatedAt: Date.now() } : ticket,
+    );
+    setState({ supportTickets: tickets });
+    saveLS(STORAGE_KEYS.supportTickets, tickets);
+    if (existing.userId) {
+      const label = status === "in_progress" ? "in progress" : status;
+      appendNotification(
+        existing.userId,
+        makeNotification({
+          type: "support",
+          title: `Support request ${label}`,
+          message: `Your support request "${existing.subject}" is now ${label}.`,
+          link: "/help",
+        }),
+      );
+    }
+    toast("Support status updated");
+    return true;
+  },
+
+  deleteSupportTicket(id) {
+    const tickets = (state.supportTickets || []).filter((ticket) => ticket.id !== id);
+    setState({ supportTickets: tickets });
+    saveLS(STORAGE_KEYS.supportTickets, tickets);
+    toast("Support request deleted");
+  },
+
   resetDemo() {
     Object.values(STORAGE_KEYS).forEach((key) => localStorage.removeItem(key));
     window.location.href = "/";
   },
 
   async login(email, password) {
-    await delay(350);
-    const user = state.users.find((item) => item.email.toLowerCase() === email.trim().toLowerCase());
-    if (!user || user.password !== password) {
-      toast("Invalid email or password", "err");
+    try {
+      const { user } = await authApi.login(email, password);
+      const localUser = { ...(state.users.find((item) => item.id === user.id) || {}), ...user };
+      const users = state.users.some((item) => item.id === user.id)
+        ? state.users.map((item) => (item.id === user.id ? localUser : item))
+        : [...state.users, localUser];
+      const guestCart = state.session ? [] : state.cart;
+      const accountCart = readAccountBucket(STORAGE_KEYS.customerCarts, user.id);
+      const accountWishlist = readAccountBucket(STORAGE_KEYS.customerWishlists, user.id).filter((id) =>
+        state.products.some((product) => product.id === id),
+      );
+      const accountNotifications = readNotifications(user.id);
+      const accountRecentlyViewed = readAccountBucket(STORAGE_KEYS.recentlyViewed, user.id).filter((id) =>
+        state.products.some((product) => product.id === id),
+      );
+      const cart = mergeCart(accountCart, guestCart, state.products);
+      setState({
+        users,
+        session: localUser,
+        cart,
+        wishlist: accountWishlist,
+        notifications: accountNotifications,
+        recentlyViewed: accountRecentlyViewed,
+      });
+      writeAccountBucket(STORAGE_KEYS.customerCarts, user.id, cart);
+      writeAccountBucket(STORAGE_KEYS.customerWishlists, user.id, accountWishlist);
+      toast(`Welcome back, ${user.name.split(" ")[0]}`);
+      return localUser;
+    } catch (error) {
+      toast(error.message || "Invalid email or password", "err");
       return null;
     }
-    const guestCart = state.session ? [] : state.cart;
-    const accountCart = readAccountBucket(STORAGE_KEYS.customerCarts, user.id);
-    const accountWishlist = readAccountBucket(STORAGE_KEYS.customerWishlists, user.id).filter((id) =>
-      state.products.some((product) => product.id === id),
-    );
-    const cart = mergeCart(accountCart, guestCart, state.products);
-    setState({ session: user, cart, wishlist: accountWishlist });
-    writeAccountBucket(STORAGE_KEYS.customerCarts, user.id, cart);
-    writeAccountBucket(STORAGE_KEYS.customerWishlists, user.id, accountWishlist);
-    saveLS(STORAGE_KEYS.session, user);
-    toast(`Welcome back, ${user.name.split(" ")[0]}`);
-    return user;
   },
-
   async register(name, email, password) {
-    await delay(400);
-    const normalizedEmail = email.trim().toLowerCase();
-    if (state.users.some((user) => user.email.toLowerCase() === normalizedEmail)) {
-      toast("Email already in use", "err");
+    try {
+      const { user } = await authApi.register(name, email, password);
+      const users = state.users.some((item) => item.id === user.id)
+        ? state.users.map((item) => (item.id === user.id ? user : item))
+        : [...state.users, user];
+      const guestCart = state.session ? [] : state.cart;
+      const cart = mergeCart([], guestCart, state.products);
+      setState({ users, session: user, cart, wishlist: [], recentlyViewed: [] });
+      writeAccountBucket(STORAGE_KEYS.customerCarts, user.id, cart);
+      writeAccountBucket(STORAGE_KEYS.customerWishlists, user.id, []);
+      const welcome = makeNotification({
+        type: "account",
+        title: "Welcome to FikarNot",
+        message: "Your account is ready. Start building your wishlist and shopping bag.",
+        link: "/products",
+      });
+      writeNotifications(user.id, [welcome]);
+      setState({ notifications: [welcome] });
+      toast(`Account created — welcome, ${user.name.split(" ")[0]}`);
+      return user;
+    } catch (error) {
+      toast(error.message || "Unable to create account", "err");
       return null;
     }
-
-    const user = { id: `u${uid()}`, name: name.trim(), email: email.trim(), password, role: "customer", createdAt: Date.now() };
-    const users = [...state.users, user];
-    const guestCart = state.session ? [] : state.cart;
-    const cart = mergeCart([], guestCart, state.products);
-    setState({ users, session: user, cart, wishlist: [] });
-    saveLS(STORAGE_KEYS.users, users);
-    writeAccountBucket(STORAGE_KEYS.customerCarts, user.id, cart);
-    writeAccountBucket(STORAGE_KEYS.customerWishlists, user.id, []);
-    saveLS(STORAGE_KEYS.session, user);
-    toast(`Account created — welcome, ${user.name.split(" ")[0]}`);
-    return user;
   },
-
-  logout() {
+  async logout() {
+    try {
+      await authApi.logout();
+    } catch {
+      /* local cleanup still applies */
+    }
     if (state.session?.id) {
       writeAccountBucket(STORAGE_KEYS.customerCarts, state.session.id, state.cart);
       writeAccountBucket(STORAGE_KEYS.customerWishlists, state.session.id, state.wishlist);
+      writeAccountBucket(STORAGE_KEYS.recentlyViewed, state.session.id, state.recentlyViewed);
+      writeNotifications(state.session.id, state.notifications);
     }
-    setState({ session: null, cart: [], wishlist: [] });
+    setState({ session: null, cart: [], wishlist: [], recentlyViewed: [], notifications: [] });
     saveLS(STORAGE_KEYS.session, null);
     localStorage.removeItem(STORAGE_KEYS.cart);
     localStorage.removeItem(STORAGE_KEYS.wishlist);
     toast("Signed out — your account data is safely saved");
   },
-
-  updateProfile(updates) {
+  async updateProfile(updates) {
     if (!state.session) return false;
     const name = (updates.name ?? state.session.name).trim();
     const email = (updates.email ?? state.session.email).trim();
@@ -325,28 +548,28 @@ export const appActions = {
       toast("Enter a valid email address", "err");
       return false;
     }
-    const duplicate = state.users.find((user) => user.id !== state.session.id && user.email.toLowerCase() === email.toLowerCase());
-    if (duplicate) {
-      toast("That email is already in use", "err");
+    try {
+      const { user } = await authApi.updateProfile(name, email);
+      const users = state.users.map((item) => (item.id === state.session.id ? { ...item, ...user } : item));
+      const orders = state.orders.map((order) => {
+        const belongsToUser =
+          order.customer?.userId === state.session.id ||
+          (!order.customer?.userId && normalizeEmail(order.customer?.email) === normalizeEmail(state.session.email));
+        return belongsToUser
+          ? { ...order, customer: { ...order.customer, userId: state.session.id, name: user.name, email: user.email } }
+          : order;
+      });
+      const session = users.find((item) => item.id === state.session.id) || user;
+      setState({ users, orders, session });
+      saveLS(STORAGE_KEYS.users, users);
+      saveLS(STORAGE_KEYS.orders, orders);
+      toast("Profile updated");
+      return true;
+    } catch (error) {
+      toast(error.message || "Unable to update profile", "err");
       return false;
     }
-    const users = state.users.map((user) => (user.id === state.session.id ? { ...user, name, email } : user));
-    const orders = state.orders.map((order) => {
-      const belongsToUser =
-        order.customer?.userId === state.session.id ||
-        (!order.customer?.userId && normalizeEmail(order.customer?.email) === normalizeEmail(state.session.email));
-      if (!belongsToUser) return order;
-      return { ...order, customer: { ...order.customer, userId: state.session.id, name, email } };
-    });
-    const session = users.find((user) => user.id === state.session.id);
-    setState({ users, orders, session });
-    saveLS(STORAGE_KEYS.users, users);
-    saveLS(STORAGE_KEYS.orders, orders);
-    saveLS(STORAGE_KEYS.session, session);
-    toast("Profile updated");
-    return true;
   },
-
   submitReview({ productId, rating, title, body }) {
     if (!state.session) {
       toast("Please sign in to leave a review", "err");
@@ -441,24 +664,15 @@ export const appActions = {
     return true;
   },
 
-  deleteAccount(currentPassword, confirmationText) {
+  async deleteAccount(currentPassword, confirmationText) {
     if (!state.session) return false;
-    if (["admin", "editor"].includes(state.session.role)) {
-      toast("Staff accounts can't be deleted here", "err");
+    try {
+      await authApi.deleteAccount(currentPassword, confirmationText);
+    } catch (error) {
+      toast(error.message || "Unable to delete account", "err");
       return false;
     }
-    const currentUser = state.users.find((user) => user.id === state.session.id);
-    if (!currentUser || currentUser.password !== currentPassword) {
-      toast("Current password is incorrect", "err");
-      return false;
-    }
-    if (confirmationText !== "DELETE") {
-      toast("Type DELETE to confirm account removal", "err");
-      return false;
-    }
-
     const accountId = state.session.id;
-    const accountEmail = normalizeEmail(state.session.email);
     const deletedAt = Date.now();
     const users = state.users.filter((user) => user.id !== accountId);
     const reviews = state.reviews.map((review) =>
@@ -466,52 +680,46 @@ export const appActions = {
     );
     const orders = state.orders.map((order) => {
       const belongsToUser =
-        order.customer?.userId === accountId || (!order.customer?.userId && normalizeEmail(order.customer?.email) === accountEmail);
-      if (!belongsToUser) return order;
-      return {
-        ...order,
-        customer: {
-          ...order.customer,
-          userId: undefined,
-          name: "Deleted Customer",
-          email: `deleted-${deletedAt}@fikarnot.local`,
-        },
-      };
+        order.customer?.userId === accountId ||
+        (!order.customer?.userId && normalizeEmail(order.customer?.email) === normalizeEmail(state.session.email));
+      return belongsToUser
+        ? {
+            ...order,
+            customer: { ...order.customer, userId: undefined, name: "Deleted Customer", email: `deleted-${deletedAt}@fikarnot.local` },
+          }
+        : order;
     });
-
-    setState({ users, orders, reviews, cart: [], wishlist: [], session: null });
+    const returnRequests = (state.returnRequests || []).filter((request) => request.userId !== accountId);
+    setState({ users, orders, reviews, returnRequests, cart: [], wishlist: [], session: null });
     saveLS(STORAGE_KEYS.users, users);
     saveLS(STORAGE_KEYS.orders, orders);
     saveLS(STORAGE_KEYS.reviews, reviews);
-    removeAccountBucket(STORAGE_KEYS.customerCarts, state.session.id);
-    removeAccountBucket(STORAGE_KEYS.customerWishlists, state.session.id);
+    saveLS(STORAGE_KEYS.returnRequests, returnRequests);
+    removeAccountBucket(STORAGE_KEYS.customerCarts, accountId);
+    removeAccountBucket(STORAGE_KEYS.customerWishlists, accountId);
+    removeAccountBucket(STORAGE_KEYS.recentlyViewed, accountId);
+    removeNotifications(accountId);
     localStorage.removeItem(STORAGE_KEYS.cart);
     localStorage.removeItem(STORAGE_KEYS.wishlist);
     saveLS(STORAGE_KEYS.session, null);
     toast("Your account has been deleted");
     return true;
   },
-
-  changePassword(currentPassword, newPassword) {
+  async changePassword(currentPassword, newPassword) {
     if (!state.session) return false;
-    const currentUser = state.users.find((user) => user.id === state.session.id);
-    if (!currentUser || currentUser.password !== currentPassword) {
-      toast("Current password is incorrect", "err");
+    if (newPassword.length < 8) {
+      toast("New password must be at least 8 characters", "err");
       return false;
     }
-    if (newPassword.length < 6) {
-      toast("New password must be at least 6 characters", "err");
+    try {
+      await authApi.changePassword(currentPassword, newPassword);
+      toast("Password updated");
+      return true;
+    } catch (error) {
+      toast(error.message || "Unable to update password", "err");
       return false;
     }
-    const users = state.users.map((user) => (user.id === state.session.id ? { ...user, password: newPassword } : user));
-    const session = users.find((user) => user.id === state.session.id);
-    setState({ users, session });
-    saveLS(STORAGE_KEYS.users, users);
-    saveLS(STORAGE_KEYS.session, session);
-    toast("Password updated");
-    return true;
   },
-
   saveAddress(address) {
     if (!state.session) return false;
     const users = state.users.map((user) => {
@@ -598,6 +806,44 @@ export const appActions = {
     toast("Removed from cart");
   },
 
+  rememberRecentlyViewed(productId) {
+    if (!state.products.some((product) => product.id === productId)) return;
+    const recentlyViewed = [productId, ...state.recentlyViewed.filter((id) => id !== productId)].slice(0, 8);
+    setState({ recentlyViewed });
+    writeAccountBucket(STORAGE_KEYS.recentlyViewed, state.session?.id || "guest", recentlyViewed);
+  },
+
+  clearRecentlyViewed() {
+    setState({ recentlyViewed: [] });
+    writeAccountBucket(STORAGE_KEYS.recentlyViewed, state.session?.id || "guest", []);
+    toast("Recently viewed history cleared");
+  },
+
+  toggleComparison(productId) {
+    const exists = state.comparison.includes(productId);
+    let comparison;
+    if (exists) {
+      comparison = state.comparison.filter((id) => id !== productId);
+    } else {
+      if (state.comparison.length >= 3) {
+        toast("You can compare up to 3 products at a time", "err");
+        return false;
+      }
+      if (!state.products.some((product) => product.id === productId)) return false;
+      comparison = [...state.comparison, productId];
+    }
+    setState({ comparison });
+    saveLS(STORAGE_KEYS.comparison, comparison);
+    toast(exists ? "Removed from comparison" : "Added to comparison");
+    return true;
+  },
+
+  clearComparison() {
+    setState({ comparison: [] });
+    saveLS(STORAGE_KEYS.comparison, []);
+    toast("Comparison cleared");
+  },
+
   toggleWishlist(productId) {
     const product = state.products.find((item) => item.id === productId);
     if (!product) return false;
@@ -613,6 +859,28 @@ export const appActions = {
     return !exists;
   },
 
+  markNotificationRead(notificationId) {
+    if (!state.session?.id) return;
+    const notifications = state.notifications.map((item) => (item.id === notificationId ? { ...item, read: true } : item));
+    setState({ notifications });
+    writeNotifications(state.session.id, notifications);
+  },
+
+  markAllNotificationsRead() {
+    if (!state.session?.id || !state.notifications.length) return;
+    const notifications = state.notifications.map((item) => ({ ...item, read: true }));
+    setState({ notifications });
+    writeNotifications(state.session.id, notifications);
+    toast("All notifications marked as read");
+  },
+
+  clearNotifications() {
+    if (!state.session?.id) return;
+    setState({ notifications: [] });
+    writeNotifications(state.session.id, []);
+    toast("Notifications cleared");
+  },
+
   clearWishlist() {
     if (!state.session?.id || !state.wishlist.length) return;
     setState({ wishlist: [] });
@@ -620,7 +888,7 @@ export const appActions = {
     toast("Wishlist cleared");
   },
 
-  upsertProduct(product) {
+  async upsertProduct(product) {
     const sku = String(product.sku || makeFallbackSku(product.id))
       .trim()
       .toUpperCase();
@@ -629,18 +897,24 @@ export const appActions = {
       toast(`SKU ${sku} is already used by ${duplicate.name}`, "err");
       return false;
     }
-    const list = [...state.products];
-    const index = list.findIndex((item) => item.id === product.id);
     const normalized = { ...product, sku, stockThreshold: Math.max(0, Math.floor(+product.stockThreshold || 0)) };
-    if (index >= 0) list[index] = { ...list[index], ...normalized };
-    else list.unshift({ createdAt: Date.now(), ...normalized });
-    setState({ products: list });
-    saveLS(STORAGE_KEYS.products, list);
-    toast(index >= 0 ? "Product updated" : "Product created");
-    return true;
+    try {
+      const { product: saved } = await catalogApi.saveProduct(normalized);
+      const list = [...state.products];
+      const index = list.findIndex((item) => item.id === saved.id);
+      if (index >= 0) list[index] = { ...list[index], ...saved };
+      else list.unshift(saved);
+      setState({ products: list });
+      saveLS(STORAGE_KEYS.products, list);
+      toast(index >= 0 ? "Product updated" : "Product created");
+      return true;
+    } catch (error) {
+      toast(error.message || "Unable to save product", "err");
+      return false;
+    }
   },
 
-  adjustStock(productId, nextStock, reason = "Manual stock adjustment") {
+  async adjustStock(productId, nextStock, reason = "Manual stock adjustment") {
     const product = state.products.find((item) => item.id === productId);
     if (!product) return false;
     const value = Math.max(0, Math.floor(Number(nextStock)));
@@ -649,66 +923,84 @@ export const appActions = {
       return false;
     }
     if (value === product.stock) return true;
-    const products = state.products.map((item) => (item.id === productId ? { ...item, stock: value } : item));
-    const inventoryLog = [
-      {
-        id: uid(),
-        productId,
-        productName: product.name,
-        previousStock: product.stock,
-        nextStock: value,
-        change: value - product.stock,
-        reason,
-        createdAt: Date.now(),
-        userId: state.session?.id || null,
-      },
-      ...state.inventoryLog,
-    ].slice(0, 100);
-    setState({ products, inventoryLog });
-    saveLS(STORAGE_KEYS.products, products);
-    saveLS(STORAGE_KEYS.inventoryLog, inventoryLog);
-    toast(`${product.name} stock updated to ${value}`);
-    return true;
+    try {
+      const { product: saved, log } = await catalogApi.adjustInventory(productId, value, reason);
+      const products = state.products.map((item) => (item.id === productId ? { ...item, ...saved } : item));
+      const inventoryLog = [log, ...(state.inventoryLog || [])].slice(0, 100);
+      setState({ products, inventoryLog });
+      saveLS(STORAGE_KEYS.products, products);
+      saveLS(STORAGE_KEYS.inventoryLog, inventoryLog);
+      toast(`${product.name} stock updated to ${value}`);
+      return true;
+    } catch (error) {
+      toast(error.message || "Unable to update stock", "err");
+      return false;
+    }
   },
 
-  deleteProduct(id) {
+  async deleteProduct(id) {
+    try {
+      await catalogApi.deleteProduct(id);
+    } catch (error) {
+      toast(error.message || "Unable to delete product", "err");
+      return false;
+    }
     const products = state.products.filter((product) => product.id !== id);
     const cart = state.cart.filter((line) => line.productId !== id);
     const wishlist = state.wishlist.filter((productId) => productId !== id);
-    setState({ products, cart, wishlist });
+    const recentlyViewed = state.recentlyViewed.filter((productId) => productId !== id);
+    const comparison = state.comparison.filter((productId) => productId !== id);
+    setState({ products, cart, wishlist, recentlyViewed, comparison });
     saveLS(STORAGE_KEYS.products, products);
+    writeAccountBucket(STORAGE_KEYS.recentlyViewed, state.session?.id || "guest", recentlyViewed);
+    saveLS(STORAGE_KEYS.comparison, comparison);
     if (state.session?.id) {
       writeAccountBucket(STORAGE_KEYS.customerCarts, state.session.id, cart);
       writeAccountBucket(STORAGE_KEYS.customerWishlists, state.session.id, wishlist);
     }
     toast("Product deleted");
+    return true;
   },
 
   toggleFeatured(id) {
-    const products = state.products.map((product) => (product.id === id ? { ...product, featured: !product.featured } : product));
-    setState({ products });
-    saveLS(STORAGE_KEYS.products, products);
+    const product = state.products.find((item) => item.id === id);
+    if (!product) return false;
+    return appActions.upsertProduct({ ...product, featured: !product.featured });
   },
 
-  upsertCategory(category) {
-    const list = [...state.categories];
-    const index = list.findIndex((item) => item.id === category.id);
-    if (index >= 0) list[index] = { ...list[index], ...category };
-    else list.push({ createdAt: Date.now(), ...category });
-    setState({ categories: list });
-    saveLS(STORAGE_KEYS.categories, list);
-    toast(index >= 0 ? "Category updated" : "Category created");
+  async upsertCategory(category) {
+    try {
+      const { category: saved } = await catalogApi.saveCategory(category);
+      const list = [...state.categories];
+      const index = list.findIndex((item) => item.id === saved.id);
+      if (index >= 0) list[index] = { ...list[index], ...saved };
+      else list.push(saved);
+      setState({ categories: list });
+      saveLS(STORAGE_KEYS.categories, list);
+      toast(index >= 0 ? "Category updated" : "Category created");
+      return true;
+    } catch (error) {
+      toast(error.message || "Unable to save category", "err");
+      return false;
+    }
   },
 
-  deleteCategory(id) {
+  async deleteCategory(id) {
     if (state.products.some((product) => product.categoryId === id)) {
       toast("Reassign or delete its products first", "err");
-      return;
+      return false;
+    }
+    try {
+      await catalogApi.deleteCategory(id);
+    } catch (error) {
+      toast(error.message || "Unable to delete category", "err");
+      return false;
     }
     const categories = state.categories.filter((category) => category.id !== id);
     setState({ categories });
     saveLS(STORAGE_KEYS.categories, categories);
     toast("Category deleted");
+    return true;
   },
 
   upsertUser(user) {
@@ -751,7 +1043,76 @@ export const appActions = {
     toast("Role updated");
   },
 
-  placeOrder(customer) {
+  validateCoupon(code, subtotal, shipping = 0) {
+    const normalized = normalizeCouponCode(code);
+    if (!normalized) return { coupon: null, discount: 0, shippingFree: false, error: "Enter a coupon code" };
+    const coupon = state.coupons.find((item) => normalizeCouponCode(item.code) === normalized);
+    if (!coupon) return { coupon: null, discount: 0, shippingFree: false, error: "That coupon code is not valid" };
+    if (!isCouponUsable(coupon))
+      return { coupon: null, discount: 0, shippingFree: false, error: "That coupon is expired, inactive, or has reached its usage limit" };
+    if (subtotal < Number(coupon.minSubtotal || 0))
+      return {
+        coupon: null,
+        discount: 0,
+        shippingFree: false,
+        error: `Spend at least ${fmt(Number(coupon.minSubtotal || 0))} to use ${normalized}`,
+      };
+    const result = getCouponDiscount(coupon, subtotal, shipping);
+    return { coupon, ...result, error: "" };
+  },
+
+  upsertCoupon(coupon) {
+    const code = normalizeCouponCode(coupon.code);
+    if (!code) {
+      toast("Coupon code is required", "err");
+      return false;
+    }
+    const duplicate = state.coupons.find((item) => item.id !== coupon.id && normalizeCouponCode(item.code) === code);
+    if (duplicate) {
+      toast("That coupon code is already in use", "err");
+      return false;
+    }
+    const normalized = {
+      id: coupon.id || `cp${uid()}`,
+      code,
+      type: coupon.type || "percent",
+      value: Math.max(0, Number(coupon.value || 0)),
+      minSubtotal: Math.max(0, Number(coupon.minSubtotal || 0)),
+      maxUses: Math.max(0, Math.floor(Number(coupon.maxUses || 0))),
+      usedCount: Math.max(0, Math.floor(Number(coupon.usedCount || 0))),
+      active: coupon.active !== false,
+      expiresAt: coupon.expiresAt ? Number(coupon.expiresAt) : null,
+      description: String(coupon.description || "").trim(),
+    };
+    if (normalized.type === "percent" && normalized.value > 100) {
+      toast("Percentage cannot exceed 100%", "err");
+      return false;
+    }
+    const coupons = [...state.coupons];
+    const index = coupons.findIndex((item) => item.id === normalized.id);
+    if (index >= 0) coupons[index] = { ...coupons[index], ...normalized };
+    else coupons.unshift(normalized);
+    setState({ coupons });
+    saveLS(STORAGE_KEYS.coupons, coupons);
+    toast(index >= 0 ? "Coupon updated" : "Coupon created");
+    return true;
+  },
+
+  deleteCoupon(id) {
+    const coupons = state.coupons.filter((coupon) => coupon.id !== id);
+    setState({ coupons });
+    saveLS(STORAGE_KEYS.coupons, coupons);
+    toast("Coupon deleted");
+  },
+
+  toggleCoupon(id) {
+    const coupons = state.coupons.map((coupon) => (coupon.id === id ? { ...coupon, active: !coupon.active } : coupon));
+    setState({ coupons });
+    saveLS(STORAGE_KEYS.coupons, coupons);
+    toast("Coupon status updated");
+  },
+
+  placeOrder(customer, couponCode = "") {
     const items = cartLines()
       .map(({ p, qty }) => ({ productId: p.id, name: p.name, price: p.price, qty: Math.min(qty, p.stock) }))
       .filter((item) => item.qty > 0);
@@ -760,7 +1121,17 @@ export const appActions = {
       return null;
     }
     const subtotal = +items.reduce((sum, item) => sum + item.price * item.qty, 0).toFixed(2);
-    const shipping = subtotal >= 75 ? 0 : 6.95;
+    const baseShipping = subtotal >= 75 ? 0 : 6.95;
+    const couponResult = couponCode
+      ? appActions.validateCoupon(couponCode, subtotal, baseShipping)
+      : { coupon: null, discount: 0, shippingFree: false, error: "" };
+    if (couponCode && couponResult.error) {
+      toast(couponResult.error, "err");
+      return null;
+    }
+    const shipping = couponResult.shippingFree ? 0 : baseShipping;
+    const discount = couponResult.discount || 0;
+    const total = +(subtotal - discount + shipping).toFixed(2);
     const order = {
       id: getNextOrderNumber(state.orders),
       customer: {
@@ -769,8 +1140,18 @@ export const appActions = {
       },
       items,
       subtotal,
+      discount,
       shipping,
-      total: +(subtotal + shipping).toFixed(2),
+      total,
+      coupon: couponResult.coupon
+        ? {
+            code: couponResult.coupon.code,
+            type: couponResult.coupon.type,
+            value: couponResult.coupon.value,
+            discount,
+            shippingFree: couponResult.shippingFree,
+          }
+        : null,
       status: "paid",
       createdAt: Date.now(),
     };
@@ -779,6 +1160,9 @@ export const appActions = {
       return item ? { ...product, stock: Math.max(0, product.stock - item.qty) } : product;
     });
     const orders = [order, ...state.orders];
+    const coupons = couponResult.coupon
+      ? state.coupons.map((coupon) => (coupon.id === couponResult.coupon.id ? { ...coupon, usedCount: coupon.usedCount + 1 } : coupon))
+      : state.coupons;
     const inventoryLog = [
       ...items
         .map((item) => {
@@ -800,18 +1184,217 @@ export const appActions = {
         .filter(Boolean),
       ...state.inventoryLog,
     ].slice(0, 100);
-    setState({ orders, products, cart: [], inventoryLog });
+    setState({ orders, products, cart: [], inventoryLog, coupons });
     saveLS(STORAGE_KEYS.orders, orders);
     saveLS(STORAGE_KEYS.products, products);
     saveLS(STORAGE_KEYS.inventoryLog, inventoryLog);
-    if (state.session?.id) writeAccountBucket(STORAGE_KEYS.customerCarts, state.session.id, []);
+    if (couponResult.coupon) saveLS(STORAGE_KEYS.coupons, coupons);
+    if (state.session?.id) {
+      writeAccountBucket(STORAGE_KEYS.customerCarts, state.session.id, []);
+      appendNotification(
+        state.session.id,
+        makeNotification({
+          type: "order",
+          title: `Order ${order.id} confirmed`,
+          message: `Thanks for your order. Your ${items.length === 1 ? "item is" : "items are"} being prepared.`,
+          link: "/account",
+          orderId: order.id,
+        }),
+      );
+    }
     return order;
   },
 
+  cancelOrder(id) {
+    if (!state.session) {
+      toast("Please sign in to cancel an order", "err");
+      return false;
+    }
+    const order = state.orders.find((item) => item.id === id);
+    const belongsToUser = order?.customer?.userId === state.session.id;
+    if (!order || !belongsToUser || !canCancelOrder(order)) {
+      toast("This order can no longer be cancelled", "err");
+      return false;
+    }
+    const orders = state.orders.map((item) => (item.id === id ? { ...item, status: "cancelled", cancelledAt: Date.now() } : item));
+    const products = state.products.map((product) => {
+      const line = order.items?.find((item) => item.productId === product.id);
+      return line ? { ...product, stock: product.stock + line.qty } : product;
+    });
+    const inventoryLog = [
+      ...order.items
+        .map((item) => {
+          const product = state.products.find((entry) => entry.id === item.productId);
+          return product
+            ? {
+                id: uid(),
+                productId: product.id,
+                productName: product.name,
+                previousStock: product.stock,
+                nextStock: product.stock + item.qty,
+                change: item.qty,
+                reason: `Order ${order.id} cancelled`,
+                createdAt: Date.now(),
+                userId: state.session.id,
+              }
+            : null;
+        })
+        .filter(Boolean),
+      ...(state.inventoryLog || []),
+    ].slice(0, 100);
+    setState({ orders, products, inventoryLog });
+    saveLS(STORAGE_KEYS.orders, orders);
+    saveLS(STORAGE_KEYS.products, products);
+    saveLS(STORAGE_KEYS.inventoryLog, inventoryLog);
+    appendNotification(
+      state.session.id,
+      makeNotification({
+        type: "order",
+        title: `Order ${order.id} cancelled`,
+        message: "Your cancellation request was completed and the items were returned to stock.",
+        link: "/account",
+        orderId: order.id,
+      }),
+    );
+    toast("Order cancelled");
+    return true;
+  },
+
+  requestReturn(orderId, reason, note = "") {
+    if (!state.session) {
+      toast("Please sign in to request a return", "err");
+      return false;
+    }
+    const order = state.orders.find((item) => item.id === orderId);
+    if (!order || order.customer?.userId !== state.session.id || !canRequestReturn(order)) {
+      toast("This order is not eligible for a return", "err");
+      return false;
+    }
+    const request = normalizeReturnRequest({
+      id: `ret-${uid()}`,
+      orderId,
+      userId: state.session.id,
+      reason,
+      note,
+      status: RETURN_STATUSES.REQUESTED,
+    });
+    const returnRequests = [request, ...state.returnRequests];
+    const orders = state.orders.map((item) => (item.id === orderId ? { ...item, returnRequest: request.id } : item));
+    setState({ returnRequests, orders });
+    saveLS(STORAGE_KEYS.returnRequests, returnRequests);
+    saveLS(STORAGE_KEYS.orders, orders);
+    appendNotification(
+      state.session.id,
+      makeNotification({
+        type: "return",
+        title: `Return requested for ${order.id}`,
+        message: "Your return request is awaiting review.",
+        link: "/account",
+        orderId,
+      }),
+    );
+    toast("Return request submitted");
+    return true;
+  },
+
+  setReturnStatus(returnId, status) {
+    if (!state.session || !["admin", "editor"].includes(state.session.role)) {
+      toast("You do not have permission to update returns", "err");
+      return false;
+    }
+    const request = state.returnRequests.find((item) => item.id === returnId);
+    if (!request) return false;
+    if (![...Object.values(RETURN_STATUSES)].includes(status)) return false;
+    const previous = request.status;
+    if (previous === status) return true;
+    const returnRequests = state.returnRequests.map((item) => (item.id === returnId ? { ...item, status, updatedAt: Date.now() } : item));
+    let orders = state.orders;
+    let products = state.products;
+    let inventoryLog = state.inventoryLog || [];
+    const order = state.orders.find((item) => item.id === request.orderId);
+    if (order && status === RETURN_STATUSES.APPROVED && previous !== RETURN_STATUSES.APPROVED) {
+      orders = orders.map((item) => (item.id === order.id ? { ...item, status: "return_approved" } : item));
+    }
+    if (order && status === RETURN_STATUSES.COMPLETED && previous !== RETURN_STATUSES.COMPLETED) {
+      orders = orders.map((item) => (item.id === order.id ? { ...item, status: "returned" } : item));
+      products = products.map((product) => {
+        const line = order.items?.find((item) => item.productId === product.id);
+        return line ? { ...product, stock: product.stock + line.qty } : product;
+      });
+      inventoryLog = [
+        ...order.items
+          .map((item) => {
+            const product = state.products.find((entry) => entry.id === item.productId);
+            return product
+              ? {
+                  id: uid(),
+                  productId: product.id,
+                  productName: product.name,
+                  previousStock: product.stock,
+                  nextStock: product.stock + item.qty,
+                  change: item.qty,
+                  reason: `Return ${request.id} completed`,
+                  createdAt: Date.now(),
+                  userId: state.session.id,
+                }
+              : null;
+          })
+          .filter(Boolean),
+        ...inventoryLog,
+      ].slice(0, 100);
+    }
+    if (order && status === RETURN_STATUSES.REJECTED && previous !== RETURN_STATUSES.REJECTED) {
+      orders = orders.map((item) => (item.id === order.id ? { ...item, returnRequest: null } : item));
+    }
+    setState({ returnRequests, orders, products, inventoryLog });
+    saveLS(STORAGE_KEYS.returnRequests, returnRequests);
+    saveLS(STORAGE_KEYS.orders, orders);
+    saveLS(STORAGE_KEYS.products, products);
+    saveLS(STORAGE_KEYS.inventoryLog, inventoryLog);
+    if (request.userId) {
+      appendNotification(
+        request.userId,
+        makeNotification({
+          type: "return",
+          title: `Return for ${request.orderId} is ${status.replace("_", " ")}`,
+          message:
+            status === RETURN_STATUSES.APPROVED
+              ? "Your return has been approved. Follow the return instructions provided by FikarNot."
+              : status === RETURN_STATUSES.COMPLETED
+                ? "Your return has been completed and the items were added back to inventory."
+                : status === RETURN_STATUSES.REJECTED
+                  ? "Your return request was not approved."
+                  : "Your return request status was updated.",
+          link: "/account",
+          orderId: request.orderId,
+        }),
+      );
+    }
+    toast("Return status updated");
+    return true;
+  },
+
   setOrderStatus(id, status) {
+    const previous = state.orders.find((order) => order.id === id);
+    if (!previous) return false;
+    if (previous.status === status) return true;
     const orders = state.orders.map((order) => (order.id === id ? { ...order, status } : order));
     setState({ orders });
     saveLS(STORAGE_KEYS.orders, orders);
+    if (previous.customer?.userId) {
+      const label = status === "paid" ? "confirmed" : status;
+      appendNotification(
+        previous.customer.userId,
+        makeNotification({
+          type: "order",
+          title: `Order ${previous.id} is ${label}`,
+          message: `Your order status has been updated to ${status}.`,
+          link: "/account",
+          orderId: previous.id,
+        }),
+      );
+    }
     toast("Order status updated");
+    return true;
   },
 };

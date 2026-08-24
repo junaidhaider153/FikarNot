@@ -9,3 +9,5 @@ export const ROLES = Object.freeze({
 
 export const STAFF_ROLES = Object.freeze([ROLES.ADMIN, ROLES.EDITOR]);
 export const ADMIN_ROLES = Object.freeze([ROLES.ADMIN]);
+
+export const WHATSAPP_NUMBER = import.meta.env.VITE_WHATSAPP_NUMBER || "";

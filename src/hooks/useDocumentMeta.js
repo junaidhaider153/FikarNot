@@ -1,6 +1,8 @@
 import { useEffect } from "react";
 import { APP_NAME } from "../config/appConfig";
 
+const SITE_URL = "https://www.fikarnot.shop";
+
 const setMetaContent = (name, content, attr = "name") => {
   if (!content) return;
   let tag = document.querySelector(`meta[${attr}="${name}"]`);
@@ -12,29 +14,45 @@ const setMetaContent = (name, content, attr = "name") => {
   tag.setAttribute("content", content);
 };
 
+const setCanonical = (url) => {
+  let link = document.querySelector('link[rel="canonical"]');
+  if (!link) {
+    link = document.createElement("link");
+    link.rel = "canonical";
+    document.head.appendChild(link);
+  }
+  link.href = url;
+};
+
 /**
- * Sets document.title and the description / Open Graph meta tags for the
- * current route. Falls back to nothing (leaves existing tags alone) for any
- * field left undefined, so pages can override only what they need.
- *
- * @param {{ title?: string, description?: string, noindex?: boolean, image?: string }} meta
+ * Route-aware metadata helper for the SPA.
+ * `canonical` should be an absolute URL for indexable routes.
  */
-export function useDocumentMeta({ title, description, noindex = false, image } = {}) {
+export function useDocumentMeta({ title, description, noindex = false, image, canonical, type = "website" } = {}) {
   useEffect(() => {
-    if (title) document.title = title.includes(APP_NAME) ? title : `${title} — ${APP_NAME}`;
+    const finalTitle = title ? (title.includes(APP_NAME) ? title : `${title} — ${APP_NAME}`) : document.title;
+    if (title) document.title = finalTitle;
+
     if (description) {
       setMetaContent("description", description);
       setMetaContent("og:description", description, "property");
       setMetaContent("twitter:description", description);
     }
     if (title) {
-      setMetaContent("og:title", document.title, "property");
-      setMetaContent("twitter:title", document.title);
+      setMetaContent("og:title", finalTitle, "property");
+      setMetaContent("twitter:title", finalTitle);
     }
+    setMetaContent("og:type", type, "property");
+    setMetaContent("robots", noindex ? "noindex, nofollow" : "index, follow");
     if (image) {
       setMetaContent("og:image", image, "property");
       setMetaContent("twitter:image", image);
     }
-    setMetaContent("robots", noindex ? "noindex, nofollow" : "index, follow");
-  }, [title, description, noindex, image]);
+
+    const url = canonical || `${SITE_URL}${window.location.pathname}`;
+    setCanonical(url);
+    setMetaContent("og:url", url, "property");
+
+    return undefined;
+  }, [title, description, noindex, image, canonical, type]);
 }

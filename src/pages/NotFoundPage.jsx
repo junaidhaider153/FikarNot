@@ -1,8 +1,10 @@
 import { Link, useLocation } from "react-router-dom";
 import { Empty } from "../components/common";
+import { useDocumentMeta } from "../hooks/useDocumentMeta";
 
 export default function NotFoundPage() {
   const location = useLocation();
+  useDocumentMeta({ title: "Page not found", noindex: true });
 
   return (
     <div className="container page-pad">

@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useApp, appActions, cartLines } from "../store/appStore";
 import { fmt, delay } from "../utils/helpers";
@@ -33,16 +33,71 @@ export default function CheckoutPage() {
   const [errs, setErrs] = useState({});
   const [busy, setBusy] = useState(false);
   const [placed, setPlaced] = useState(null);
+  const [couponCode, setCouponCode] = useState("");
+  const [appliedCoupon, setAppliedCoupon] = useState(null);
+  const [couponError, setCouponError] = useState("");
 
   const totals = useMemo(() => {
     const subtotal = +lines.reduce((total, line) => total + line.p.price * line.qty, 0).toFixed(2);
-    const shipping = subtotal === 0 ? 0 : subtotal >= 75 ? 0 : 6.95;
-    return { subtotal, shipping, total: +(subtotal + shipping).toFixed(2) };
-  }, [lines]);
+    const baseShipping = subtotal === 0 ? 0 : subtotal >= 75 ? 0 : 6.95;
+    if (!appliedCoupon)
+      return { subtotal, shipping: baseShipping, discount: 0, total: +(subtotal + baseShipping).toFixed(2), couponInvalidReason: "" };
+    const result = appActions.validateCoupon(appliedCoupon.code, subtotal, baseShipping);
+    if (result.error)
+      return {
+        subtotal,
+        shipping: baseShipping,
+        discount: 0,
+        total: +(subtotal + baseShipping).toFixed(2),
+        couponInvalidReason: result.error,
+      };
+    const shipping = result.shippingFree ? 0 : baseShipping;
+    return {
+      subtotal,
+      shipping,
+      discount: result.discount || 0,
+      total: +(subtotal - (result.discount || 0) + shipping).toFixed(2),
+      couponInvalidReason: "",
+    };
+  }, [lines, appliedCoupon]);
+
+  // If the cart changes underneath an already-applied coupon (item removed, quantity
+  // reduced) and it no longer qualifies, surface that instead of letting the "applied"
+  // badge silently keep showing while the discount quietly reverts to $0.
+  useEffect(() => {
+    if (appliedCoupon && totals.couponInvalidReason) {
+      setCouponError(
+        `${appliedCoupon.code} no longer applies: ${totals.couponInvalidReason.charAt(0).toLowerCase()}${totals.couponInvalidReason.slice(1)}`,
+      );
+      setAppliedCoupon(null);
+      setCouponCode("");
+    }
+  }, [totals.couponInvalidReason, appliedCoupon]);
 
   const set = (key) => (event) => {
     setForm((current) => ({ ...current, [key]: event.target.value }));
     if (errs[key]) setErrs((current) => ({ ...current, [key]: "" }));
+  };
+
+  const applyCoupon = (event) => {
+    event.preventDefault();
+    const code = couponCode.trim();
+    const baseShipping = totals.subtotal === 0 ? 0 : totals.subtotal >= 75 ? 0 : 6.95;
+    const result = appActions.validateCoupon(code, totals.subtotal, baseShipping);
+    if (result.error) {
+      setCouponError(result.error);
+      setAppliedCoupon(null);
+      return;
+    }
+    setCouponError("");
+    setAppliedCoupon(result.coupon);
+    setCouponCode(result.coupon.code);
+  };
+
+  const removeCoupon = () => {
+    setAppliedCoupon(null);
+    setCouponError("");
+    setCouponCode("");
   };
 
   const continueAsGuest = (event) => {
@@ -85,12 +140,15 @@ export default function CheckoutPage() {
     setBusy(true);
     await delay(900);
 
-    const order = appActions.placeOrder({
-      name: form.name.trim(),
-      email: form.email.trim(),
-      address: `${form.address.trim()}, ${form.city.trim()} ${form.zip.trim()}`,
-      paymentMethod,
-    });
+    const order = appActions.placeOrder(
+      {
+        name: form.name.trim(),
+        email: form.email.trim(),
+        address: `${form.address.trim()}, ${form.city.trim()} ${form.zip.trim()}`,
+        paymentMethod,
+      },
+      appliedCoupon?.code || "",
+    );
 
     setBusy(false);
     if (!order?.id) {
@@ -445,15 +503,53 @@ export default function CheckoutPage() {
               </div>
             ))}
           </div>
+          <form className="coupon-form" onSubmit={applyCoupon}>
+            <label className="lbl" htmlFor="checkout-coupon">
+              Promo code
+            </label>
+            <div className="coupon-input-row">
+              <input
+                id="checkout-coupon"
+                className="input"
+                value={couponCode}
+                onChange={(e) => {
+                  setCouponCode(e.target.value.toUpperCase());
+                  setCouponError("");
+                }}
+                placeholder="WELCOME10"
+                disabled={Boolean(appliedCoupon)}
+              />
+              {appliedCoupon ? (
+                <button type="button" className="btn btn-ghost btn-sm" onClick={removeCoupon}>
+                  Remove
+                </button>
+              ) : (
+                <button type="submit" className="btn btn-dark btn-sm">
+                  Apply
+                </button>
+              )}
+            </div>
+            {appliedCoupon && <p className="coupon-success">✓ {appliedCoupon.code} applied</p>}
+            {couponError && <p className="f-err">{couponError}</p>}
+          </form>
           <div className="sum-row">
             <span>Subtotal</span>
             <span>{fmt(totals.subtotal)}</span>
           </div>
+          {totals.discount > 0 && (
+            <div className="sum-row coupon-discount-row">
+              <span>Discount</span>
+              <span>-{fmt(totals.discount)}</span>
+            </div>
+          )}
           <div className="sum-row">
             <span>Shipping</span>
             <span>{totals.shipping === 0 ? "Free" : fmt(totals.shipping)}</span>
           </div>
-          {totals.shipping > 0 && <div className="free-note">Add {fmt(75 - totals.subtotal)} more to unlock free shipping.</div>}
+          {totals.shipping > 0 && !appliedCoupon?.type?.includes("shipping") && (
+            <div className="free-note">Add {fmt(75 - totals.subtotal)} more to unlock free shipping.</div>
+          )}
+          {appliedCoupon?.type === "free_shipping" && <div className="free-note">Free shipping unlocked with {appliedCoupon.code} ✦</div>}
           <div className="sum-row total">
             <span>Total</span>
             <span>{fmt(totals.total)}</span>
@@ -498,6 +594,14 @@ function OrderConfirmation({ order }) {
             <strong>{paymentLabel}</strong>
           </div>
         </div>
+        {order.coupon && (
+          <div className="confirmation-address">
+            <span>Promotion</span>
+            <strong>
+              {order.coupon.code} · {order.discount > 0 ? `Saved ${fmt(order.discount)}` : "Free shipping"}
+            </strong>
+          </div>
+        )}
 
         <div className="confirmation-address">
           <span>Deliver to</span>
