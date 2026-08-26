@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useState, useCallback } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useApp, appActions } from "../store/appStore";
 import { fmt } from "../utils/helpers";
@@ -14,10 +14,12 @@ export function ProductCard({ p }) {
   const isCompared = s.comparison.includes(p.id);
   const navigate = useNavigate();
   const location = useLocation();
+  
   const images = useMemo(() => {
     const list = Array.isArray(p.images) && p.images.length ? p.images : [p.image];
     return [...new Set(list.filter(Boolean))];
   }, [p.images, p.image]);
+  
   const [activeImage, setActiveImage] = useState(0);
   const [hovered, setHovered] = useState(false);
 
@@ -35,14 +37,55 @@ export function ProductCard({ p }) {
 
   const image = images[activeImage] || images[0];
 
+  // Memoized callbacks to avoid creating new functions on every render
+  const handleMouseEnter = useCallback(() => setHovered(true), []);
+  const handleMouseLeave = useCallback(() => {
+    setHovered(false);
+    setActiveImage(0);
+  }, []);
+
+  const handleWishlistClick = useCallback((event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    if (!s.session) {
+      navigate(`/login?redirect=${encodeURIComponent(`${location.pathname}${location.search}`)}`);
+      return;
+    }
+    appActions.toggleWishlist(p.id);
+  }, [p.id, s.session, navigate, location]);
+
+  const handleComparisonClick = useCallback((event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    appActions.toggleComparison(p.id);
+  }, [p.id]);
+
+  const handleEditClick = useCallback((event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    navigate(`/admin/products?edit=${p.id}`);
+  }, [p.id, navigate]);
+
+  const handleDeleteClick = useCallback((event) => {
+    event.preventDefault();
+    event.stopPropagation();
+    setConfirmDelete(true);
+  }, []);
+
+  const handleConfirmDelete = useCallback(() => {
+    appActions.deleteProduct(p.id);
+    setConfirmDelete(false);
+  }, [p.id]);
+
+  const handleAddToCart = useCallback(() => {
+    appActions.addToCart(p.id);
+  }, [p.id]);
+
   return (
     <article
       className="card"
-      onMouseEnter={() => setHovered(true)}
-      onMouseLeave={() => {
-        setHovered(false);
-        setActiveImage(0);
-      }}
+      onMouseEnter={handleMouseEnter}
+      onMouseLeave={handleMouseLeave}
     >
       <div className="card-media">
         <Link to={`/product/${p.id}`} aria-label={p.name}>
@@ -59,15 +102,7 @@ export function ProductCard({ p }) {
           aria-label={isWishlisted ? `Remove ${p.name} from wishlist` : `Add ${p.name} to wishlist`}
           aria-pressed={isWishlisted}
           title={isWishlisted ? "Remove from wishlist" : "Add to wishlist"}
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            if (!s.session) {
-              navigate(`/login?redirect=${encodeURIComponent(`${location.pathname}${location.search}`)}`);
-              return;
-            }
-            appActions.toggleWishlist(p.id);
-          }}
+          onClick={handleWishlistClick}
         >
           <Ic n="heart" s={16} filled={isWishlisted} />
         </button>
@@ -77,11 +112,7 @@ export function ProductCard({ p }) {
           aria-label={isCompared ? `Remove ${p.name} from comparison` : `Compare ${p.name}`}
           aria-pressed={isCompared}
           title={isCompared ? "Remove from comparison" : "Compare product"}
-          onClick={(event) => {
-            event.preventDefault();
-            event.stopPropagation();
-            appActions.toggleComparison(p.id);
-          }}
+          onClick={handleComparisonClick}
         >
           <Ic n="chart" s={15} />
         </button>
@@ -91,11 +122,7 @@ export function ProductCard({ p }) {
               className="icon-btn"
               aria-label={`Edit ${p.name}`}
               title="Edit"
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                navigate(`/admin/products?edit=${p.id}`);
-              }}
+              onClick={handleEditClick}
             >
               <Ic n="edit" s={14} />
             </button>
@@ -103,11 +130,7 @@ export function ProductCard({ p }) {
               className="icon-btn"
               aria-label={`Delete ${p.name}`}
               title="Delete"
-              onClick={(event) => {
-                event.preventDefault();
-                event.stopPropagation();
-                setConfirmDelete(true);
-              }}
+              onClick={handleDeleteClick}
             >
               <Ic n="trash" s={14} />
             </button>
@@ -131,7 +154,7 @@ export function ProductCard({ p }) {
         </div>
         <div className="card-foot">
           <span className="price">{fmt(p.price)}</span>
-          <button className="btn btn-dark btn-sm" disabled={p.stock === 0} onClick={() => appActions.addToCart(p.id)}>
+          <button className="btn btn-dark btn-sm" disabled={p.stock === 0} onClick={handleAddToCart}>
             <Ic n="cart" s={14} /> Add
           </button>
         </div>
@@ -142,10 +165,7 @@ export function ProductCard({ p }) {
           message="This removes the product from the catalogue and associated active shopping lists."
           confirmLabel="Delete product"
           onCancel={() => setConfirmDelete(false)}
-          onConfirm={() => {
-            appActions.deleteProduct(p.id);
-            setConfirmDelete(false);
-          }}
+          onConfirm={handleConfirmDelete}
         />
       )}
     </article>

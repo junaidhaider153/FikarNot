@@ -1,4 +1,4 @@
-import { useMemo, useState } from "react";
+import { useMemo, useState, useCallback } from "react";
 import { Link } from "react-router-dom";
 import { useApp, appActions } from "../store/appStore";
 import { IMG, GALLERY } from "../assets/assets";
@@ -40,28 +40,57 @@ export default function HomePage() {
   const site = siteData?.settings || {};
   useDocumentMeta({ title: "Everyday Products", description: APP_DESCRIPTION });
   const list = products || [];
-  const featured = list.filter((p) => p.featured).slice(0, 4);
-  const fresh = [...list].sort((a, b) => b.createdAt - a.createdAt).slice(0, 4);
-  const popular = [...list].sort((a, b) => b.rating - a.rating).slice(0, 4);
+
+  // Memoize expensive array operations to prevent recalculation on every render
+  const featured = useMemo(() => 
+    list.filter((p) => p.featured).slice(0, 4), 
+    [list]
+  );
+
+  const fresh = useMemo(() => 
+    [...list].sort((a, b) => b.createdAt - a.createdAt).slice(0, 4), 
+    [list]
+  );
+
+  const popular = useMemo(() => 
+    [...list].sort((a, b) => b.rating - a.rating).slice(0, 4), 
+    [list]
+  );
+
+  // Memoize category count lookup to avoid O(n) filter for each category
+  const categoryCounts = useMemo(() => {
+    const counts = {};
+    s.categories.forEach((cat) => {
+      counts[cat.id] = s.products.filter((p) => p.categoryId === cat.id).length;
+    });
+    return counts;
+  }, [s.products, s.categories]);
+
   const averageRating = useMemo(() => {
     if (!list.length) return "0.0";
     return (list.reduce((sum, p) => sum + p.rating, 0) / list.length).toFixed(1);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- depending on `products`, not the derived `list` (a fresh array reference every render), so this actually memoizes.
-  }, [products]);
-  const countFor = (id) => s.products.filter((p) => p.categoryId === id).length;
-  const activeOffers = (s.coupons || []).filter((coupon) => isCouponUsable(coupon)).slice(0, 3);
-  const recent = resolveRecentlyViewed(s.recentlyViewed, list, 4);
+  }, [list]);
+
+  const activeOffers = useMemo(() => 
+    (s.coupons || []).filter((coupon) => isCouponUsable(coupon)).slice(0, 3),
+    [s.coupons]
+  );
+
+  const recent = useMemo(() => 
+    resolveRecentlyViewed(s.recentlyViewed, list, 4),
+    [s.recentlyViewed, list]
+  );
 
   // Hero slider: opens on the existing hero shot, then cycles a few catalogue images.
   // To add a real video slide once you have footage, drop the file in `public/media/`
   // and add an entry here, e.g.:
   //   { id: "video", type: "video", src: "/media/hero-loop.mp4", poster: IMG.hero }
-  const heroSlides = [
+  const heroSlides = useMemo(() => [
     { id: "hero", type: "image", src: site.heroImage || IMG.hero, alt: "FikarNot products arranged on a warm cream surface" },
     ...GALLERY.slice(0, 3).map(([key, url]) => ({ id: key, type: "image", src: url, alt: `${key} from the FikarNot catalogue` })),
-  ];
+  ], [site.heroImage]);
 
-  const subscribe = (event) => {
+  const subscribe = useCallback((event) => {
     event.preventDefault();
     const value = email.trim();
     if (!/^\S+@\S+\.\S+$/.test(value)) {
@@ -70,7 +99,7 @@ export default function HomePage() {
     }
     appActions.toast("You're on the FikarNot list ✦");
     setEmail("");
-  };
+  }, [email]);
 
   return (
     <>
@@ -155,7 +184,7 @@ export default function HomePage() {
               <span className="cat-dot" style={{ background: c.color }} />
               <h3>{c.name}</h3>
               <p>{c.description}</p>
-              <div className="cat-count">{countFor(c.id)} items</div>
+              <div className="cat-count">{categoryCounts[c.id] || 0} items</div>
             </Link>
           ))}
         </div>
