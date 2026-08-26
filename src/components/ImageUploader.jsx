@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Ic } from "./icons";
 import { MAX_STORED_IMAGES, prepareImageFile } from "../utils/imageUpload";
+import { uploadsApi } from "../api/uploadsApi";
 
 export function ImageUploader({ images = [], onChange }) {
   const inputRef = useRef(null);
@@ -16,11 +17,13 @@ export function ImageUploader({ images = [], onChange }) {
     try {
       const room = Math.max(0, MAX_STORED_IMAGES - images.length);
       if (!room) throw new Error(`You can keep up to ${MAX_STORED_IMAGES} product images.`);
-      const prepared = [];
+      const uploaded = [];
       for (const file of selected.slice(0, room)) {
-        prepared.push(await prepareImageFile(file));
+        const dataUrl = await prepareImageFile(file);
+        const { url: storedUrl } = await uploadsApi.uploadImage(dataUrl, file.name);
+        uploaded.push(storedUrl);
       }
-      onChange([...images, ...prepared]);
+      onChange([...images, ...uploaded]);
     } catch (e) {
       setErr(e.message || "Could not add image.");
     } finally {

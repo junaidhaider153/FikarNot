@@ -19,7 +19,11 @@ import { fmt, uid } from "../utils/helpers";
 import { Ic } from "../components/icons";
 import { Modal, Empty, Stars, Pagination } from "../components/common";
 import { ImageUploader } from "../components/ImageUploader";
+import { prepareImageFile, MAX_IMAGE_BYTES } from "../utils/imageUpload";
+import { uploadsApi } from "../api/uploadsApi";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
+import { siteApi } from "../api/siteApi";
+import { mediaApi } from "../api/mediaApi";
 import { usePagination } from "../hooks/usePagination";
 import { RETURN_STATUSES } from "../utils/returns";
 import { AnalyticsTab } from "../components/admin/AnalyticsTab";
@@ -295,15 +299,15 @@ export function UserEditor({ initial, onClose }) {
     password: "",
   }));
   const [errs, setErrs] = useState({});
-  const save = (e) => {
+  const save = async (e) => {
     e.preventDefault();
     const er = {};
     if (!f.name.trim()) er.name = "Required";
     if (!/.+@.+\..+/.test(f.email)) er.email = "Valid email required";
-    if (!initial && f.password.length < 6) er.password = "Min 6 chars";
+    if (!initial && f.password.length < 12) er.password = "Min 12 chars";
     setErrs(er);
     if (Object.keys(er).length) return;
-    const ok = appActions.upsertUser({
+    const ok = await appActions.upsertUser({
       id: initial?.id || "u" + uid(),
       name: f.name.trim(),
       email: f.email.trim(),
@@ -1296,6 +1300,18 @@ function ReviewsTab() {
                     </td>
                     <td>{new Date(review.createdAt).toLocaleDateString()}</td>
                     <td>
+                      {review.status === "hidden" ? (
+                        <span className="role-badge editor" style={{ marginRight: 8 }}>
+                          Hidden
+                        </span>
+                      ) : null}
+                      <button
+                        className="btn btn-ghost btn-sm"
+                        style={{ marginRight: 8 }}
+                        onClick={() => appActions.setReviewStatus(review.id, review.status === "hidden" ? "published" : "hidden")}
+                      >
+                        {review.status === "hidden" ? "Restore" : "Hide"}
+                      </button>
                       <button
                         className="btn btn-danger btn-sm"
                         onClick={() => {
@@ -1538,6 +1554,191 @@ export function SupportTab() {
   );
 }
 
+
+function MediaTab() {
+  const [assets, setAssets] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [working, setWorking] = useState(false);
+  const load = async () => {
+    setLoading(true);
+    try {
+      const result = await mediaApi.list({ limit: 100, offset: 0 });
+      setAssets(result.assets || []);
+    } catch (error) {
+      appActions.toast(error.message || "Could not load media", "err");
+    } finally {
+      setLoading(false);
+    }
+  };
+  useEffect(() => { load(); }, []);
+  const remove = async (asset) => {
+    if (asset.usageCount > 0) {
+      appActions.toast("This image is currently in use. Remove its references first.", "err");
+      return;
+    }
+    if (!window.confirm(`Delete ${asset.originalName || asset.filename}?`)) return;
+    setWorking(true);
+    try {
+      await mediaApi.remove(asset.id);
+      setAssets((current) => current.filter((item) => item.id !== asset.id));
+      appActions.toast("Media deleted");
+    } catch (error) {
+      appActions.toast(error.message || "Could not delete media", "err");
+    } finally {
+      setWorking(false);
+    }
+  };
+  const cleanup = async () => {
+    if (!window.confirm("Remove all uploaded images that are no longer used anywhere in FikarNot?")) return;
+    setWorking(true);
+    try {
+      const result = await mediaApi.cleanup();
+      appActions.toast(`${result.removed || 0} unused image${result.removed === 1 ? "" : "s"} removed`);
+      await load();
+    } catch (error) {
+      appActions.toast(error.message || "Could not clean media", "err");
+    } finally {
+      setWorking(false);
+    }
+  };
+  return (
+    <div>
+      <div className="sec-hd">
+        <div>
+          <h2 className="sec-title display">Media library</h2>
+          <p className="section-sub">Uploaded product and storefront images stored by FikarNot.</p>
+        </div>
+        <button className="btn btn-ghost" onClick={cleanup} disabled={working || loading}>Clean unused</button>
+      </div>
+      {loading ? <div className="panel"><p>Loading media…</p></div> : assets.length === 0 ? (
+        <Empty icon="box" title="No uploaded media" sub="Images uploaded from a device will appear here." />
+      ) : (
+        <div className="media-library-grid">
+          {assets.map((asset) => (
+            <article className="media-library-card" key={asset.id}>
+              <div className="media-library-thumb"><img src={asset.url} alt={asset.originalName || "Uploaded media"} loading="lazy" /></div>
+              <div className="media-library-info">
+                <strong title={asset.originalName || asset.filename}>{asset.originalName || asset.filename}</strong>
+                <span>{(asset.byteSize / 1024).toFixed(0)} KB · {asset.mimeType.replace("image/", "").toUpperCase()}</span>
+                <span>{asset.usageCount > 0 ? `Used in ${asset.usageCount} place${asset.usageCount === 1 ? "" : "s"}` : "Unused"}</span>
+              </div>
+              <button className="btn btn-danger btn-sm" disabled={working || asset.usageCount > 0} onClick={() => remove(asset)}>Delete</button>
+            </article>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function SettingsTab() {
+  const [loading, setLoading] = useState(true);
+  const [saving, setSaving] = useState(false);
+  const [heroUploading, setHeroUploading] = useState(false);
+  const [heroUploadError, setHeroUploadError] = useState("");
+  const [form, setForm] = useState({
+    storeName: "FikarNot",
+    supportEmail: "support@fikarnot.shop",
+    heroKicker: "",
+    heroEyebrow: "",
+    heroTitle: "",
+    heroHighlight: "",
+    heroSubtitle: "",
+    heroSticker: "",
+    heroImage: "",
+    announcement: "",
+    aboutTitle: "",
+    aboutIntro: "",
+    aboutBody: "",
+    whatsappNumber: "",
+    instagramUrl: "",
+    facebookUrl: "",
+    metaTitle: "",
+    metaDescription: "",
+  });
+  useEffect(() => {
+    let alive = true;
+    siteApi.get().then((result) => {
+      if (alive) setForm((current) => ({ ...current, ...(result.settings || {}) }));
+    }).catch(() => appActions.toast("Could not load store settings", "err")).finally(() => alive && setLoading(false));
+    return () => { alive = false; };
+  }, []);
+  const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
+  const uploadHeroImage = async (file) => {
+    if (!file) return;
+    setHeroUploading(true);
+    setHeroUploadError("");
+    try {
+      const dataUrl = await prepareImageFile(file);
+      const result = await uploadsApi.uploadImage(dataUrl, file.name);
+      set("heroImage", result.url);
+      appActions.toast("Hero image uploaded. Save settings to publish it.");
+    } catch (error) {
+      setHeroUploadError(error.message || "Could not upload hero image.");
+    } finally {
+      setHeroUploading(false);
+    }
+  };
+  const save = async (event) => {
+    event.preventDefault();
+    setSaving(true);
+    try {
+      await siteApi.update(form);
+      appActions.toast("Store settings saved");
+    } catch (error) {
+      appActions.toast(error.message || "Could not save settings", "err");
+    } finally {
+      setSaving(false);
+    }
+  };
+  if (loading) return <div className="panel"><p>Loading store settings…</p></div>;
+  return (
+    <form className="panel" onSubmit={save}>
+      <h3 className="display">Store & homepage settings</h3>
+      <p style={{ color: "var(--ink2)", marginBottom: 18 }}>These settings are stored in the backend. Change them here instead of editing the React source.</p>
+      <div className="f-grid">
+        <div><label className="lbl" htmlFor="settings-store-name">Store name</label><input id="settings-store-name" className="input" value={form.storeName} onChange={(e) => set("storeName", e.target.value)} /></div>
+        <div><label className="lbl" htmlFor="settings-support-email">Support email</label><input id="settings-support-email" className="input" type="email" value={form.supportEmail} onChange={(e) => set("supportEmail", e.target.value)} /></div>
+        <div className="f-full"><label className="lbl" htmlFor="settings-kicker">Hero kicker</label><input id="settings-kicker" className="input" value={form.heroKicker} onChange={(e) => set("heroKicker", e.target.value)} /></div>
+        <div className="f-full"><label className="lbl" htmlFor="settings-eyebrow">Hero eyebrow</label><input id="settings-eyebrow" className="input" value={form.heroEyebrow} onChange={(e) => set("heroEyebrow", e.target.value)} /></div>
+        <div><label className="lbl" htmlFor="settings-title">Hero title</label><input id="settings-title" className="input" value={form.heroTitle} onChange={(e) => set("heroTitle", e.target.value)} /></div>
+        <div><label className="lbl" htmlFor="settings-highlight">Hero highlight</label><input id="settings-highlight" className="input" value={form.heroHighlight} onChange={(e) => set("heroHighlight", e.target.value)} /></div>
+        <div className="f-full"><label className="lbl" htmlFor="settings-subtitle">Hero subtitle</label><textarea id="settings-subtitle" className="textarea" value={form.heroSubtitle} onChange={(e) => set("heroSubtitle", e.target.value)} /></div>
+        <div><label className="lbl" htmlFor="settings-sticker">Hero sticker</label><input id="settings-sticker" className="input" value={form.heroSticker} onChange={(e) => set("heroSticker", e.target.value)} /></div>
+        <div className="f-full">
+          <label className="lbl" htmlFor="settings-hero-image">Hero image</label>
+          <div className="media-upload-inline">
+            <input id="settings-hero-image" className="input" placeholder="https://… or upload from device" value={form.heroImage} onChange={(e) => set("heroImage", e.target.value)} />
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <label className="btn btn-ghost btn-sm" style={{ cursor: "pointer" }}>
+                {heroUploading ? "Uploading…" : "Upload from device"}
+                <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden disabled={heroUploading} onChange={(e) => { uploadHeroImage(e.target.files?.[0]); e.target.value = ""; }} />
+              </label>
+              <span className="image-hint">JPG, PNG, WebP or GIF · up to {Math.round(MAX_IMAGE_BYTES / (1024 * 1024))} MB</span>
+            </div>
+            {heroUploadError && <p className="f-err">{heroUploadError}</p>}
+            {form.heroImage && <div className="hero-image-setting-preview"><img src={form.heroImage} alt="Current FikarNot hero preview" /></div>}
+          </div>
+        </div>
+        <div className="f-full"><label className="lbl" htmlFor="settings-announcement">Announcement bar</label><input id="settings-announcement" className="input" value={form.announcement} onChange={(e) => set("announcement", e.target.value)} /></div>
+        <div className="f-full"><h4 className="display" style={{ margin: "12px 0 4px" }}>About page</h4></div>
+        <div className="f-full"><label className="lbl" htmlFor="settings-about-title">About title</label><input id="settings-about-title" className="input" value={form.aboutTitle} onChange={(e) => set("aboutTitle", e.target.value)} /></div>
+        <div className="f-full"><label className="lbl" htmlFor="settings-about-intro">About intro</label><textarea id="settings-about-intro" className="textarea" value={form.aboutIntro} onChange={(e) => set("aboutIntro", e.target.value)} /></div>
+        <div className="f-full"><label className="lbl" htmlFor="settings-about-body">About body</label><textarea id="settings-about-body" className="textarea" value={form.aboutBody} onChange={(e) => set("aboutBody", e.target.value)} /></div>
+        <div className="f-full"><h4 className="display" style={{ margin: "12px 0 4px" }}>Contact, social & SEO</h4></div>
+        <div><label className="lbl" htmlFor="settings-whatsapp">WhatsApp number</label><input id="settings-whatsapp" className="input" placeholder="923001234567" value={form.whatsappNumber} onChange={(e) => set("whatsappNumber", e.target.value)} /></div>
+        <div><label className="lbl" htmlFor="settings-instagram">Instagram URL</label><input id="settings-instagram" className="input" value={form.instagramUrl} onChange={(e) => set("instagramUrl", e.target.value)} /></div>
+        <div><label className="lbl" htmlFor="settings-facebook">Facebook URL</label><input id="settings-facebook" className="input" value={form.facebookUrl} onChange={(e) => set("facebookUrl", e.target.value)} /></div>
+        <div><label className="lbl" htmlFor="settings-meta-title">SEO title</label><input id="settings-meta-title" className="input" value={form.metaTitle} onChange={(e) => set("metaTitle", e.target.value)} /></div>
+        <div className="f-full"><label className="lbl" htmlFor="settings-meta-description">SEO description</label><textarea id="settings-meta-description" className="textarea" value={form.metaDescription} onChange={(e) => set("metaDescription", e.target.value)} /></div>
+      </div>
+      <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
+        <button className="btn btn-dark" disabled={saving}>{saving ? "Saving…" : "Save settings"}</button>
+      </div>
+    </form>
+  );
+}
+
 export default function AdminPage({ tab }) {
   const s = useApp();
   useDocumentMeta({ title: "Studio", noindex: true });
@@ -1583,7 +1784,7 @@ export default function AdminPage({ tab }) {
       icon: "mail",
       n: s.supportTickets?.filter((ticket) => ticket.status === "open").length || 0,
     },
-    ...(s.session.role === "admin" ? [{ id: "users", path: "/admin/users", label: "Users", icon: "users", n: s.users.length }] : []),
+    ...(s.session.role === "admin" ? [{ id: "media", path: "/admin/media", label: "Media", icon: "box" }, { id: "users", path: "/admin/users", label: "Users", icon: "users", n: s.users.length }, { id: "settings", path: "/admin/settings", label: "Settings", icon: "tag" }] : []),
   ];
   const activeTab = tabs.find((t) => t.id === tab);
   return (
@@ -1610,7 +1811,9 @@ export default function AdminPage({ tab }) {
         {tab === "reviews" && <ReviewsTab />}
         {tab === "support" && <SupportTab />}
         {tab === "returns" && <ReturnsTab />}
+        {tab === "media" && s.session.role === "admin" && <MediaTab />}
         {tab === "users" && s.session.role === "admin" && <UsersTab />}
+        {tab === "settings" && s.session.role === "admin" && <SettingsTab />}
       </main>
     </div>
   );

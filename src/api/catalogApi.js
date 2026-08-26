@@ -1,25 +1,16 @@
-const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
-async function request(path, options = {}) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    credentials: "include",
-    headers: { "Content-Type": "application/json", ...(options.headers || {}) },
-  });
-  let payload = {};
-  try {
-    payload = await response.json();
-    // eslint-disable-next-line no-empty -- response may have no JSON body (e.g. 204); payload already defaults to {}
-  } catch {}
-  if (!response.ok) {
-    const error = new Error(payload.message || "Catalog request failed");
-    error.code = payload.error || "CATALOG_REQUEST_FAILED";
-    error.status = response.status;
-    throw error;
-  }
-  return payload;
-}
+import { apiRequest } from "./apiClient";
+
+const request = (path, options) => apiRequest(path, options, "Catalog request failed");
+
 export const catalogApi = {
-  list: () => request("/api/catalog"),
+  list: (params = {}) => {
+    const search = new URLSearchParams();
+    for (const [key, value] of Object.entries(params)) {
+      if (value !== undefined && value !== null && value !== "") search.set(key, String(value));
+    }
+    const query = search.toString();
+    return request(`/api/catalog${query ? `?${query}` : ""}`);
+  },
   migrate: (categories, products, inventoryLog) =>
     request("/api/catalog/migrate", { method: "POST", body: JSON.stringify({ categories, products, inventoryLog }) }),
   saveProduct: (product) => request("/api/catalog/products", { method: "POST", body: JSON.stringify({ product }) }),

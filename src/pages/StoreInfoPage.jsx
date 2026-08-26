@@ -2,6 +2,8 @@ import { Link, useLocation } from "react-router-dom";
 import { useEffect } from "react";
 import { Ic } from "../components/icons";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
+import { siteApi } from "../api/siteApi";
+import { useAsync } from "../hooks/useAsync";
 const CONTENT = {
   about: {
     eyebrow: "About FikarNot",
@@ -55,7 +57,7 @@ const CONTENT = {
     sections: [
       [
         "What is stored",
-        "The project stores demo account data, catalogue information, cart and wishlist state, notifications, support requests and order information in local browser storage.",
+        "In the current development build, account, catalogue, order and engagement records are handled by the FikarNot backend and SQLite database, while some UI preferences may remain local to the browser.",
       ],
       ["No real payment processing", "The current checkout is a mock experience. Do not enter real financial credentials."],
       [
@@ -80,7 +82,17 @@ const CONTENT = {
 };
 export default function StoreInfoPage({ page = "about" }) {
   const loc = useLocation();
-  const c = CONTENT[page] || CONTENT.about;
+  const { data: siteData } = useAsync(() => siteApi.get(), []);
+  const site = siteData?.settings || {};
+  const base = CONTENT[page] || CONTENT.about;
+  const c = page === "about"
+    ? {
+        ...base,
+        title: site.aboutTitle || base.title,
+        intro: site.aboutIntro || base.intro,
+        sections: site.aboutBody ? [["What is FikarNot?", site.aboutBody], ...base.sections.slice(1)] : base.sections,
+      }
+    : base;
   useDocumentMeta({ title: c.title, description: c.intro });
   useEffect(() => window.scrollTo(0, 0), [loc.pathname]);
   return (

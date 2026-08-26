@@ -2,8 +2,10 @@ User-agent: *
 Allow: /
 Disallow: /admin
 Disallow: /account
-Disallow: /cart
 Disallow: /checkout
 Disallow: /login
+Disallow: /forgot-password
+Disallow: /reset-password
+Disallow: /verify-email
 
 Sitemap: https://www.fikarnot.shop/sitemap.xml

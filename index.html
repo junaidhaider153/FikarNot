@@ -6,6 +6,26 @@
     <meta name="description" content="FikarNot — thoughtful everyday products." />
     <meta name="theme-color" content="#17150F" />
     <meta name="robots" content="index, follow" />
+    <!--
+      Content-Security-Policy notes:
+      - Delivered via <meta> because the Node API server never serves this HTML file
+        (it's API-only); a CSP response header set there would have no effect on the
+        page. If you later put this behind a server/CDN that serves the HTML, prefer
+        setting this as a real response header instead — it supports frame-ancestors
+        and report-to, which <meta> cannot.
+      - style-src needs 'unsafe-inline' because the app uses React inline styles
+        (style={{...}}) extensively; removing that requires migrating those to
+        classes, which is a larger refactor.
+      - img-src includes image.qwenlm.ai for the seeded demo catalogue only — remove
+        it once real product photography (served from /uploads via this app) replaces
+        the demo images.
+      - connect-src is 'self' because the API is same-origin by default. If you set
+        VITE_API_URL to a different origin, add that origin here too.
+    -->
+    <meta
+      http-equiv="Content-Security-Policy"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net data:; img-src 'self' data: blob: https://image.qwenlm.ai; connect-src 'self'; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+    />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://cdn.jsdelivr.net" />
     <link rel="canonical" href="https://www.fikarnot.shop/" />

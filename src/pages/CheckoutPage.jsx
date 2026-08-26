@@ -6,6 +6,8 @@ import { Ic } from "../components/icons";
 import { Empty } from "../components/common";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
 
+const MOCK_CARD_ENABLED = import.meta.env.VITE_ENABLE_MOCK_PAYMENTS === "1" || import.meta.env.DEV;
+
 const INITIAL_FORM = {
   name: "",
   email: "",
@@ -29,7 +31,7 @@ export default function CheckoutPage() {
     name: s.session?.name || "",
     email: s.session?.email || "",
   }));
-  const [paymentMethod, setPaymentMethod] = useState("card");
+  const [paymentMethod, setPaymentMethod] = useState(MOCK_CARD_ENABLED ? "card" : "cod");
   const [errs, setErrs] = useState({});
   const [busy, setBusy] = useState(false);
   const [placed, setPlaced] = useState(null);
@@ -140,7 +142,7 @@ export default function CheckoutPage() {
     setBusy(true);
     await delay(900);
 
-    const order = appActions.placeOrder(
+    const order = await appActions.placeOrder(
       {
         name: form.name.trim(),
         email: form.email.trim(),
@@ -275,7 +277,7 @@ export default function CheckoutPage() {
     );
   }
 
-  const paymentLabel = paymentMethod === "card" ? "Pay securely" : "Place COD order";
+  const paymentLabel = paymentMethod === "card" ? "Place demo card order" : "Place COD order";
 
   return (
     <div className="container checkout-page">
@@ -358,21 +360,23 @@ export default function CheckoutPage() {
               <span className="step-n">2</span> Payment method
             </h3>
             <div className="payment-methods" role="radiogroup" aria-label="Payment method">
-              <button
-                type="button"
-                className={`payment-option${paymentMethod === "card" ? " selected" : ""}`}
-                onClick={() => setPaymentMethod("card")}
-                aria-pressed={paymentMethod === "card"}
-              >
-                <span className="payment-icon">
-                  <Ic n="shield" s={18} />
-                </span>
-                <span>
-                  <strong>Card</strong>
-                  <small>Mock secure card payment</small>
-                </span>
-                <span className="payment-check">{paymentMethod === "card" ? "✓" : ""}</span>
-              </button>
+              {MOCK_CARD_ENABLED && (
+                <button
+                  type="button"
+                  className={`payment-option${paymentMethod === "card" ? " selected" : ""}`}
+                  onClick={() => setPaymentMethod("card")}
+                  aria-pressed={paymentMethod === "card"}
+                >
+                  <span className="payment-icon">
+                    <Ic n="shield" s={18} />
+                  </span>
+                  <span>
+                    <strong>Card</strong>
+                    <small>Demo payment — no card is charged</small>
+                  </span>
+                  <span className="payment-check">{paymentMethod === "card" ? "✓" : ""}</span>
+                </button>
+              )}
               <button
                 type="button"
                 className={`payment-option${paymentMethod === "cod" ? " selected" : ""}`}

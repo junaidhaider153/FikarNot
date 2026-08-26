@@ -15,6 +15,9 @@ export default function LoginPage() {
   const [pass, setPass] = useState("");
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
+  const [verificationNotice, setVerificationNotice] = useState(null);
+  const [resending, setResending] = useState(false);
+  const [devVerificationUrl, setDevVerificationUrl] = useState("");
   const redirect = query.get("redirect");
   const submittedRef = useRef(false);
 
@@ -38,22 +41,37 @@ export default function LoginPage() {
       setErr("Please enter your name");
       return;
     }
-    if (mode === "register" && pass.length < 8) {
-      setErr("Password must be at least 8 characters");
+    if (mode === "register" && pass.length < 12) {
+      setErr("Password must be at least 12 characters");
       return;
     }
     setBusy(true);
     submittedRef.current = true;
-    const user = mode === "login" ? await appActions.login(cleanEmail, pass) : await appActions.register(name, cleanEmail, pass);
+    let result = null;
+    if (mode === "login") {
+      try {
+        result = await appActions.login(cleanEmail, pass);
+      } catch (error) {
+        if (error?.code === "EMAIL_NOT_VERIFIED") {
+          setVerificationNotice(cleanEmail);
+        }
+      }
+    } else {
+      result = await appActions.register(name, cleanEmail, pass);
+      if (result?.requiresVerification) {
+        setVerificationNotice(cleanEmail);
+        setDevVerificationUrl(result.devVerificationUrl || "");
+      }
+    }
     setBusy(false);
-    if (user) navigate(redirect || (user.role === "admin" || user.role === "editor" ? "/admin" : "/account"), { replace: true });
+    if (result?.role) navigate(redirect || (result.role === "admin" || result.role === "editor" ? "/admin" : "/account"), { replace: true });
   };
 
-  const demo = [
+  const demo = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEMO_LOGIN === "1" ? [
     { label: "Admin", e: "junaid@fikarnot.shop", p: "admin123" },
     { label: "Editor", e: "editor@fikarnot.shop", p: "editor123" },
     { label: "Customer", e: "urwa@fikarnot.shop", p: "maya123" },
-  ];
+  ] : [];
 
   return (
     <div className="container auth-wrap">
@@ -153,6 +171,26 @@ export default function LoginPage() {
               {err}
             </p>
           )}
+          {verificationNotice && (
+            <div className="free-note" style={{ marginBottom: 14 }} role="status">
+              <strong>Verify your email first.</strong> Check {verificationNotice} for the FikarNot verification link.
+              <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button type="button" className="btn btn-ghost btn-sm" disabled={resending} onClick={async () => {
+                  setResending(true);
+                  try {
+                    const response = await (await import("../api/authApi")).authApi.resendVerification(verificationNotice);
+                    setDevVerificationUrl(response.devVerificationUrl || "");
+                    appActions.toast("A new verification link has been prepared");
+                  } catch (error) {
+                    appActions.toast(error.message || "Could not resend verification", "err");
+                  } finally { setResending(false); }
+                }}>
+                  {resending ? "Sending…" : "Resend verification"}
+                </button>
+                {devVerificationUrl && <a className="btn btn-ghost btn-sm" href={devVerificationUrl}>Open verification link</a>}
+              </div>
+            </div>
+          )}
           {mode === "login" && (
             <div style={{ textAlign: "right", margin: "-4px 0 12px" }}>
               <Link to="/forgot-password" style={{ fontSize: 13, fontWeight: 600 }}>
@@ -165,7 +203,7 @@ export default function LoginPage() {
           </button>
         </form>
 
-        {mode === "login" && (
+        {mode === "login" && demo.length > 0 && (
           <div className="demo-login">
             <p className="lbl">Demo accounts</p>
             <div className="demo-actions">

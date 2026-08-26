@@ -1,15 +1,13 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 import { useApp } from "../store/appStore";
-import { api } from "../api/storeApi";
 import { useAsync } from "../hooks/useAsync";
 import { useDebounced } from "../hooks/useDebounced";
 import { ErrorCard, Empty, SkelGrid, Pagination } from "../components/common";
 import { ProductCard } from "../components/ProductCard";
 import { ProductFilters } from "../components/ProductFilters";
-import { searchProducts } from "../utils/search";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
-import { usePagination } from "../hooks/usePagination";
+import { catalogApi } from "../api/catalogApi";
 
 const SORTS = new Set(["featured", "newest", "rating", "price-asc", "price-desc", "name"]);
 const RATINGS = new Set([0, 3, 4, 4.5]);
@@ -17,8 +15,7 @@ const RATINGS = new Set([0, 3, 4, 4.5]);
 export default function ProductsPage() {
   const s = useApp();
   const [params, setParams] = useSearchParams();
-  const { data, loading, error, retry } = useAsync(() => api.listProducts(), []);
-  const products = data || [];
+  const [page, setPage] = useState(Number(params.get("page") || 1) || 1);
   useDocumentMeta({
     title: "Shop all products",
     description: "Browse the full FikarNot catalogue — audio, wearables, home & desk, and carry essentials.",
@@ -30,10 +27,7 @@ export default function ProductsPage() {
   const [inStock, setInStock] = useState(params.get("stock") === "1");
   const [minRating, setMinRating] = useState(RATINGS.has(Number(params.get("rating"))) ? Number(params.get("rating")) : 0);
 
-  const maxPrice = Math.max(100, ...products.map((product) => Math.ceil(Number(product.price) / 10) * 10), 100);
-  const parsedPrice = Number(params.get("max"));
-  const initialPrice = Number.isFinite(parsedPrice) && parsedPrice >= 10 ? Math.min(parsedPrice, maxPrice) : maxPrice;
-  const [priceCap, setPriceCap] = useState(initialPrice);
+  const [priceCap, setPriceCap] = useState(Number(params.get("max")) || 100);
   const dq = useDebounced(q, 300);
 
   useEffect(() => {
@@ -42,22 +36,24 @@ export default function ProductsPage() {
     const nextStock = params.get("stock") === "1";
     const nextRating = Number(params.get("rating"));
     const nextMax = Number(params.get("max"));
-
+    const nextPage = Math.max(1, Number(params.get("page")) || 1);
     setQ(params.get("q") || "");
     setCategory(nextCategory);
     setSort(SORTS.has(nextSort) ? nextSort : "featured");
     setInStock(nextStock);
     setMinRating(RATINGS.has(nextRating) ? nextRating : 0);
-    setPriceCap(Number.isFinite(nextMax) && nextMax >= 10 ? Math.min(nextMax, maxPrice) : maxPrice);
-  }, [params, maxPrice]);
+    if (Number.isFinite(nextMax) && nextMax >= 10) setPriceCap(nextMax);
+    setPage(nextPage);
+  }, [params]);
 
   useEffect(() => {
     const next = new URLSearchParams(params);
     const normalized = dq.trim();
     if (normalized) next.set("q", normalized);
     else next.delete("q");
+    next.delete("page");
     const current = params.get("q") || "";
-    if (current !== normalized) setParams(next, { replace: true });
+    if (current !== normalized || params.get("page")) setParams(next, { replace: true });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [dq]);
 
@@ -65,38 +61,39 @@ export default function ProductsPage() {
     const next = new URLSearchParams(params);
     if (value === defaultValue || value === "" || value == null) next.delete(key);
     else next.set(key, String(value));
+    if (key !== "page") next.delete("page");
     setParams(next, { replace: true });
   };
 
+  const changePage = (nextPage) => {
+    const safe = Math.max(1, Math.min(pageCount, nextPage));
+    setPage(safe);
+    updateParam("page", safe, 1);
+    window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+  };
+
+  const hasExplicitMax = params.has("max");
+  const requestParams = {
+    q: dq.trim(),
+    category: category === "all" ? "" : category,
+    sort,
+    stock: inStock ? 1 : "",
+    rating: minRating || "",
+    maxPrice: hasExplicitMax ? priceCap : "",
+    limit: 12,
+    offset: Math.max(0, (page - 1) * 12),
+  };
+  const { data, loading, error, retry } = useAsync(() => catalogApi.list(requestParams), [dq, category, sort, inStock, minRating, priceCap, page]);
+  const products = data?.products || [];
+  const maxPrice = Math.max(100, Math.ceil(Number(data?.maxPrice || 100) / 10) * 10);
+  useEffect(() => {
+    if (!hasExplicitMax && data?.maxPrice) setPriceCap(Math.max(100, Math.ceil(Number(data.maxPrice) / 10) * 10));
+  }, [data?.maxPrice, hasExplicitMax]);
+  const total = Number(data?.total || 0);
+  const pageCount = Math.max(1, Math.ceil(total / 12));
+  const start = total === 0 ? 0 : (page - 1) * 12 + 1;
+  const end = Math.min(page * 12, total);
   const hasFilters = Boolean(q.trim()) || category !== "all" || sort !== "featured" || inStock || minRating > 0 || priceCap < maxPrice;
-
-  const list = useMemo(() => {
-    let out = searchProducts(products, dq);
-
-    out = out.filter((product) => {
-      if (category !== "all" && product.categoryId !== category) return false;
-      if (product.price > priceCap) return false;
-      if (inStock && product.stock <= 0) return false;
-      if (minRating > 0 && Number(product.rating) < minRating) return false;
-      return true;
-    });
-
-    if (dq.trim()) return out;
-
-    const by = {
-      featured: (a, b) => Number(b.featured) - Number(a.featured) || b.rating - a.rating,
-      newest: (a, b) => b.createdAt - a.createdAt,
-      rating: (a, b) => b.rating - a.rating,
-      "price-asc": (a, b) => a.price - b.price,
-      "price-desc": (a, b) => b.price - a.price,
-      name: (a, b) => a.name.localeCompare(b.name),
-    };
-
-    return [...out].sort(by[sort] || by.featured);
-    // eslint-disable-next-line react-hooks/exhaustive-deps -- depending on `data`, not the derived `products` (a fresh array reference every render), so this actually memoizes.
-  }, [data, dq, category, priceCap, inStock, minRating, sort]);
-
-  const { page, pageCount, pageItems, setPage, start, end, total } = usePagination(list, 12);
 
   const clear = () => {
     setQ("");
@@ -105,6 +102,7 @@ export default function ProductsPage() {
     setInStock(false);
     setMinRating(0);
     setPriceCap(maxPrice);
+    setPage(1);
     setParams({}, { replace: true });
   };
 
@@ -148,8 +146,8 @@ export default function ProductsPage() {
           setInStock(value);
           updateParam("stock", value ? 1 : 0, 0);
         }}
-        filtered={!loading ? list.length : 0}
-        total={products.length}
+        filtered={!loading ? total : 0}
+        total={Number(data?.total || 0)}
         searching={Boolean(dq.trim())}
         onClear={clear}
         hasFilters={hasFilters}
@@ -159,7 +157,7 @@ export default function ProductsPage() {
         <SkelGrid n={8} />
       ) : error ? (
         <ErrorCard message={error.message} onRetry={retry} />
-      ) : list.length === 0 ? (
+      ) : products.length === 0 ? (
         <Empty
           icon="search"
           title="Nothing matches"
@@ -173,11 +171,11 @@ export default function ProductsPage() {
       ) : (
         <>
           <div className="prod-grid catalog-grid">
-            {pageItems.map((product) => (
+            {products.map((product) => (
               <ProductCard key={product.id} p={product} />
             ))}
           </div>
-          <Pagination page={page} pageCount={pageCount} setPage={setPage} start={start} end={end} total={total} noun="products" />
+          <Pagination page={page} pageCount={pageCount} setPage={changePage} start={start} end={end} total={total} noun="products" />
         </>
       )}
     </div>

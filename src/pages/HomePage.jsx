@@ -7,6 +7,7 @@ import { ProductCard } from "../components/ProductCard";
 import { HeroSlider } from "../components/HeroSlider";
 import { Empty, SkelGrid } from "../components/common";
 import { api } from "../api/storeApi";
+import { siteApi } from "../api/siteApi";
 import { useAsync } from "../hooks/useAsync";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
 import { APP_DESCRIPTION } from "../config/appConfig";
@@ -35,6 +36,8 @@ export default function HomePage() {
   const s = useApp();
   const [email, setEmail] = useState("");
   const { data: products, loading } = useAsync(() => api.listProducts(), []);
+  const { data: siteData } = useAsync(() => siteApi.get(), []);
+  const site = siteData?.settings || {};
   useDocumentMeta({ title: "Everyday Products", description: APP_DESCRIPTION });
   const list = products || [];
   const featured = list.filter((p) => p.featured).slice(0, 4);
@@ -54,7 +57,7 @@ export default function HomePage() {
   // and add an entry here, e.g.:
   //   { id: "video", type: "video", src: "/media/hero-loop.mp4", poster: IMG.hero }
   const heroSlides = [
-    { id: "hero", type: "image", src: IMG.hero, alt: "FikarNot products arranged on a warm cream surface" },
+    { id: "hero", type: "image", src: site.heroImage || IMG.hero, alt: "FikarNot products arranged on a warm cream surface" },
     ...GALLERY.slice(0, 3).map(([key, url]) => ({ id: key, type: "image", src: url, alt: `${key} from the FikarNot catalogue` })),
   ];
 
@@ -73,15 +76,15 @@ export default function HomePage() {
     <>
       <section className="container hero hero-modern">
         <div className="hero-copy">
-          <span className="hero-kicker">Curated essentials · Free shipping over $75</span>
-          <span className="eyebrow">FikarNot — objects for the everyday</span>
+          <span className="hero-kicker">{site.heroKicker || "Curated essentials · Free shipping over $75"}</span>
+          <span className="eyebrow">{site.heroEyebrow || "FikarNot — objects for the everyday"}</span>
           <h1 className="h1">
-            Everyday essentials,
+            {site.heroTitle || "Everyday essentials,"}
             <br />
-            <em>beautifully chosen.</em>
+            <em>{site.heroHighlight || "beautifully chosen."}</em>
           </h1>
           <p className="hero-sub">
-            Discover a refined mix of tech, desk and everyday carry — selected for utility, character and the way they fit into real life.
+            {site.heroSubtitle || "Discover a refined mix of tech, desk and everyday carry — selected for utility, character and the way they fit into real life."}
           </p>
           <div className="hero-cta">
             <Link className="btn btn-dark" to="/products">
@@ -118,7 +121,7 @@ export default function HomePage() {
           <span className="hero-orb hero-orb-a" aria-hidden="true" />
           <span className="hero-orb hero-orb-b" aria-hidden="true" />
           <HeroSlider slides={heroSlides} />
-          <span className="sticker">NEW SEASON DROP</span>
+          <span className="sticker">{site.heroSticker || "NEW SEASON DROP"}</span>
           <div className="hero-float-card hero-float-card-top">
             <span className="hero-float-icon">✦</span>
             <div>

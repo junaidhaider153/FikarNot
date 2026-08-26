@@ -1,29 +1,6 @@
-const API_BASE = (import.meta.env.VITE_API_URL || "").replace(/\/$/, "");
+import { apiRequest } from "./apiClient";
 
-async function request(path, options = {}) {
-  const response = await fetch(`${API_BASE}${path}`, {
-    ...options,
-    credentials: "include",
-    headers: {
-      "Content-Type": "application/json",
-      ...(options.headers || {}),
-    },
-  });
-
-  let payload = null;
-  try {
-    payload = await response.json();
-  } catch {
-    payload = {};
-  }
-  if (!response.ok) {
-    const error = new Error(payload.message || "Request failed");
-    error.code = payload.error || "REQUEST_FAILED";
-    error.status = response.status;
-    throw error;
-  }
-  return payload;
-}
+const request = (path, options) => apiRequest(path, options, "Request failed");
 
 export const authApi = {
   me: () => request("/api/auth/me"),
@@ -39,4 +16,7 @@ export const authApi = {
   verifyResetToken: (token) => request(`/api/auth/reset-password?token=${encodeURIComponent(token)}`),
   resetPassword: (token, newPassword) =>
     request("/api/auth/reset-password", { method: "POST", body: JSON.stringify({ token, newPassword }) }),
+  verifyEmail: (token) => request(`/api/auth/verify-email?token=${encodeURIComponent(token)}`),
+  confirmEmail: (token) => request("/api/auth/verify-email", { method: "POST", body: JSON.stringify({ token }) }),
+  resendVerification: (email) => request("/api/auth/resend-verification", { method: "POST", body: JSON.stringify({ email }) }),
 };

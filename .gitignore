@@ -1,8 +1,10 @@
-node_modules
+node_modules/
 .DS_Store
-dist
+dist/
 .vscode/*.log
 server/data/*.sqlite
 server/data/*.sqlite-shm
 server/data/*.sqlite-wal
+server/data/uploads/*
+!server/data/uploads/.gitkeep
 .env
