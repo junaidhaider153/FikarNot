@@ -7,22 +7,14 @@ const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIST_INDEX = join(__dirname, "..", "dist", "index.html");
 const SITE_URL = (process.env.SITE_URL || "https://www.fikarnot.shop").replace(/\/$/, "");
 const SITEMAP_API_URL = String(process.env.SITEMAP_API_URL || "").trim().replace(/\/$/, "");
+const isProductionBuild = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production" || process.env.FIKARNOT_BUILD_ENV === "production";
 const esc = (value) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const jsonEsc = (value) => JSON.stringify(value).replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/&/g, "\\u0026");
 
-const isProduction = process.env.NODE_ENV === "production";
-
 const loadCatalog = async () => {
   if (!SITEMAP_API_URL) {
-    // A production build with no SITEMAP_API_URL would otherwise prerender the
-    // 8 hardcoded demo products with no error — indistinguishable from a real,
-    // deliberate local/dev run. Fail loudly instead of shipping the wrong SEO data.
-    if (isProduction) {
-      throw new Error(
-        "SITEMAP_API_URL is not set. Refusing to prerender SEO pages from seed/demo " +
-          "data in a production build. Set SITEMAP_API_URL to the live API origin, or " +
-          "run with NODE_ENV unset/development if this is intentionally a local build.",
-      );
+    if (isProductionBuild) {
+      throw new Error("SITEMAP_API_URL is required in production; refusing to prerender SEO pages from seed data.");
     }
     return seedData();
   }
@@ -97,6 +89,6 @@ const main = async () => {
 try {
   await main();
 } catch (error) {
-  if (isProduction) throw error;
+  if (isProductionBuild) throw error;
   console.warn(`SEO prerender skipped: ${error.message}`);
 }

@@ -1,8 +1,34 @@
 import { test, before, after } from "node:test";
 import assert from "node:assert/strict";
+import crypto from "node:crypto";
 import { startTestServer } from "./helpers.js";
 
 let server;
+
+const base32Decode = (input) => {
+  const alphabet = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
+  let bits = 0;
+  let value = 0;
+  const bytes = [];
+  for (const char of input.replace(/=+$/g, "").toUpperCase()) {
+    const index = alphabet.indexOf(char);
+    if (index < 0) throw new Error("invalid base32");
+    value = (value << 5) | index;
+    bits += 5;
+    if (bits >= 8) { bytes.push((value >>> (bits - 8)) & 255); bits -= 8; }
+  }
+  return Buffer.from(bytes);
+};
+const makeTotp = (secret, timestamp = Date.now()) => {
+  const counter = BigInt(Math.floor(timestamp / 1000 / 30));
+  const msg = Buffer.alloc(8);
+  msg.writeBigUInt64BE(counter);
+  const digest = crypto.createHmac("sha1", base32Decode(secret)).update(msg).digest();
+  const offset = digest[digest.length - 1] & 15;
+  const binary = ((digest[offset] & 127) << 24) | (digest[offset + 1] << 16) | (digest[offset + 2] << 8) | digest[offset + 3];
+  return String(binary % 1_000_000).padStart(6, "0");
+};
+
 
 before(async () => {
   server = await startTestServer();
@@ -146,4 +172,31 @@ test("a non-admin cannot list users", async () => {
   assert.equal(status, 403);
   assert.equal(body.error, "FORBIDDEN");
   await server.request("/api/auth/logout", { method: "POST", body: "{}" });
+});
+
+
+test("staff 2FA enrollment and login challenge work end-to-end", async () => {
+  let result = await server.login("junaid@fikarnot.shop", "admin123");
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+
+  result = await server.request("/api/auth/2fa/setup", { method: "POST", body: JSON.stringify({ currentPassword: "admin123" }) });
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  assert.match(result.body.secret, /^[A-Z2-7]+$/);
+  assert.match(result.body.otpauthUrl, /^otpauth:\/\/totp\//);
+
+  const secret = result.body.secret;
+  const code = makeTotp(secret);
+  result = await server.request("/api/auth/2fa/enable", { method: "POST", body: JSON.stringify({ currentPassword: "admin123", secret, code }) });
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+  await server.request("/api/auth/logout", { method: "POST", body: "{}" });
+
+  result = await server.login("junaid@fikarnot.shop", "admin123");
+  assert.equal(result.status, 401);
+  assert.equal(result.body.error, "TWO_FACTOR_REQUIRED");
+
+  result = await server.login("junaid@fikarnot.shop", "admin123", makeTotp(secret));
+  assert.equal(result.status, 200, JSON.stringify(result.body));
+
+  result = await server.request("/api/auth/2fa/disable", { method: "POST", body: JSON.stringify({ currentPassword: "admin123", code: makeTotp(secret) }) });
+  assert.equal(result.status, 200, JSON.stringify(result.body));
 });

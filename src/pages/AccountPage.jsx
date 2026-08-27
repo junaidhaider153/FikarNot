@@ -277,6 +277,13 @@ export default function AccountPage() {
                       <span>Total</span>
                       <span>{fmt(orders[0].total)}</span>
                     </div>
+                    {orders[0].trackingNumber && (
+                      <div className="confirmation-address" style={{ marginTop: 12 }}>
+                        <span>Shipment</span>
+                        <strong>{orders[0].courier || "Courier"} · {orders[0].trackingNumber}</strong>
+                        {orders[0].trackingUrl && <a href={orders[0].trackingUrl} target="_blank" rel="noreferrer">Track shipment</a>}
+                      </div>
+                    )}
                     <button className="btn btn-ghost btn-sm" onClick={() => setTab("orders")}>
                       View orders
                     </button>

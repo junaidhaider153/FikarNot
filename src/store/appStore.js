@@ -10,6 +10,7 @@ import { ordersApi } from "../api/ordersApi";
 import { engagementApi } from "../api/engagementApi";
 import { accountApi } from "../api/accountApi";
 import { usersApi } from "../api/usersApi";
+import { siteApi } from "../api/siteApi";
 
 let state = {
   ready: false,
@@ -28,6 +29,7 @@ let state = {
   returnRequests: [],
   session: null,
   toast: null,
+  siteSettings: null,
 };
 
 const listeners = new Set();
@@ -315,6 +317,13 @@ export const appActions = {
         // Authentication is server-backed. Never keep passwords or role authority in browser storage.
         data.users = data.users.map(({ password: _password, ...user }) => user);
         saveLS(STORAGE_KEYS.users, data.users);
+        try {
+          const site = await siteApi.get();
+          if (site?.settings) setState({ siteSettings: site.settings });
+        } catch (siteError) {
+          console.warn("[FikarNot] Site settings unavailable; using frontend defaults.", siteError);
+        }
+
         const auth = await authApi.me();
         const session = auth.authenticated ? auth.user : null;
         if (session && !data.users.some((user) => user.id === session.id)) data.users = [...data.users, session];
@@ -537,9 +546,9 @@ export const appActions = {
     window.location.href = "/";
   },
 
-  async login(email, password) {
+  async login(email, password, totp = "") {
     try {
-      const { user } = await authApi.login(email, password);
+      const { user } = await authApi.login(email, password, totp);
       const localUser = { ...(state.users.find((item) => item.id === user.id) || {}), ...user };
       const users = state.users.some((item) => item.id === user.id)
         ? state.users.map((item) => (item.id === user.id ? localUser : item))
@@ -1309,11 +1318,12 @@ export const appActions = {
       return null;
     }
     try {
-      const { order } = await ordersApi.create({
+      const response = await ordersApi.create({
         customer: { ...customer, ...(state.session?.id ? { userId: state.session.id } : {}) },
         items,
         couponCode: couponCode || "",
       });
+      const order = { ...(response.order || {}), paymentProofToken: response.paymentProofToken || null, manualPaymentDetails: response.manualPaymentDetails || null };
       const products = state.products.map((product) => {
         const purchased = order.items?.find((item) => item.productId === product.id);
         return purchased ? { ...product, stock: Math.max(0, Number(product.stock) - Number(purchased.qty)) } : product;
@@ -1485,6 +1495,52 @@ export const appActions = {
     }
     toast("Return status updated");
     return true;
+  },
+
+  async setReturnRefund(returnId, payload) {
+    if (!state.session || !["admin", "editor"].includes(state.session.role)) {
+      toast("You do not have permission to update refunds", "err");
+      return false;
+    }
+    try {
+      const { request } = await engagementApi.setReturnRefund(returnId, payload);
+      const returnRequests = state.returnRequests.map((item) => (item.id === returnId ? request : item));
+      setState({ returnRequests });
+      saveLS(STORAGE_KEYS.returnRequests, returnRequests);
+      toast("Refund status updated");
+      return true;
+    } catch (error) {
+      toast(error.message || "Refund status could not be updated", "err");
+      return false;
+    }
+  },
+
+  async confirmPayment(id, payload = {}) {
+    try {
+      const { order } = await ordersApi.confirmPayment(id, payload);
+      const orders = state.orders.map((item) => (item.id === id ? order : item));
+      setState({ orders });
+      saveLS(STORAGE_KEYS.orders, orders);
+      toast("Payment confirmed");
+      return true;
+    } catch (error) {
+      toast(error.message || "Payment could not be confirmed", "err");
+      return false;
+    }
+  },
+
+  async setOrderFulfilment(id, payload) {
+    try {
+      const { order } = await ordersApi.setFulfilment(id, payload);
+      const orders = state.orders.map((item) => (item.id === id ? order : item));
+      setState({ orders });
+      saveLS(STORAGE_KEYS.orders, orders);
+      toast(payload.shipmentStatus === "delivered" ? "Shipment marked delivered" : "Shipment details saved");
+      return true;
+    } catch (error) {
+      toast(error.message || "Shipment details could not be saved", "err");
+      return false;
+    }
   },
 
   async setOrderStatus(id, status) {

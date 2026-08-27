@@ -1,10 +1,22 @@
-# FikarNot — Production-Hardened 1.6.5
+## Professor audit implementation status
 
-## Module 1.6.6
+Current release: **v1.7.7**.
 
-- Fixed ESLint Node-global errors for `.mjs` utility scripts.
-- Fixed `no-empty` lint errors in intentional best-effort cleanup/legacy parsing catches.
-- Kept the full 40-test regression suite and production SEO safeguards intact.
+Implemented in this release family:
+
+- PayFast transaction foundation with backend token request, hosted checkout fields, signed response validation, server-side amount/currency verification, payment status tracking, and idempotent callbacks.
+- PKR commerce settings with admin-managed shipping threshold/rate, tax/GST fields, currency and online/COD controls.
+- Courier/tracking fields and shipping/delivery transactional notifications.
+- Printable order invoices.
+- Return completion creates a pending refund record for paid online orders; staff can record the provider refund reference and mark the refund completed.
+- Payment state protection prevents a confirmed payment from being downgraded by a later failure callback.
+- Regression tests for payment tampering, failed-payment stock release, return refunds, and payment state transitions.
+
+Still requiring real deployment/business credentials or third-party infrastructure before accepting live customer payments:
+
+- Activate PayFast with production merchant credentials and complete a sandbox/production callback verification.
+- Connect durable production database/media storage appropriate to the chosen hosting architecture.
+- Add staff 2FA/TOTP, centralized error tracking, uptime alerts, scheduled off-box encrypted backups, and a documented restore drill.
 
 ## Module 19 — SEO, Accessibility & Performance
 ## Module 34.1 Patch (1.6.1)
@@ -269,5 +281,50 @@ The current project is deliberately fail-safe about card payments: a production 
 When `NODE_ENV=production`, the API refuses to start if required HTTPS origins/email settings are missing or if demo seeding, mock payments, or development reset links are enabled. Use `npm run check:production` before deployment as a fast preflight check.
 
 
-## Verification
-Module 36.1.5 includes 40 automated tests covering security, orders, catalogue pagination, live sitemap generation, media storage and SEO build fail-safe behavior. See `AUDIT_MODULE35_MODULE36.md` and `DEPLOYMENT_VERCEL.md`.
+## Current baseline
+
+FikarNot 1.6.8 includes the Module 39 final release-audit, production SEO fail-safe, media-storage, audit-log, and deployment hardening. See `README_MODULE37.md` for the module notes.
+
+## Deployment checkpoint
+
+Module 38 adds a two-container deployment path: a Node API container and an Nginx frontend container. See `README_MODULE38.md` and `DEPLOYMENT.md` for the production configuration and persistence requirements.
+
+
+## Module 39 — Final Release Audit
+Run `npm run release:audit` to validate required production, CI, deployment, SEO, and repository-hygiene invariants before release. `npm run verify` includes this audit.
+
+
+### Module 39.2 Final QA corrections
+- Production detection for postbuild SEO/sitemap scripts recognizes `NODE_ENV=production`, `VERCEL_ENV=production`, or `FIKARNOT_BUILD_ENV=production`.
+- Production configuration validation also recognizes `VERCEL_ENV=production` and requires `SITE_URL` and `SITEMAP_API_URL`.
+- Vite CSP expansion supports `VITE_API_URL` and `VITE_UPLOADS_PUBLIC_BASE_URL` for separately hosted API/media services.
+- Package and lockfile versions are synchronized at 1.6.8.
+
+## Sprint 3–6 commerce hardening
+
+The current branch now supports admin-managed PKR currency, shipping threshold/rate, tax/GST, COD availability, separate order `payment_status`, payment records, signed PayFast callback verification, fulfilment courier/tracking fields, order-status notifications, and a `/healthz` endpoint. Online payment activation is intentionally disabled until PayFast merchant credentials and the provider callback contract are configured. PayFast is configured as a Pakistan-focused hosted checkout adapter; complete merchant onboarding and production callback validation before enabling it.
+
+
+## Sprint 3/4 payment UX update
+FikarNot now supports PKR manual payment methods (JazzCash, Easypaisa, bank transfer) with configurable account details, secure payment-slip uploads, staff verification, and a WhatsApp support link. Wallet passwords/MPINs/OTPs are never collected by FikarNot. Live provider checkout remains separately gated by provider credentials.
+
+
+## Manual payment workflow (Sprint 3/4)
+FikarNot supports configurable JazzCash, Easypaisa, bank-transfer and COD checkout. Customers are shown the merchant payment details after selecting a manual method and can upload one receipt/screenshot for staff verification. The proof is stored separately from the public media library and is accessible only to authorized staff. Guest checkouts use a short-lived per-order proof token. FikarNot never collects wallet passwords, MPINs or OTPs; official provider authentication stays inside the provider's own app/payment flow.
+
+Configure the manual payment details from **Admin → Store settings → Commerce & checkout**. Set the merchant JazzCash/Easypaisa number or bank details before exposing those methods to customers.
+
+
+## Sprint 7 — Single-operator fulfilment
+
+FikarNot now supports manual courier fulfilment for a small-store operator. Staff can record the courier, tracking number, HTTPS tracking URL, and shipment state from the Admin Orders screen. Customers can see shipment details and follow the tracking URL from their account. The workflow is intentionally courier-agnostic so a PostEx shipment can be created manually without requiring a courier API integration.
+
+WhatsApp support is configured through `VITE_WHATSAPP_NUMBER` or the admin site setting `whatsappNumber`. Do not store WhatsApp, banking, JazzCash, or Easypaisa passwords in the application.
+
+## v1.7.6 — Single-operator fulfilment UI
+
+The admin Orders screen now separates payment and shipment information and provides a faster one-person fulfilment workflow. Staff can create or update courier shipments, copy customer/address/phone/COD details for courier portals, and open a prefilled WhatsApp conversation with the customer. Shipment status changes continue to use the existing server-side fulfilment endpoint and audit logging.
+
+
+## Business contact configuration
+The current launch contact is configured as `+92 370 9072688` for WhatsApp, JazzCash and Easypaisa. Keep bank-transfer details blank until the business bank account details are configured from Admin → Store settings. Never store wallet passwords, MPINs or OTPs in the application.

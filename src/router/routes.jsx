@@ -16,6 +16,7 @@ import ComparePage from "../pages/ComparePage";
 import NotificationsPage from "../pages/NotificationsPage";
 import HelpCenterPage from "../pages/HelpCenterPage";
 import StoreInfoPage from "../pages/StoreInfoPage";
+import PaymentResultPage from "../pages/PaymentResultPage";
 import NotFoundPage from "../pages/NotFoundPage";
 import { STAFF_ROLES, ADMIN_ROLES } from "../config/appConfig";
 import { ProtectedRoute } from "./ProtectedRoute";
@@ -87,6 +88,8 @@ export function AppRoutes() {
       <Route path="/returns" element={<StoreInfoPage page="returns" />} />
       <Route path="/privacy" element={<StoreInfoPage page="privacy" />} />
       <Route path="/terms" element={<StoreInfoPage page="terms" />} />
+      <Route path="/payment/success" element={<PaymentResultPage success />} />
+      <Route path="/payment/failure" element={<PaymentResultPage />} />
 
       <Route path="/admin" element={<AdminRoute tab="dashboard" roles={STAFF_ROLES} />} />
       <Route path="/admin/analytics" element={<AdminRoute tab="analytics" roles={STAFF_ROLES} />} />

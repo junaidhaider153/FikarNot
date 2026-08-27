@@ -3,6 +3,7 @@ import { seedData } from "../src/data/seedData.js";
 
 const SITE_URL = (process.env.SITE_URL || "https://www.fikarnot.shop").replace(/\/$/, "");
 const SITEMAP_API_URL = String(process.env.SITEMAP_API_URL || "").trim().replace(/\/$/, "");
+const isProductionBuild = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production" || process.env.FIKARNOT_BUILD_ENV === "production";
 const xmlEscape = (value) => String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 
 const buildUrls = ({ products, categories }) => {
@@ -33,23 +34,10 @@ ${urls
 </urlset>
 `;
 
-const isProduction = process.env.NODE_ENV === "production";
-
 const loadCatalog = async () => {
   if (!SITEMAP_API_URL) {
-    // Same reasoning as scripts/prerender-seo.js: a production build with no
-    // SITEMAP_API_URL would otherwise silently write a sitemap.xml built from the
-    // 8 hardcoded demo products, with nothing failing. Fail loudly instead.
-    //
-    // Note: server/index.js also serves a live, DB-backed /sitemap.xml route.
-    // If your host proxies /sitemap.xml to the API server, you don't need this
-    // static file at all — see README "Production deployment notes".
-    if (isProduction) {
-      throw new Error(
-        "SITEMAP_API_URL is not set. Refusing to generate sitemap.xml from seed/demo " +
-          "data in a production build. Set SITEMAP_API_URL to the live API origin, or " +
-          "route /sitemap.xml to the API server's live route instead of using this file.",
-      );
+    if (isProductionBuild) {
+      throw new Error("SITEMAP_API_URL is required in production; refusing to publish a seed-data sitemap.");
     }
     return seedData();
   }
@@ -75,7 +63,7 @@ try {
   writeFileSync(outPath, toXml(urls));
   console.log(`sitemap.xml written from ${SITEMAP_API_URL ? "live API" : "seed data"} with ${urls.length} URLs`);
 } catch (error) {
-  if (isProduction) throw error;
+  if (isProductionBuild) throw error;
   const catalog = seedData();
   const urls = buildUrls(catalog);
   writeFileSync(outPath, toXml(urls));

@@ -13,6 +13,8 @@ export default function LoginPage() {
   const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [pass, setPass] = useState("");
+  const [totp, setTotp] = useState("");
+  const [twoFactorRequired, setTwoFactorRequired] = useState(false);
   const [busy, setBusy] = useState(false);
   const [err, setErr] = useState("");
   const [verificationNotice, setVerificationNotice] = useState(null);
@@ -50,7 +52,7 @@ export default function LoginPage() {
     let result = null;
     if (mode === "login") {
       try {
-        result = await appActions.login(cleanEmail, pass);
+        result = await appActions.login(cleanEmail, pass, totp);
       } catch (error) {
         if (error?.code === "EMAIL_NOT_VERIFIED") {
           setVerificationNotice(cleanEmail);
@@ -99,6 +101,8 @@ export default function LoginPage() {
             onClick={() => {
               setMode("login");
               setErr("");
+              setTwoFactorRequired(false);
+              setTotp("");
             }}
           >
             Sign in
@@ -110,6 +114,8 @@ export default function LoginPage() {
             onClick={() => {
               setMode("register");
               setErr("");
+              setTwoFactorRequired(false);
+              setTotp("");
             }}
           >
             Register
@@ -166,6 +172,12 @@ export default function LoginPage() {
               autoComplete={mode === "login" ? "current-password" : "new-password"}
             />
           </div>
+          {mode === "login" && twoFactorRequired && (
+            <div className="field">
+              <label className="lbl" htmlFor="l-totp">Authenticator code (staff only when 2FA is enabled)</label>
+              <input id="l-totp" className="input" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={totp} onChange={(e) => setTotp(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="123456" />
+            </div>
+          )}
           {err && (
             <p className="f-err" role="alert">
               {err}

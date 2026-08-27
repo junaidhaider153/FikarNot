@@ -19,7 +19,7 @@ const SERVER_ENTRY = path.join(__dirname, "..", "server", "index.js");
  * test file a clean, fully isolated instance without needing to refactor the
  * server into an importable factory function.
  */
-export async function startTestServer({ seedDemoUsers = true } = {}) {
+export async function startTestServer({ seedDemoUsers = true, env = {} } = {}) {
   const port = await getFreePort();
   const dataDir = mkdtempSync(path.join(tmpdir(), "fikarnot-test-"));
   const baseUrl = `http://localhost:${port}`;
@@ -33,7 +33,13 @@ export async function startTestServer({ seedDemoUsers = true } = {}) {
       FIKARNOT_SEED_DEMO_DATA: seedDemoUsers ? "1" : "0",
       FIKARNOT_DISABLE_BREACH_CHECK: "1", // tests shouldn't depend on outbound internet access
       FIKARNOT_EXPOSE_RESET_LINKS: "1",
+      PAYFAST_MERCHANT_ID: "merchant-test",
+      PAYFAST_SECURED_KEY: "secured-test",
+      PAYFAST_TOKEN_URL: "https://example.invalid/token",
+      PAYFAST_CHECKOUT_URL: "https://example.invalid/checkout",
+      FIKARNOT_API_PUBLIC_URL: "https://api.example.invalid",
       FIKARNOT_TRUST_PROXY: "1",
+      ...env,
     },
     stdio: ["ignore", "pipe", "pipe"],
   });
@@ -77,9 +83,9 @@ export async function startTestServer({ seedDemoUsers = true } = {}) {
   /** Ensures a CSRF cookie exists (mirrors what the real app does via a GET on boot). */
   const primeCsrf = async () => { await request("/api/auth/me"); };
 
-  const login = async (email, password) => {
+  const login = async (email, password, totp = "") => {
     await primeCsrf();
-    return request("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password }) });
+    return request("/api/auth/login", { method: "POST", body: JSON.stringify({ email, password, totp }) });
   };
 
   const close = async () => {

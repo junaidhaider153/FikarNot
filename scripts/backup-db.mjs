@@ -28,3 +28,20 @@ try {
 } finally {
   db.close();
 }
+
+const retentionDays = Math.max(1, Number(process.env.FIKARNOT_BACKUP_RETENTION_DAYS || 30));
+const cutoff = Date.now() - retentionDays * 864e5;
+for (const entry of fs.readdirSync(backupDir, { withFileTypes: true })) {
+  if (!entry.isFile() || !entry.name.endsWith(".sqlite")) continue;
+  const full = path.join(backupDir, entry.name);
+  if (fs.statSync(full).mtimeMs < cutoff) fs.unlinkSync(full);
+}
+const uploadUrl = String(process.env.FIKARNOT_BACKUP_UPLOAD_URL || "").trim();
+if (uploadUrl) {
+  const bytes = fs.readFileSync(backupPath);
+  const headers = { "Content-Type": "application/x-sqlite3", "X-FikarNot-Backup-Name": path.basename(backupPath) };
+  if (process.env.FIKARNOT_BACKUP_UPLOAD_TOKEN) headers.Authorization = `Bearer ${process.env.FIKARNOT_BACKUP_UPLOAD_TOKEN}`;
+  const response = await fetch(uploadUrl, { method: "PUT", headers, body: bytes });
+  if (!response.ok) throw new Error(`Backup upload failed with HTTP ${response.status}`);
+  console.log(`Off-box backup upload succeeded: ${uploadUrl}`);
+}

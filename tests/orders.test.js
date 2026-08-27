@@ -196,3 +196,32 @@ test("live sitemap is generated from the server catalogue", async () => {
   })();
   assert.match(text, /<loc>.*\/product\/p1<\/loc>/);
 });
+
+
+test("invoice endpoint returns a printable document only to the order owner", async () => {
+  assert.equal((await server.login("junaid@fikarnot.shop", "admin123")).status, 200);
+  const created = await server.request("/api/orders", { method: "POST", body: JSON.stringify({
+    customer: { name: "Junaid", email: "junaid@fikarnot.shop", address: "Invoice street", paymentMethod: "cod" },
+    items: [{ productId: "p1", qty: 1 }],
+  }) });
+  assert.equal(created.status, 201);
+  const invoice = await server.request(`/api/orders/${encodeURIComponent(created.body.order.id)}/invoice`);
+  assert.equal(invoice.status, 200);
+  assert.match(String(invoice.headers.get("content-type")), /text\/html/i);
+  assert.match(String(invoice.body), /Invoice/);
+});
+
+
+test("staff can create and update a courier shipment with a tracking URL", async () => {
+  const login = await server.login("junaid@fikarnot.shop", "admin123");
+  assert.equal(login.status, 200, JSON.stringify(login.body));
+  const created = await server.request("/api/orders", { method: "POST", body: JSON.stringify({ customer: guestCustomer, items: [{ productId: "p6", qty: 1 }] }) });
+  assert.equal(created.status, 201, JSON.stringify(created.body));
+  const response = await server.request(`/api/admin/orders/${created.body.order.id}/fulfilment`, { method: "POST", body: JSON.stringify({ courier: "PostEx", trackingNumber: "PEX-TEST-123", trackingUrl: "https://postex.pk/track/PEX-TEST-123", shipmentStatus: "shipped" }) });
+  assert.equal(response.status, 200, JSON.stringify(response.body));
+  assert.equal(response.body.order.courier, "PostEx");
+  assert.equal(response.body.order.trackingNumber, "PEX-TEST-123");
+  assert.equal(response.body.order.trackingUrl, "https://postex.pk/track/PEX-TEST-123");
+  assert.equal(response.body.order.shipmentStatus, "shipped");
+  assert.equal(response.body.order.status, "shipped");
+});

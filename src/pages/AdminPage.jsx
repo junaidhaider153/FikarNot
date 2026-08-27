@@ -23,6 +23,7 @@ import { prepareImageFile, MAX_IMAGE_BYTES } from "../utils/imageUpload";
 import { uploadsApi } from "../api/uploadsApi";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
 import { siteApi } from "../api/siteApi";
+import { authApi } from "../api/authApi";
 import { mediaApi } from "../api/mediaApi";
 import { usePagination } from "../hooks/usePagination";
 import { RETURN_STATUSES } from "../utils/returns";
@@ -707,6 +708,7 @@ export function DashboardTab() {
               <th>Items</th>
               <th>Total</th>
               <th>Status</th>
+              <th>Payment</th>
             </tr>
           </thead>
           <tbody>
@@ -1200,13 +1202,141 @@ export function UsersTab() {
     </>
   );
 }
+async function copyText(text, successMessage) {
+  try {
+    if (navigator.clipboard?.writeText) {
+      await navigator.clipboard.writeText(text);
+    } else {
+      const textarea = document.createElement("textarea");
+      textarea.value = text;
+      textarea.setAttribute("readonly", "");
+      textarea.style.position = "fixed";
+      textarea.style.opacity = "0";
+      document.body.appendChild(textarea);
+      textarea.select();
+      document.execCommand("copy");
+      textarea.remove();
+    }
+    appActions.toast(successMessage || "Copied");
+  } catch {
+    appActions.toast("Could not copy to clipboard", "err");
+  }
+}
+
+function ShipmentManager({ order }) {
+  const [open, setOpen] = useState(false);
+  const [courier, setCourier] = useState(order.courier || "PostEx");
+  const [trackingNumber, setTrackingNumber] = useState(order.trackingNumber || "");
+  const [trackingUrl, setTrackingUrl] = useState(order.trackingUrl || "");
+  const [shipmentStatus, setShipmentStatus] = useState(order.shipmentStatus || "not_created");
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    setCourier(order.courier || "PostEx");
+    setTrackingNumber(order.trackingNumber || "");
+    setTrackingUrl(order.trackingUrl || "");
+    setShipmentStatus(order.shipmentStatus || "not_created");
+  }, [order.courier, order.trackingNumber, order.trackingUrl, order.shipmentStatus]);
+
+  const customerPhone = String(order.customer?.phone || "").replace(/\D/g, "");
+  const whatsappText = order.trackingNumber
+    ? `Hello ${order.customer?.name || "there"}, your FikarNot order ${order.id} has been shipped via ${order.courier || "courier"}. Tracking ID: ${order.trackingNumber}.${order.trackingUrl ? ` Track it here: ${order.trackingUrl}` : ""}`
+    : `Hello ${order.customer?.name || "there"}, this is FikarNot regarding your order ${order.id}.`;
+  const postexDetails = [
+    `FikarNot Order: ${order.id}`,
+    `Customer: ${order.customer?.name || ""}`,
+    `Phone: ${order.customer?.phone || ""}`,
+    `Address: ${order.customer?.address || ""}`,
+    `COD Amount: ${order.paymentMethod === "cod" ? fmt(order.total) : "N/A"}`,
+    `Items: ${(order.items || []).map((item) => `${item.qty}x ${item.name}`).join(", ")}`,
+  ].join("\n");
+
+  const save = async () => {
+    setSaving(true);
+    try {
+      await appActions.setOrderFulfilment(order.id, {
+        courier: courier.trim(),
+        trackingNumber: trackingNumber.trim(),
+        trackingUrl: trackingUrl.trim(),
+        shipmentStatus,
+      });
+      setOpen(false);
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  return (
+    <div className="shipment-manager">
+      <div className="shipment-summary">
+        <span className="status-pill">{String(order.shipmentStatus || "not_created").replaceAll("_", " ")}</span>
+        {order.trackingNumber ? (
+          <span className="shipment-ref">{order.courier || "Courier"} · {order.trackingNumber}</span>
+        ) : (
+          <span className="shipment-ref">No tracking yet</span>
+        )}
+      </div>
+      <div className="shipment-actions">
+        <button className="btn btn-ghost btn-sm" type="button" onClick={() => copyText(postexDetails, "Shipment details copied")}>Copy details</button>
+        {customerPhone && (
+          <a className="btn btn-ghost btn-sm" href={`https://wa.me/${customerPhone}?text=${encodeURIComponent(whatsappText)}`} target="_blank" rel="noreferrer noopener">WhatsApp</a>
+        )}
+        <button className="btn btn-dark btn-sm" type="button" onClick={() => setOpen((current) => !current)} aria-expanded={open}>
+          {open ? "Close" : order.trackingNumber ? "Update shipment" : "Create shipment"}
+        </button>
+      </div>
+      {open && (
+        <div className="shipment-editor" aria-label={`Manage shipment for ${order.id}`}>
+          <div className="shipment-editor-grid">
+            <div>
+              <label className="lbl" htmlFor={`courier-${order.id}`}>Courier</label>
+              <select id={`courier-${order.id}`} className="select" value={courier} onChange={(event) => setCourier(event.target.value)}>
+                <option value="PostEx">PostEx</option>
+                <option value="TCS">TCS</option>
+                <option value="Leopards">Leopards</option>
+                <option value="M&amp;P">M&amp;P</option>
+                <option value="Other">Other</option>
+              </select>
+            </div>
+            <div>
+              <label className="lbl" htmlFor={`tracking-${order.id}`}>Tracking number</label>
+              <input id={`tracking-${order.id}`} className="input" value={trackingNumber} onChange={(event) => setTrackingNumber(event.target.value)} placeholder="Enter courier tracking ID" />
+            </div>
+            <div className="f-full">
+              <label className="lbl" htmlFor={`tracking-url-${order.id}`}>Tracking URL <span style={{ fontWeight: 400, color: "var(--ink2)" }}>(optional)</span></label>
+              <input id={`tracking-url-${order.id}`} className="input" value={trackingUrl} onChange={(event) => setTrackingUrl(event.target.value)} placeholder="https://…" inputMode="url" />
+            </div>
+            <div>
+              <label className="lbl" htmlFor={`shipment-status-${order.id}`}>Shipment status</label>
+              <select id={`shipment-status-${order.id}`} className="select" value={shipmentStatus} onChange={(event) => setShipmentStatus(event.target.value)}>
+                <option value="not_created">Not created</option>
+                <option value="ready_to_ship">Ready to ship</option>
+                <option value="shipped">Shipped</option>
+                <option value="in_transit">In transit</option>
+                <option value="delivered">Delivered</option>
+                <option value="returned">Returned</option>
+              </select>
+            </div>
+          </div>
+          <div className="shipment-copy-row">
+            <button className="btn btn-ghost btn-sm" type="button" onClick={() => copyText(order.customer?.address || "", "Customer address copied")}>Copy address</button>
+            <button className="btn btn-ghost btn-sm" type="button" onClick={() => copyText(order.customer?.phone || "", "Customer phone copied")}>Copy phone</button>
+            {order.paymentMethod === "cod" && <button className="btn btn-ghost btn-sm" type="button" onClick={() => copyText(String(order.total), "COD amount copied")}>Copy COD amount</button>}
+            <button className="btn btn-dark btn-sm" type="button" disabled={saving} onClick={save}>{saving ? "Saving…" : "Save shipment"}</button>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export function OrdersTab() {
   const s = useApp();
   const { page, pageCount, pageItems, setPage, start, end, total } = usePagination(s.orders, 10);
   return (
     <>
       <div className="table-wrap">
-        <table className="tbl">
+        <table className="tbl orders-admin-table">
           <thead>
             <tr>
               <th>Order</th>
@@ -1215,14 +1345,14 @@ export function OrdersTab() {
               <th>Total</th>
               <th>Date</th>
               <th>Status</th>
+              <th>Payment</th>
+              <th>Shipment</th>
             </tr>
           </thead>
           <tbody>
             {pageItems.map((o) => (
               <tr key={o.id}>
-                <td>
-                  <b>{o.id}</b>
-                </td>
+                <td><b>{o.id}</b></td>
                 <td>
                   <div>{o.customer.name}</div>
                   <div style={{ fontSize: 12, color: "var(--ink2)" }}>{o.customer.email}</div>
@@ -1231,19 +1361,21 @@ export function OrdersTab() {
                 <td>{fmt(o.total)}</td>
                 <td style={{ color: "var(--ink2)" }}>{new Date(o.createdAt).toLocaleDateString()}</td>
                 <td>
-                  <select
-                    className="status-sel"
-                    value={o.status}
-                    aria-label={`Status for order ${o.id}`}
-                    onChange={(e) => appActions.setOrderStatus(o.id, e.target.value)}
-                  >
-                    <option>paid</option>
-                    <option>processing</option>
-                    <option>shipped</option>
-                    <option>delivered</option>
-                    <option>cancelled</option>
+                  <select className="status-sel" value={o.status} aria-label={`Status for order ${o.id}`} onChange={(e) => appActions.setOrderStatus(o.id, e.target.value)}>
+                    <option>paid</option><option>processing</option><option>shipped</option><option>delivered</option><option>cancelled</option>
                   </select>
                 </td>
+                <td>
+                  <div style={{ fontSize: 12 }}><b>{o.paymentStatus || "—"}</b></div>
+                  {o.paymentMethod && <div style={{ fontSize: 12, color: "var(--ink2)" }}>{o.paymentMethod}</div>}
+                  {o.paymentProof && (
+                    <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>
+                      <a className="btn btn-ghost btn-sm" href={`${import.meta.env.VITE_API_URL || ""}/api/admin/orders/${encodeURIComponent(o.id)}/payment-proof`} target="_blank" rel="noreferrer">View slip</a>
+                      {o.paymentStatus === "pending" && ["jazzcash", "easypaisa", "bank_transfer"].includes(o.paymentMethod) && <button className="btn btn-dark btn-sm" type="button" onClick={() => appActions.confirmPayment(o.id, {})}>Confirm</button>}
+                    </div>
+                  )}
+                </td>
+                <td><ShipmentManager order={o} /></td>
               </tr>
             ))}
           </tbody>
@@ -1392,6 +1524,22 @@ export function ReturnsTab() {
                           <option key={status}>{status}</option>
                         ))}
                       </select>
+                      {request.refund ? (
+                        <div style={{ marginTop: 8, fontSize: 12 }}>
+                          Refund: <b>{request.refund.status}</b> · {fmt(request.refund.amount)}
+                          {request.refund.status !== "refunded" && request.status === "completed" ? (
+                            <button
+                              className="btn btn-ghost btn-sm"
+                              style={{ marginLeft: 8 }}
+                              onClick={() => appActions.setReturnRefund(request.id, { status: "refunded", providerRef: window.prompt("Enter refund/provider reference") || "", note: "Refund confirmed by staff." })}
+                            >
+                              Mark refunded
+                            </button>
+                          ) : null}
+                        </div>
+                      ) : request.status === "completed" && order?.paymentMethod !== "cod" ? (
+                        <div style={{ marginTop: 8, fontSize: 12 }}>Refund pending · online payment</div>
+                      ) : null}
                     </td>
                   </tr>
                 );
@@ -1631,6 +1779,33 @@ function MediaTab() {
   );
 }
 
+
+function TwoFactorSection() {
+  const [status, setStatus] = useState(null);
+  const [password, setPassword] = useState("");
+  const [code, setCode] = useState("");
+  const [secret, setSecret] = useState("");
+  const [otpauthUrl, setOtpauthUrl] = useState("");
+  const [busy, setBusy] = useState(false);
+  useEffect(() => { authApi.twoFactorStatus().then(setStatus).catch(() => {}); }, []);
+  const setup = async () => { setBusy(true); try { const result = await authApi.twoFactorSetup(password); setSecret(result.secret); setOtpauthUrl(result.otpauthUrl); appActions.toast("Authenticator secret generated. Add it to your authenticator app."); } catch (e) { appActions.toast(e.message || "Could not start 2FA setup", "err"); } finally { setBusy(false); } };
+  const enable = async () => { setBusy(true); try { await authApi.twoFactorEnable(password, secret, code); setStatus({ enabled: true, required: true }); setPassword(""); setCode(""); setSecret(""); setOtpauthUrl(""); appActions.toast("Two-factor authentication enabled"); } catch (e) { appActions.toast(e.message || "Could not enable 2FA", "err"); } finally { setBusy(false); } };
+  const disable = async () => { setBusy(true); try { await authApi.twoFactorDisable(password, code); setStatus({ enabled: false, required: true }); setPassword(""); setCode(""); appActions.toast("Two-factor authentication disabled"); } catch (e) { appActions.toast(e.message || "Could not disable 2FA", "err"); } finally { setBusy(false); } };
+  if (!status) return <div className="f-full"><h4 className="display" style={{ margin: "12px 0 4px" }}>Staff security</h4><p style={{ color: "var(--ink2)" }}>Loading two-factor authentication…</p></div>;
+  return <div className="f-full" style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--line)" }}>
+    <h4 className="display" style={{ margin: "12px 0 4px" }}>Staff security · Two-factor authentication</h4>
+    <p style={{ color: "var(--ink2)", fontSize: 13 }}>Protect this admin/editor account with a 6-digit code from Google Authenticator, Microsoft Authenticator, 1Password, or another TOTP app.</p>
+    <div className="free-note" style={{ marginBottom: 12 }}>{status.enabled ? "2FA is enabled for this staff account." : "2FA is not enabled. I strongly recommend enabling it before launch."}</div>
+    <div className="f-grid">
+      <div><label className="lbl" htmlFor="twofactor-password">Current password</label><input id="twofactor-password" className="input" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+      <div><label className="lbl" htmlFor="twofactor-code">Authenticator code</label><input id="twofactor-code" className="input" inputMode="numeric" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0,6))} placeholder="123456" /></div>
+    </div>
+    {!status.enabled && !secret && <button type="button" className="btn btn-ghost btn-sm" disabled={busy || !password} onClick={setup}>Generate setup secret</button>}
+    {secret && <div className="panel" style={{ marginTop: 12, background: "var(--paper)" }}><strong>Setup secret</strong><p style={{ wordBreak: "break-all", fontFamily: "monospace" }}>{secret}</p><p style={{ fontSize: 12, color: "var(--ink2)" }}>Manual setup URI: <code style={{ wordBreak: "break-all" }}>{otpauthUrl}</code></p><button type="button" className="btn btn-dark btn-sm" disabled={busy || code.length !== 6} onClick={enable}>Verify and enable 2FA</button></div>}
+    {status.enabled && <button type="button" className="btn btn-danger btn-sm" disabled={busy || !password || code.length !== 6} onClick={disable}>Disable 2FA</button>}
+  </div>;
+}
+
 function SettingsTab() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -1650,11 +1825,27 @@ function SettingsTab() {
     aboutTitle: "",
     aboutIntro: "",
     aboutBody: "",
-    whatsappNumber: "",
+    whatsappNumber: "923709072688",
     instagramUrl: "",
     facebookUrl: "",
     metaTitle: "",
     metaDescription: "",
+    currency: "PKR",
+    currencyLocale: "en-PK",
+    freeShippingThreshold: "5000",
+    shippingFlatRate: "500",
+    taxRate: "0",
+    taxLabel: "GST",
+    allowCod: "1",
+    allowOnlinePayments: "0",
+    allowManualPayments: "1",
+    jazzcashNumber: "923709072688",
+    easypaisaNumber: "923709072688",
+    bankName: "",
+    bankAccountTitle: "",
+    bankAccountNumber: "",
+    bankIban: "",
+    bankInstructions: "",
   });
   useEffect(() => {
     let alive = true;
@@ -1721,6 +1912,25 @@ function SettingsTab() {
           </div>
         </div>
         <div className="f-full"><label className="lbl" htmlFor="settings-announcement">Announcement bar</label><input id="settings-announcement" className="input" value={form.announcement} onChange={(e) => set("announcement", e.target.value)} /></div>
+        <div className="f-full"><h4 className="display" style={{ margin: "12px 0 4px" }}>Commerce & checkout</h4></div>
+        <div><label className="lbl" htmlFor="settings-currency">Currency</label><input id="settings-currency" className="input" value={form.currency} onChange={(e) => set("currency", e.target.value.toUpperCase())} maxLength={3} /></div>
+        <div><label className="lbl" htmlFor="settings-locale">Currency locale</label><input id="settings-locale" className="input" value={form.currencyLocale} onChange={(e) => set("currencyLocale", e.target.value)} /></div>
+        <div><label className="lbl" htmlFor="settings-free-shipping">Free shipping threshold</label><input id="settings-free-shipping" className="input" inputMode="decimal" value={form.freeShippingThreshold} onChange={(e) => set("freeShippingThreshold", e.target.value)} /></div>
+        <div><label className="lbl" htmlFor="settings-shipping-rate">Flat shipping rate</label><input id="settings-shipping-rate" className="input" inputMode="decimal" value={form.shippingFlatRate} onChange={(e) => set("shippingFlatRate", e.target.value)} /></div>
+        <div><label className="lbl" htmlFor="settings-tax-rate">Tax / GST rate (%)</label><input id="settings-tax-rate" className="input" inputMode="decimal" value={form.taxRate} onChange={(e) => set("taxRate", e.target.value)} /></div>
+        <div><label className="lbl" htmlFor="settings-tax-label">Tax label</label><input id="settings-tax-label" className="input" value={form.taxLabel} onChange={(e) => set("taxLabel", e.target.value)} /></div>
+        <div><label className="lbl" htmlFor="settings-cod">Cash on delivery</label><select id="settings-cod" className="select" value={form.allowCod} onChange={(e) => set("allowCod", e.target.value)}><option value="1">Enabled</option><option value="0">Disabled</option></select></div>
+        <div><label className="lbl" htmlFor="settings-online">Online payments</label><select id="settings-online" className="select" value={form.allowOnlinePayments} onChange={(e) => set("allowOnlinePayments", e.target.value)}><option value="0">Disabled</option><option value="1">Enabled — requires PayFast configuration</option></select></div>
+        <div><label className="lbl" htmlFor="settings-manual-payments">Manual wallet/bank payments</label><select id="settings-manual-payments" className="select" value={form.allowManualPayments} onChange={(e) => set("allowManualPayments", e.target.value)}><option value="1">Enabled</option><option value="0">Disabled</option></select></div>
+        <div className="f-full"><h4 className="display" style={{ margin: "12px 0 4px" }}>Manual payment details</h4></div>
+        <div><label className="lbl" htmlFor="settings-jazzcash">JazzCash number</label><input id="settings-jazzcash" className="input" placeholder="923001234567" value={form.jazzcashNumber} onChange={(e) => set("jazzcashNumber", e.target.value)} /></div>
+        <div><label className="lbl" htmlFor="settings-easypaisa">Easypaisa number</label><input id="settings-easypaisa" className="input" placeholder="923001234567" value={form.easypaisaNumber} onChange={(e) => set("easypaisaNumber", e.target.value)} /></div>
+        <div><label className="lbl" htmlFor="settings-bank-name">Bank name</label><input id="settings-bank-name" className="input" value={form.bankName} onChange={(e) => set("bankName", e.target.value)} /></div>
+        <div><label className="lbl" htmlFor="settings-bank-title">Account title</label><input id="settings-bank-title" className="input" value={form.bankAccountTitle} onChange={(e) => set("bankAccountTitle", e.target.value)} /></div>
+        <div><label className="lbl" htmlFor="settings-bank-account">Account number</label><input id="settings-bank-account" className="input" value={form.bankAccountNumber} onChange={(e) => set("bankAccountNumber", e.target.value)} /></div>
+        <div><label className="lbl" htmlFor="settings-bank-iban">IBAN</label><input id="settings-bank-iban" className="input" value={form.bankIban} onChange={(e) => set("bankIban", e.target.value)} /></div>
+        <div className="f-full"><label className="lbl" htmlFor="settings-bank-instructions">Payment instructions</label><textarea id="settings-bank-instructions" className="textarea" placeholder="e.g. Use your order ID as the transfer reference." value={form.bankInstructions} onChange={(e) => set("bankInstructions", e.target.value)} /></div>
+        <div className="f-full"><p style={{ color: "var(--ink2)", fontSize: 12, margin: 0 }}>Current default launch currency is PKR. Existing product numeric prices are not automatically converted; review catalogue pricing before enabling live sales.</p></div>
         <div className="f-full"><h4 className="display" style={{ margin: "12px 0 4px" }}>About page</h4></div>
         <div className="f-full"><label className="lbl" htmlFor="settings-about-title">About title</label><input id="settings-about-title" className="input" value={form.aboutTitle} onChange={(e) => set("aboutTitle", e.target.value)} /></div>
         <div className="f-full"><label className="lbl" htmlFor="settings-about-intro">About intro</label><textarea id="settings-about-intro" className="textarea" value={form.aboutIntro} onChange={(e) => set("aboutIntro", e.target.value)} /></div>

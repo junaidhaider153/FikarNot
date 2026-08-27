@@ -2,10 +2,13 @@ import { useEffect, useState } from "react";
 import { Header, Marquee, Footer, Toast } from "../layout";
 import { SiteStructuredData } from "../seo/StructuredData";
 import { WHATSAPP_NUMBER } from "../../config/appConfig";
+import { useApp } from "../../store/appStore";
 
 export function WhatsAppFloat() {
+  const s = useApp();
+  const configuredNumber = s.siteSettings?.whatsappNumber || WHATSAPP_NUMBER;
   const message = encodeURIComponent("Hi FikarNot, I need help with my order.");
-  const href = WHATSAPP_NUMBER ? `https://wa.me/${WHATSAPP_NUMBER.replace(/\D/g, "")}?text=${message}` : `https://wa.me/?text=${message}`;
+  const href = configuredNumber ? `https://wa.me/${configuredNumber.replace(/\D/g, "")}?text=${message}` : `https://wa.me/?text=${message}`;
   return (
     <a className="whatsapp-float" href={href} target="_blank" rel="noreferrer noopener" aria-label="Chat with FikarNot on WhatsApp">
       <span className="whatsapp-float-icon" aria-hidden="true">

@@ -24,59 +24,44 @@ const CONTENT = {
   },
   shipping: {
     eyebrow: "Shipping",
-    title: "Simple delivery, clearly explained.",
+    title: "Shipping, clearly explained.",
     intro:
-      "This demo store uses a simple shipping model so you can focus on the shopping experience while keeping the rules easy to understand.",
+      "Shipping charges and thresholds are controlled by the current store settings and shown at checkout before you place an order.",
     sections: [
-      ["Standard shipping", "Orders under $75 use the demo standard rate of $6.95."],
-      [
-        "Free shipping",
-        "Orders of $75 or more qualify for free standard shipping. Eligible free-shipping coupons can also remove the shipping charge.",
-      ],
-      [
-        "Order processing",
-        "Orders are created immediately in this browser-based project and move through the order status timeline from paid to processing, shipped and delivered.",
-      ],
+      ["Standard shipping", "The applicable flat shipping rate and free-shipping threshold are displayed during checkout."],
+      ["Delivery updates", "Once an order is dispatched, the courier and tracking reference can be added by staff and shown against the order record."],
+      ["Delays", "Delivery windows may vary by destination, stock availability and courier capacity. Support can provide order-specific updates."],
     ],
   },
   returns: {
     eyebrow: "Returns",
     title: "A straightforward return policy.",
-    intro: "This personal project uses a simple demo return policy to model how a real storefront might communicate post-purchase support.",
+    intro: "Eligible delivered orders can be submitted for return within the published return window. Approved returns are inspected before completion.",
     sections: [
-      ["30-day window", "The demo policy allows return requests within 30 days of delivery."],
+      ["30-day window", "Return requests should be submitted within 30 days of delivery unless a different product-specific policy applies."],
       ["Condition", "Items should be unused and returned in reasonable condition with original packaging where applicable."],
       ["Need help?", "Use the Help Center contact form and include your order number so the support team can review the request."],
     ],
   },
   privacy: {
     eyebrow: "Privacy",
-    title: "Your demo data stays in your browser.",
+    title: "Privacy policy.",
     intro:
-      "FikarNot is currently a browser-based personal project. Most account, cart, wishlist and order data is stored in localStorage on the device running the site.",
+      "FikarNot processes the information needed to provide accounts, orders, support and delivery. Payment credentials should be handled by the selected payment provider and are not stored by FikarNot.",
     sections: [
-      [
-        "What is stored",
-        "In the current development build, account, catalogue, order and engagement records are handled by the FikarNot backend and SQLite database, while some UI preferences may remain local to the browser.",
-      ],
-      ["No real payment processing", "The current checkout is a mock experience. Do not enter real financial credentials."],
-      [
-        "Demo environment",
-        "Because this is a local project, its current storage model should not be treated as production-grade privacy or security infrastructure.",
-      ],
+      ["Information collected", "Account details, contact information, order details, support messages and operational records may be stored to fulfil purchases and provide support."],
+      ["Payment information", "FikarNot does not need to store full card credentials. When live payments are enabled, customers are sent to the configured payment provider."],
+      ["Retention and access", "Operational records are retained only as needed for order support, accounting, security and legal obligations and are restricted by application roles."],
     ],
   },
   terms: {
     eyebrow: "Terms",
-    title: "Demo store terms of use.",
-    intro: "These terms describe the intended use of the FikarNot personal project.",
+    title: "Terms of service.",
+    intro: "These terms describe the use of the FikarNot storefront, catalogue, orders and support services.",
     sections: [
-      ["Personal project", "FikarNot is a demonstration and learning project, not a live commercial store."],
-      ["No real purchases", "Orders, payments, shipping and promotional codes are simulated within the application."],
-      [
-        "Use responsibly",
-        "Avoid entering sensitive personal, payment or credential information that you would not want stored in a browser-based demo.",
-      ],
+      ["Orders", "An order becomes binding according to the checkout confirmation and the payment/fulfilment status recorded by FikarNot."],
+      ["Prices and availability", "Product prices, stock, promotions and delivery estimates may change before an order is accepted or may be adjusted to correct an obvious error."],
+      ["Acceptable use", "Do not misuse the storefront, attempt unauthorized access, submit fraudulent orders or interfere with other customers' accounts."],
     ],
   },
 };

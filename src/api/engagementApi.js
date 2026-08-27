@@ -19,6 +19,7 @@ export const engagementApi = {
   deleteSupport: (id) => request(`/api/support/${encodeURIComponent(id)}`, { method: "DELETE" }),
   createReturn: (payload) => request("/api/returns", { method: "POST", body: JSON.stringify(payload) }),
   setReturnStatus: (id, status) => request(`/api/returns/${encodeURIComponent(id)}/status`, { method: "POST", body: JSON.stringify({ status }) }),
+  setReturnRefund: (id, payload) => request(`/api/admin/returns/${encodeURIComponent(id)}/refund`, { method: "POST", body: JSON.stringify(payload) }),
   listNotifications: () => request("/api/notifications"),
   markNotificationRead: (id) => request(`/api/notifications/${encodeURIComponent(id)}/read`, { method: "POST", body: "{}" }),
   markAllNotificationsRead: () => request("/api/notifications/read-all", { method: "POST", body: "{}" }),
