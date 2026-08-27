@@ -303,7 +303,7 @@ const ALLOWED_ORIGINS = String(process.env.FIKARNOT_FRONTEND_ORIGIN || "http://l
   .map((value) => value.trim().replace(/\/$/, ""))
   .filter(Boolean);
 const FRONTEND_ORIGIN = ALLOWED_ORIGINS[0] || "http://localhost:5173";
-const PORT = Number(process.env.FIKARNOT_API_PORT || 8787);
+const port = process.env.PORT || process.env.FIKARNOT_API_PORT || 8787;
 const COOKIE_NAME = "fn_session";
 const CSRF_COOKIE_NAME = "fn_csrf";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
