@@ -3003,8 +3003,8 @@ const shutdown = (signal) => {
   });
 };
 
-server.listen(port, () => {
-  console.log(`FikarNot API running on http://localhost:${port}`);
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`FikarNot API running on port ${PORT}`);
 });
 
 process.on("SIGINT", () => shutdown("SIGINT"));
