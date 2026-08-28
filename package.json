@@ -9,7 +9,6 @@
   "scripts": {
     "dev": "node scripts/dev-all.mjs",
     "build": "vite build",
-    "postbuild": "node scripts/generate-sitemap.js && node scripts/prerender-seo.js",
     "preview": "vite preview",
     "lint": "eslint .",
     "format": "prettier --write .",
