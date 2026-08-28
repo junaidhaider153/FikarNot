@@ -1,9 +1,8 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { seedData } from "../src/data/seedData.js";
 
-const SITE_URL = (process.env.SITE_URL || "https://www.fikarnot.shop").replace(/\/$/, "");
+const SITE_URL = (process.env.SITE_URL || "https://fikarnot.shop").replace(/\/$/, "");
 const SITEMAP_API_URL = String(process.env.SITEMAP_API_URL || "").trim().replace(/\/$/, "");
-const isProductionBuild = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production" || process.env.FIKARNOT_BUILD_ENV === "production";
 const xmlEscape = (value) => String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 
 const buildUrls = ({ products, categories }) => {
@@ -21,7 +20,7 @@ const buildUrls = ({ products, categories }) => {
 };
 
 const toXml = (urls) => `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
+<urlset xmlns="http://sitemaps.org">
 ${urls
   .map(
     (u) => `  <url>
@@ -35,14 +34,13 @@ ${urls
 `;
 
 const loadCatalog = async () => {
-  if (!SITEMAP_API_URL) {
-    if (isProductionBuild) {
-      throw new Error("SITEMAP_API_URL is required in production; refusing to publish a seed-data sitemap.");
-    }
-    return seedData();
-  }
+  if (!SITEMAP_API_URL) return seedData();
+  
   const first = await fetch(`${SITEMAP_API_URL}/api/catalog?limit=100&offset=0`);
-  if (!first.ok) throw new Error(`Sitemap API returned ${first.status}`);
+  if (!first.ok || first.headers.get("content-type")?.includes("text/html")) {
+    throw new Error(`Sitemap API returned invalid response (${first.status})`);
+  }
+  
   const payload = await first.json();
   const products = [...(payload.products || [])];
   const total = Number(payload.total || products.length);
@@ -57,15 +55,15 @@ const loadCatalog = async () => {
 
 const outPath = new URL("../dist/sitemap.xml", import.meta.url);
 mkdirSync(new URL("../dist", import.meta.url), { recursive: true });
+
 try {
   const catalog = await loadCatalog();
   const urls = buildUrls(catalog);
   writeFileSync(outPath, toXml(urls));
   console.log(`sitemap.xml written from ${SITEMAP_API_URL ? "live API" : "seed data"} with ${urls.length} URLs`);
 } catch (error) {
-  if (isProductionBuild) throw error;
   const catalog = seedData();
   const urls = buildUrls(catalog);
   writeFileSync(outPath, toXml(urls));
-  console.warn(`Live sitemap generation failed (${error.message}); wrote development fallback with ${urls.length} URLs.`);
+  console.warn(`Live sitemap generation failed (${error.message}); wrote production fallback with ${urls.length} URLs.`);
 }

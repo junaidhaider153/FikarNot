@@ -303,7 +303,7 @@ const ALLOWED_ORIGINS = String(process.env.FIKARNOT_FRONTEND_ORIGIN || "http://l
   .map((value) => value.trim().replace(/\/$/, ""))
   .filter(Boolean);
 const FRONTEND_ORIGIN = ALLOWED_ORIGINS[0] || "http://localhost:5173";
-const PORT = Number(process.env.FIKARNOT_API_PORT || 8787);
+const port = process.env.PORT || process.env.FIKARNOT_API_PORT || 8787;
 const COOKIE_NAME = "fn_session";
 const CSRF_COOKIE_NAME = "fn_csrf";
 const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
@@ -401,10 +401,14 @@ const json = (res, status, payload) => {
 
 const corsHeaders = (req, res) => {
   const requestOrigin = String(req?.headers?.origin || "").replace(/\/$/, "");
-  const allowedOrigin = requestOrigin && ALLOWED_ORIGINS.includes(requestOrigin) ? requestOrigin : FRONTEND_ORIGIN;
+  // Checks your dynamic environment variables list directly
+  const allowedOrigin = requestOrigin && ALLOWED_ORIGINS.includes(requestOrigin) 
+    ? requestOrigin 
+    : FRONTEND_ORIGIN;
+
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token, Authorization, Accept, X-Requested-With");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,PATCH,OPTIONS");
   res.setHeader("Vary", "Origin");
 };
@@ -3003,8 +3007,10 @@ const shutdown = (signal) => {
   });
 };
 
-server.listen(PORT, () => {
-  console.log(`FikarNot API running on http://localhost:${PORT}`);
+const PORT = process.env.PORT || 3000;
+
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`[FikarNot API] Running smoothly on port ${PORT}`);
 });
 
 process.on("SIGINT", () => shutdown("SIGINT"));

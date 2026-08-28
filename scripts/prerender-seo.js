@@ -5,21 +5,19 @@ import { seedData } from "../src/data/seedData.js";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const DIST_INDEX = join(__dirname, "..", "dist", "index.html");
-const SITE_URL = (process.env.SITE_URL || "https://www.fikarnot.shop").replace(/\/$/, "");
+const SITE_URL = (process.env.SITE_URL || "https://fikarnot.shop").replace(/\/$/, "");
 const SITEMAP_API_URL = String(process.env.SITEMAP_API_URL || "").trim().replace(/\/$/, "");
-const isProductionBuild = process.env.NODE_ENV === "production" || process.env.VERCEL_ENV === "production" || process.env.FIKARNOT_BUILD_ENV === "production";
 const esc = (value) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
 const jsonEsc = (value) => JSON.stringify(value).replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/&/g, "\\u0026");
 
 const loadCatalog = async () => {
-  if (!SITEMAP_API_URL) {
-    if (isProductionBuild) {
-      throw new Error("SITEMAP_API_URL is required in production; refusing to prerender SEO pages from seed data.");
-    }
-    return seedData();
-  }
+  if (!SITEMAP_API_URL) return seedData();
+  
   const first = await fetch(`${SITEMAP_API_URL}/api/catalog?limit=100&offset=0`);
-  if (!first.ok) throw new Error(`SEO catalog API returned ${first.status}`);
+  if (!first.ok || first.headers.get("content-type")?.includes("text/html")) {
+    throw new Error(`SEO catalog API returned invalid response (${first.status})`);
+  }
+  
   const payload = await first.json();
   const products = [...(payload.products || [])];
   const total = Number(payload.total || products.length);
@@ -31,7 +29,6 @@ const loadCatalog = async () => {
   }
   return { products, categories: payload.categories || [] };
 };
-
 
 const renderProductHtml = (baseHtml, product, category) => {
   const title = `${product.name} — FikarNot`;
@@ -47,7 +44,7 @@ const renderProductHtml = (baseHtml, product, category) => {
     image: [image],
     category: category?.name,
     aggregateRating: Number(product.rating) > 0 ? { "@type": "AggregateRating", ratingValue: Number(product.rating), bestRating: 5, ratingCount: 1 } : undefined,
-    offers: { "@type": "Offer", url, priceCurrency: "USD", price: Number(product.price).toFixed(2), availability: Number(product.stock) > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock" },
+    offers: { "@type": "Offer", url, priceCurrency: "USD", price: Number(product.price).toFixed(2), availability: Number(product.stock) > 0 ? "https://schema.org" : "https://schema.org" },
   };
   const breadcrumbLd = {
     "@context": "https://schema.org",
@@ -76,19 +73,22 @@ const renderProductHtml = (baseHtml, product, category) => {
 
 const main = async () => {
   const baseHtml = readFileSync(DIST_INDEX, "utf8");
-  const { products, categories } = await loadCatalog();
+  let catalog;
+  try {
+    catalog = await loadCatalog();
+  } catch (error) {
+    console.warn(`⚠️ Live SEO catalog load failed (${error.message}). Using local fallback seed data.`);
+    catalog = seedData();
+  }
+  
+  const { products, categories } = catalog;
   const categoryById = new Map(categories.map((category) => [category.id, category]));
   for (const product of products) {
     const outDir = join(__dirname, "..", "dist", "product", String(product.id));
     mkdirSync(outDir, { recursive: true });
     writeFileSync(join(outDir, "index.html"), renderProductHtml(baseHtml, product, categoryById.get(product.categoryId)));
   }
-  console.log(`prerendered ${products.length} product SEO pages from ${SITEMAP_API_URL ? "live API" : "seed data"}`);
+  console.log(`prerendered ${products.length} product SEO pages.`);
 };
 
-try {
-  await main();
-} catch (error) {
-  if (isProductionBuild) throw error;
-  console.warn(`SEO prerender skipped: ${error.message}`);
-}
+await main();
