@@ -401,10 +401,14 @@ const json = (res, status, payload) => {
 
 const corsHeaders = (req, res) => {
   const requestOrigin = String(req?.headers?.origin || "").replace(/\/$/, "");
-  const allowedOrigin = requestOrigin && ALLOWED_ORIGINS.includes(requestOrigin) ? requestOrigin : FRONTEND_ORIGIN;
+  // Checks your dynamic environment variables list directly
+  const allowedOrigin = requestOrigin && ALLOWED_ORIGINS.includes(requestOrigin) 
+    ? requestOrigin 
+    : FRONTEND_ORIGIN;
+
   res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
   res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token");
+  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token, Authorization, Accept, X-Requested-With");
   res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,PATCH,OPTIONS");
   res.setHeader("Vary", "Origin");
 };
