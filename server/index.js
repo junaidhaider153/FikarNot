@@ -3003,8 +3003,10 @@ const shutdown = (signal) => {
   });
 };
 
+const PORT = process.env.PORT || 3000;
+
 server.listen(PORT, "0.0.0.0", () => {
-  console.log(`FikarNot API running on port ${PORT}`);
+  console.log(`[FikarNot API] Running smoothly on port ${PORT}`);
 });
 
 process.on("SIGINT", () => shutdown("SIGINT"));
