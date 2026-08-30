@@ -1,61 +1,352 @@
-import { useEffect, useState } from "react";
-import { Header, Marquee, Footer, Toast } from "../layout";
-import { SiteStructuredData } from "../seo/StructuredData";
-import { WHATSAPP_NUMBER } from "../../config/appConfig";
-import { useApp } from "../../store/appStore";
+import { useEffect, useMemo, useRef, useState } from "react";
+import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
+import { useApp, appActions } from "../store/appStore";
+import { useDebounced } from "../hooks/useDebounced";
+import { fmt } from "../utils/helpers";
+import { relevance } from "../utils/search";
+import { Ic } from "./icons";
 
-export function WhatsAppFloat() {
+export function HeaderSearch() {
   const s = useApp();
-  const configuredNumber = s.siteSettings?.whatsappNumber || WHATSAPP_NUMBER;
-  const message = encodeURIComponent("Hi FikarNot, I need help with my order.");
-  const href = configuredNumber ? `https://wa.me/${configuredNumber.replace(/\D/g, "")}?text=${message}` : `https://wa.me/?text=${message}`;
-  return (
-    <a className="whatsapp-float" href={href} target="_blank" rel="noreferrer noopener" aria-label="Chat with FikarNot on WhatsApp">
-      <span className="whatsapp-float-icon" aria-hidden="true">
-        <svg viewBox="0 0 24 24" width="22" height="22" fill="currentColor">
-          <path d="M20.5 3.5A11.86 11.86 0 0 0 12.05 0C5.54 0 .25 5.29.25 11.8c0 2.08.54 4.1 1.56 5.89L.18 23.82l6.27-1.64a11.73 11.73 0 0 0 5.6 1.43h.01c6.5 0 11.79-5.29 11.79-11.8 0-3.15-1.23-6.11-3.35-8.31ZM12.06 21.58h-.01a9.74 9.74 0 0 1-4.97-1.36l-.36-.22-3.72.97.99-3.63-.23-.37a9.77 9.77 0 1 1 8.3 4.61Zm5.37-7.32c-.29-.15-1.72-.85-1.99-.95-.27-.1-.46-.15-.66.15-.19.29-.76.95-.93 1.14-.17.2-.34.22-.63.07-.29-.15-1.23-.45-2.35-1.44-.87-.77-1.45-1.72-1.62-2.01-.17-.29-.02-.45.13-.6.13-.13.29-.34.44-.51.15-.17.2-.29.29-.49.1-.19.05-.36-.02-.51-.07-.15-.66-1.58-.9-2.17-.24-.57-.48-.49-.66-.5h-.56c-.19 0-.51.07-.78.36-.27.29-1.02.99-1.02 2.42s1.05 2.81 1.2 3.01c.15.19 2.07 3.17 5.01 4.44.7.3 1.24.48 1.66.61.7.22 1.34.19 1.84.12.56-.08 1.72-.7 1.97-1.38.24-.68.24-1.26.17-1.38-.07-.12-.27-.19-.56-.34Z" />
-        </svg>
-      </span>
-      <span>Chat with us</span>
-    </a>
+  const navigate = useNavigate();
+  const [q, setQ] = useState("");
+  const dq = useDebounced(q, 300);
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(-1);
+  const boxRef = useRef(null);
+  const suggestions = useMemo(
+    () =>
+      dq.trim()
+        ? s.products
+            .map((p) => ({ p, score: relevance(p, dq) }))
+            .filter((x) => x.score > 0)
+            .sort((a, b) => b.score - a.score)
+            .slice(0, 5)
+        : [],
+    [dq, s.products],
   );
-}
-
-export function BackToTop() {
-  const [visible, setVisible] = useState(false);
-
   useEffect(() => {
-    const onScroll = () => setVisible(window.scrollY > 520);
-    onScroll();
-    window.addEventListener("scroll", onScroll, { passive: true });
-    return () => window.removeEventListener("scroll", onScroll);
+    setOpen(dq.trim() !== "" && suggestions.length > 0);
+    setActive(-1);
+  }, [suggestions, dq]);
+  useEffect(() => {
+    const onDoc = (e) => {
+      if (boxRef.current && !boxRef.current.contains(e.target)) setOpen(false);
+    };
+    document.addEventListener("mousedown", onDoc);
+    return () => document.removeEventListener("mousedown", onDoc);
   }, []);
-
-  if (!visible) return null;
-
+  const pick = (p) => {
+    navigate(`/product/${p.id}`);
+    setQ("");
+    setOpen(false);
+  };
+  const goAll = () => {
+    navigate(`/products?q=${encodeURIComponent(q.trim())}`);
+    setQ("");
+    setOpen(false);
+  };
+  const onKey = (e) => {
+    if (!open) return;
+    const total = suggestions.length + 1; // +1 for "see all results"
+    if (e.key === "ArrowDown") {
+      e.preventDefault();
+      setActive((a) => (a + 1) % total);
+    } else if (e.key === "ArrowUp") {
+      e.preventDefault();
+      setActive((a) => (a - 1 + total) % total);
+    } else if (e.key === "Escape") setOpen(false);
+    else if (e.key === "Enter") {
+      e.preventDefault();
+      if (active >= 0 && active < suggestions.length) pick(suggestions[active].p);
+      else goAll();
+    }
+  };
   return (
-    <button type="button" className="back-to-top" aria-label="Back to top" onClick={() => window.scrollTo({ top: 0, behavior: "smooth" })}>
-      ↑
-    </button>
+    <div className="searchbox" ref={boxRef}>
+      <form
+        className="search-input"
+        role="search"
+        onSubmit={(e) => {
+          e.preventDefault();
+          goAll();
+        }}
+      >
+        <Ic n="search" s={14} />
+        <input
+          value={q}
+          onChange={(e) => setQ(e.target.value)}
+          onFocus={() => dq.trim() && setOpen(true)}
+          onKeyDown={onKey}
+          placeholder="Search products…"
+          aria-label="Search products"
+          role="combobox"
+          aria-expanded={open}
+          aria-autocomplete="list"
+          aria-controls="hdr-suggest"
+        />
+      </form>
+      {open && (
+        <ul className="suggest" id="hdr-suggest" role="listbox" aria-label="Search suggestions">
+          {suggestions.map(({ p }, i) => (
+            <li
+              key={p.id}
+              role="option"
+              aria-selected={i === active}
+              className={i === active ? "on" : ""}
+              onMouseEnter={() => setActive(i)}
+              onMouseDown={(e) => {
+                e.preventDefault();
+                pick(p);
+              }}
+            >
+              <img src={p.image} alt="" />
+              <span className="nm">{p.name}</span>
+              <span className="pr">{fmt(p.price)}</span>
+            </li>
+          ))}
+          <li
+            className={"sg-foot" + (active === suggestions.length ? " on" : "")}
+            role="option"
+            aria-selected={active === suggestions.length}
+            onMouseEnter={() => setActive(suggestions.length)}
+            onMouseDown={(e) => {
+              e.preventDefault();
+              goAll();
+            }}
+          >
+            See all results for “{dq.trim()}” →
+          </li>
+        </ul>
+      )}
+    </div>
+  );
+}
+function parseNavLinks(raw) {
+  if (!raw) return [];
+  try {
+    const parsed = JSON.parse(raw);
+    return Array.isArray(parsed) ? parsed.filter((link) => link && link.label && link.url) : [];
+  } catch {
+    return [];
+  }
+}
+
+export function Logo({ className = "logo", dark = false }) {
+  const s = useApp();
+  const logoUrl = s.siteSettings?.logoUrl;
+  const storeName = s.siteSettings?.storeName || "FikarNot";
+  return (
+    <Link className={className} to="/" style={dark ? { color: "#fff" } : undefined}>
+      {logoUrl ? (
+        <img className="logo-image" src={logoUrl} alt={storeName} />
+      ) : (
+        <span className="logo-mark">{storeName.charAt(0).toUpperCase() || "F"}</span>
+      )}
+      {storeName}
+    </Link>
   );
 }
 
-export function Layout({ children }) {
+export function Header() {
+  const s = useApp();
+  const [open, setOpen] = useState(false);
+  const location = useLocation();
+  const count = s.cart.reduce((n, i) => n + i.qty, 0);
+  const canEdit = s.session && ["admin", "editor"].includes(s.session.role);
+  const customLinks = useMemo(() => parseNavLinks(s.siteSettings?.navLinks), [s.siteSettings?.navLinks]);
+  useEffect(() => setOpen(false), [location.pathname]);
   return (
-    <>
-      <SiteStructuredData />
-      <a className="skip-link" href="#main-content">
-        Skip to content
-      </a>
-      <Header />
-      <Marquee />
-      <main id="main-content" className="app-main">
-        {children}
-      </main>
-      <Footer />
-      <Toast />
-      <WhatsAppFloat />
-      <BackToTop />
-    </>
+    <header className="hdr">
+      <div className="container hdr-inner">
+        <Logo />
+        <nav className="nav" aria-label="Primary">
+          <NavLink className="hdr-link" to="/">
+            Home
+          </NavLink>
+          <NavLink className="hdr-link" to="/products">
+            Shop
+          </NavLink>
+          {customLinks.map((link) => (
+            <NavLink className="hdr-link" to={link.url} key={link.url}>
+              {link.label}
+            </NavLink>
+          ))}
+          {canEdit && (
+            <NavLink className="hdr-link" to="/admin">
+              Studio
+            </NavLink>
+          )}
+        </nav>
+        <div className="hdr-actions">
+          <HeaderSearch />
+          {s.session ? (
+            <span className="user-chip">
+              <Link className="user-link" to="/account" aria-label="Open your account">
+                <span className="avatar">
+                  {s.session.name
+                    .split(" ")
+                    .map((w) => w[0])
+                    .join("")
+                    .slice(0, 2)}
+                </span>
+                <span className="uname">{s.session.name.split(" ")[0]}</span>
+              </Link>
+              <button
+                className="icon-btn dark"
+                onClick={() => {
+                  appActions.logout();
+                }}
+                aria-label="Sign out"
+                title="Sign out"
+              >
+                <Ic n="logout" s={15} />
+              </button>
+            </span>
+          ) : (
+            <NavLink className="hdr-link signin-header" to="/login">
+              <Ic n="user" s={15} /> Sign in
+            </NavLink>
+          )}
+          {s.session && (
+            <Link
+              className="icon-link dark notification-header"
+              to="/notifications"
+              aria-label={`Notifications, ${s.notifications?.filter((item) => !item.read).length || 0} unread`}
+              title="Notifications"
+            >
+              <Ic n="bell" s={17} />
+              {(s.notifications?.filter((item) => !item.read).length || 0) > 0 && (
+                <span className="count-badge">{s.notifications.filter((item) => !item.read).length}</span>
+              )}
+            </Link>
+          )}
+          <Link
+            className="icon-link dark wishlist-header"
+            to="/wishlist"
+            aria-label={`Wishlist, ${s.wishlist.length} items`}
+            title="Wishlist"
+          >
+            <Ic n="heart" s={17} filled={s.wishlist.length > 0} />
+            {s.wishlist.length > 0 && <span className="count-badge">{s.wishlist.length}</span>}
+          </Link>
+          <Link className="icon-link dark recently-viewed-header" to="/recently-viewed" aria-label="Recently viewed products" title="Recently viewed">
+            <Ic n="clock" s={17} />
+          </Link>
+          <Link className="cart-btn" to="/cart" aria-label={`Cart, ${count} items`}>
+            <Ic n="cart" s={17} />
+            {count > 0 && <span className="count-badge">{count}</span>}
+          </Link>
+          <button className="icon-btn dark menu-btn" aria-label="Menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+            <Ic n={open ? "x" : "menu"} s={18} />
+          </button>
+        </div>
+      </div>
+      <nav className={"mobile-nav" + (open ? " open" : "")} aria-label="Mobile">
+        <NavLink to="/">Home</NavLink>
+        <NavLink to="/products">Shop</NavLink>
+        {customLinks.map((link) => (
+          <NavLink to={link.url} key={link.url}>
+            {link.label}
+          </NavLink>
+        ))}
+        {canEdit && <NavLink to="/admin">Studio</NavLink>}
+        <NavLink to="/compare">Compare ({s.comparison.length})</NavLink>
+        <NavLink to="/wishlist">Wishlist ({s.wishlist.length})</NavLink>
+        <NavLink to="/recently-viewed">Recently viewed</NavLink>
+        {s.session && (
+          <NavLink to="/notifications">
+            Notifications
+            {(s.notifications?.filter((item) => !item.read).length || 0) > 0
+              ? ` (${s.notifications.filter((item) => !item.read).length})`
+              : ""}
+          </NavLink>
+        )}
+        <NavLink to="/cart">Cart ({count})</NavLink>
+        {s.session ? <NavLink to="/account">My account</NavLink> : <NavLink to="/login">Sign in</NavLink>}
+      </nav>
+    </header>
   );
 }
+const DEFAULT_MARQUEE_ITEMS = ["Free shipping over $75", "30-day returns", "Designed in Portland", "Carbon-neutral delivery", "2-year warranty"];
+
+export function Marquee() {
+  const s = useApp();
+  const announcement = s.siteSettings?.announcement?.trim();
+  // Store owners can enter one line, or split several lines/segments with
+  // a newline, a pipe ( | ) or a middle dot ( · ) to get the classic
+  // multi-item scrolling marquee instead of a single repeated message.
+  const items = announcement ? announcement.split(/\r?\n|\s*\|\s*|\s+·\s+/).map((t) => t.trim()).filter(Boolean) : DEFAULT_MARQUEE_ITEMS;
+  const row = items.map((t, i) => <span key={`${t}-${i}`}>{t} ✦</span>);
+  return (
+    <div className="marquee" aria-hidden="true">
+      <div className="marquee-track">
+        {row}
+        {row}
+      </div>
+    </div>
+  );
+}
+export function Footer() {
+  const s = useApp();
+  const isStaff = s.session && ["admin", "editor"].includes(s.session.role);
+  return (
+    <footer className="footer">
+      <div className="container">
+        <div className="footer-grid">
+          <div>
+            <Logo dark />
+            <p style={{ marginTop: 14, fontSize: 13.5, maxWidth: "34ch" }}>
+              Everyday objects, obsessively made.
+            </p>
+          </div>
+          <div>
+            <h4>Shop</h4>
+            <Link to="/products">All products</Link>
+            <Link to="/products?cat=c1">Audio</Link>
+            <Link to="/products?cat=c2">Wearables</Link>
+            <Link to="/products?cat=c3">Home &amp; Desk</Link>
+            <Link to="/products?cat=c4">Carry</Link>
+          </div>
+          <div>
+            <h4>Account</h4>
+            <Link to="/login">Sign in</Link>
+            <Link to="/account">My account</Link>
+            <Link to="/wishlist">Wishlist</Link>
+            <Link to="/cart">Cart</Link>
+            <Link to="/checkout">Checkout</Link>
+            <Link to="/admin">Studio</Link>
+          </div>
+          <div>
+            <h4>Help</h4>
+            <Link to="/help">Help Center</Link>
+            <Link to="/shipping">Shipping</Link>
+            <Link to="/returns">Returns</Link>
+            <Link to="/about">About</Link>
+            <Link to="/privacy">Privacy</Link>
+          </div>
+        </div>
+        <div className="footer-bottom">
+          <span>© {new Date().getFullYear()} FikarNot Demo Store — no real orders.</span>
+          {isStaff && (
+            <button className="reset" onClick={appActions.resetDemo}>
+              <Ic n="refresh" s={12} /> Reset demo data
+            </button>
+          )}
+        </div>
+      </div>
+    </footer>
+  );
+}
+export function Toast() {
+  const s = useApp();
+  if (!s.toast) return null;
+  return (
+    <div className={"toast" + (s.toast.kind === "err" ? " err" : "")} role="status" aria-live="polite">
+      <span className="dot" />
+      {s.toast.msg}
+    </div>
+  );
+}
+
+/* ============================ product pieces ============================= */
