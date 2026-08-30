@@ -58,7 +58,7 @@ export default function HelpCenterPage() {
   }));
   useDocumentMeta({ title: "Help Center", description: "Frequently asked questions and support for FikarNot." });
   const myTickets = useMemo(
-    () => (s.session?.id ? (s.supportTickets || []).filter((t) => t.userId === s.session.id).slice(0, 5) : []),
+    () => (s.session?.id && Array.isArray(s.supportTickets) ? s.supportTickets.filter((t) => t.userId === s.session.id).slice(0, 5) : []),
     [s.session, s.supportTickets],
   );
   const submit = (e) => {

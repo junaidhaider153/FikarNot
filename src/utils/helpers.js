@@ -17,6 +17,15 @@ export const loadLS = (key, fallback) => {
   }
 };
 
+// Same as loadLS, but guarantees an array is returned even if the stored
+// value is corrupted/malformed (e.g. an old bug wrote a non-array value).
+// Prevents "X.filter is not a function" style crashes on pages that read
+// these keys expecting an array.
+export const loadLSArray = (key) => {
+  const value = loadLS(key, []);
+  return Array.isArray(value) ? value : [];
+};
+
 export const saveLS = (key, value) => {
   try {
     localStorage.setItem(key, JSON.stringify(value));

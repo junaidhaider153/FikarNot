@@ -340,6 +340,12 @@ const gmailTransporter = GMAIL_USER && GMAIL_APP_PASSWORD
   ? nodemailer.createTransport({
       service: "gmail",
       auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
+      // Without these, a blocked/stalled SMTP connection (common on some
+      // hosts) can hang forever with no error, freezing whatever request
+      // is awaiting the send. Fail fast instead.
+      connectionTimeout: 10_000,
+      greetingTimeout: 10_000,
+      socketTimeout: 15_000,
     })
   : null;
 
@@ -1617,12 +1623,16 @@ const server = http.createServer(async (req, res) => {
       const rawVerifyToken = createEmailVerificationToken(id);
       const verifyUrl = `${APP_ORIGIN}/verify-email?token=${encodeURIComponent(rawVerifyToken)}`;
       void sendWelcomeEmail(createdUser);
-      const verifyEmailResult = await sendVerificationEmail(createdUser, verifyUrl);
+      // Fire-and-forget: don't make the person wait on email delivery to
+      // finish registering. If it fails, they can still request a new
+      // verification email later.
+      void sendVerificationEmail(createdUser, verifyUrl).catch((error) => {
+        console.error("[FikarNot] Verification email failed to send", error?.message);
+      });
       const response = { user: safeUser(createdUser), requiresVerification: true };
-      // If we couldn't actually deliver the email (no mail provider configured,
-      // or the provider request failed), hand the link back directly instead of
-      // leaving the person stuck with no way to verify their account.
-      if (!verifyEmailResult.sent) response.devVerificationUrl = verifyUrl;
+      // If email isn't configured at all, hand the link back directly
+      // instead of leaving the person stuck with no way to verify.
+      if (!isProduction && !gmailTransporter) response.devVerificationUrl = verifyUrl;
       send(req, res, 201, response);
       return;
     }
