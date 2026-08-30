@@ -1118,12 +1118,21 @@ export function UsersTab() {
   const s = useApp();
   const [editing, setEditing] = useState(null);
   const [creating, setCreating] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
   const { page, pageCount, pageItems, setPage, start, end, total } = usePagination(s.users, 10);
+  const refresh = async () => {
+    setRefreshing(true);
+    await appActions.refreshUsers();
+    setRefreshing(false);
+  };
   return (
     <>
       <div className="toolbar">
         <span className="result-count">{s.users.length} users</span>
-        <button className="btn btn-dark" style={{ marginLeft: "auto" }} onClick={() => setCreating(true)}>
+        <button className="btn btn-ghost" style={{ marginLeft: "auto" }} onClick={refresh} disabled={refreshing}>
+          <Ic n="refresh" s={15} /> {refreshing ? "Refreshing…" : "Refresh"}
+        </button>
+        <button className="btn btn-dark" onClick={() => setCreating(true)}>
           <Ic n="plus" s={15} /> New user
         </button>
       </div>
@@ -1175,8 +1184,15 @@ export function UsersTab() {
                     </button>
                     <button
                       className="icon-btn"
-                      aria-label={`Delete ${u.name}`}
+                      aria-label={u.role === "admin" ? `${u.name} is an admin — change their role before deleting` : `Delete ${u.name}`}
+                      title={u.role === "admin" ? "Admin accounts can't be deleted here — change the role to editor or customer first" : "Delete user"}
+                      disabled={u.role === "admin"}
+                      style={u.role === "admin" ? { opacity: 0.4, cursor: "not-allowed" } : undefined}
                       onClick={() => {
+                        if (u.role === "admin") {
+                          appActions.toast("Admin accounts can't be deleted from this screen. Change the role to editor or customer first.", "err");
+                          return;
+                        }
                         if (window.confirm(`Delete ${u.name}?`)) appActions.deleteUser(u.id);
                       }}
                     >
@@ -1347,6 +1363,7 @@ export function OrdersTab() {
               <th>Status</th>
               <th>Payment</th>
               <th>Shipment</th>
+              <th style={{ textAlign: "right" }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -1376,6 +1393,18 @@ export function OrdersTab() {
                   )}
                 </td>
                 <td><ShipmentManager order={o} /></td>
+                <td style={{ textAlign: "right" }}>
+                  <button
+                    className="icon-btn"
+                    aria-label={`Delete order ${o.id}`}
+                    title="Delete order"
+                    onClick={() => {
+                      if (window.confirm(`Permanently delete order ${o.id}? This cannot be undone.`)) appActions.deleteOrder(o.id);
+                    }}
+                  >
+                    <Ic n="trash" s={14} />
+                  </button>
+                </td>
               </tr>
             ))}
           </tbody>
@@ -1811,6 +1840,10 @@ function SettingsTab() {
   const [saving, setSaving] = useState(false);
   const [heroUploading, setHeroUploading] = useState(false);
   const [heroUploadError, setHeroUploadError] = useState("");
+  const [logoUploading, setLogoUploading] = useState(false);
+  const [logoUploadError, setLogoUploadError] = useState("");
+  const [heroImages, setHeroImages] = useState([]);
+  const [navLinks, setNavLinks] = useState([]);
   const [form, setForm] = useState({
     storeName: "FikarNot",
     supportEmail: "support@fikarnot.shop",
@@ -1821,6 +1854,7 @@ function SettingsTab() {
     heroSubtitle: "",
     heroSticker: "",
     heroImage: "",
+    logoUrl: "",
     announcement: "",
     aboutTitle: "",
     aboutIntro: "",
@@ -1850,7 +1884,26 @@ function SettingsTab() {
   useEffect(() => {
     let alive = true;
     siteApi.get().then((result) => {
-      if (alive) setForm((current) => ({ ...current, ...(result.settings || {}) }));
+      if (!alive) return;
+      const settings = result.settings || {};
+      setForm((current) => ({ ...current, ...settings }));
+      let parsedHeroImages = [];
+      try {
+        parsedHeroImages = JSON.parse(settings.heroImages || "[]");
+      } catch {
+        parsedHeroImages = [];
+      }
+      if (!Array.isArray(parsedHeroImages) || !parsedHeroImages.length) {
+        parsedHeroImages = settings.heroImage ? [settings.heroImage] : [];
+      }
+      setHeroImages(parsedHeroImages.filter(Boolean));
+      let parsedNavLinks = [];
+      try {
+        parsedNavLinks = JSON.parse(settings.navLinks || "[]");
+      } catch {
+        parsedNavLinks = [];
+      }
+      setNavLinks(Array.isArray(parsedNavLinks) ? parsedNavLinks : []);
     }).catch(() => appActions.toast("Could not load store settings", "err")).finally(() => alive && setLoading(false));
     return () => { alive = false; };
   }, []);
@@ -1862,22 +1915,50 @@ function SettingsTab() {
     try {
       const dataUrl = await prepareImageFile(file);
       const result = await uploadsApi.uploadImage(dataUrl, file.name);
-      set("heroImage", result.url);
-      appActions.toast("Hero image uploaded. Save settings to publish it.");
+      setHeroImages((current) => [...current, result.url]);
+      appActions.toast("Hero image added. Save settings to publish it.");
     } catch (error) {
       setHeroUploadError(error.message || "Could not upload hero image.");
     } finally {
       setHeroUploading(false);
     }
   };
+  const removeHeroImage = (index) => setHeroImages((current) => current.filter((_, i) => i !== index));
+  const uploadLogo = async (file) => {
+    if (!file) return;
+    setLogoUploading(true);
+    setLogoUploadError("");
+    try {
+      const dataUrl = await prepareImageFile(file, { maxDimension: 400 });
+      const result = await uploadsApi.uploadImage(dataUrl, file.name);
+      set("logoUrl", result.url);
+      appActions.toast("Logo uploaded. Save settings to publish it.");
+    } catch (error) {
+      setLogoUploadError(error.message || "Could not upload logo.");
+    } finally {
+      setLogoUploading(false);
+    }
+  };
+  const addNavLink = () => setNavLinks((current) => [...current, { label: "", url: "" }]);
+  const updateNavLink = (index, key, value) =>
+    setNavLinks((current) => current.map((link, i) => (i === index ? { ...link, [key]: value } : link)));
+  const removeNavLink = (index) => setNavLinks((current) => current.filter((_, i) => i !== index));
   const save = async (event) => {
     event.preventDefault();
     setSaving(true);
     try {
-      await siteApi.update(form);
-      appActions.toast("Store settings saved");
-    } catch (error) {
-      appActions.toast(error.message || "Could not save settings", "err");
+      const cleanNavLinks = navLinks
+        .map((link) => ({ label: (link.label || "").trim(), url: (link.url || "").trim() }))
+        .filter((link) => link.label && link.url);
+      const payload = {
+        ...form,
+        heroImage: heroImages[0] || "",
+        heroImages: JSON.stringify(heroImages),
+        navLinks: JSON.stringify(cleanNavLinks),
+      };
+      await appActions.updateSiteSettings(payload);
+    } catch {
+      // toast already shown by updateSiteSettings
     } finally {
       setSaving(false);
     }
@@ -1890,6 +1971,22 @@ function SettingsTab() {
       <div className="f-grid">
         <div><label className="lbl" htmlFor="settings-store-name">Store name</label><input id="settings-store-name" className="input" value={form.storeName} onChange={(e) => set("storeName", e.target.value)} /></div>
         <div><label className="lbl" htmlFor="settings-support-email">Support email</label><input id="settings-support-email" className="input" type="email" value={form.supportEmail} onChange={(e) => set("supportEmail", e.target.value)} /></div>
+        <div className="f-full">
+          <label className="lbl" htmlFor="settings-logo">Store logo</label>
+          <div className="media-upload-inline">
+            <input id="settings-logo" className="input" placeholder="https://… or upload from device" value={form.logoUrl} onChange={(e) => set("logoUrl", e.target.value)} />
+            <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
+              <label className="btn btn-ghost btn-sm" style={{ cursor: "pointer" }}>
+                {logoUploading ? "Uploading…" : "Upload from device"}
+                <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml" hidden disabled={logoUploading} onChange={(e) => { uploadLogo(e.target.files?.[0]); e.target.value = ""; }} />
+              </label>
+              <span className="image-hint">Square image works best · up to {Math.round(MAX_IMAGE_BYTES / (1024 * 1024))} MB</span>
+              {form.logoUrl && <button type="button" className="btn btn-ghost btn-sm" onClick={() => set("logoUrl", "")}>Remove logo</button>}
+            </div>
+            {logoUploadError && <p className="f-err">{logoUploadError}</p>}
+            {form.logoUrl && <div className="hero-image-setting-preview" style={{ maxWidth: 80 }}><img src={form.logoUrl} alt="Current logo preview" /></div>}
+          </div>
+        </div>
         <div className="f-full"><label className="lbl" htmlFor="settings-kicker">Hero kicker</label><input id="settings-kicker" className="input" value={form.heroKicker} onChange={(e) => set("heroKicker", e.target.value)} /></div>
         <div className="f-full"><label className="lbl" htmlFor="settings-eyebrow">Hero eyebrow</label><input id="settings-eyebrow" className="input" value={form.heroEyebrow} onChange={(e) => set("heroEyebrow", e.target.value)} /></div>
         <div><label className="lbl" htmlFor="settings-title">Hero title</label><input id="settings-title" className="input" value={form.heroTitle} onChange={(e) => set("heroTitle", e.target.value)} /></div>
@@ -1897,21 +1994,42 @@ function SettingsTab() {
         <div className="f-full"><label className="lbl" htmlFor="settings-subtitle">Hero subtitle</label><textarea id="settings-subtitle" className="textarea" value={form.heroSubtitle} onChange={(e) => set("heroSubtitle", e.target.value)} /></div>
         <div><label className="lbl" htmlFor="settings-sticker">Hero sticker</label><input id="settings-sticker" className="input" value={form.heroSticker} onChange={(e) => set("heroSticker", e.target.value)} /></div>
         <div className="f-full">
-          <label className="lbl" htmlFor="settings-hero-image">Hero image</label>
+          <label className="lbl" htmlFor="settings-hero-image">Hero slider images</label>
           <div className="media-upload-inline">
-            <input id="settings-hero-image" className="input" placeholder="https://… or upload from device" value={form.heroImage} onChange={(e) => set("heroImage", e.target.value)} />
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <label className="btn btn-ghost btn-sm" style={{ cursor: "pointer" }}>
-                {heroUploading ? "Uploading…" : "Upload from device"}
-                <input type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden disabled={heroUploading} onChange={(e) => { uploadHeroImage(e.target.files?.[0]); e.target.value = ""; }} />
+                {heroUploading ? "Uploading…" : "Add an image"}
+                <input id="settings-hero-image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden disabled={heroUploading} onChange={(e) => { uploadHeroImage(e.target.files?.[0]); e.target.value = ""; }} />
               </label>
-              <span className="image-hint">JPG, PNG, WebP or GIF · up to {Math.round(MAX_IMAGE_BYTES / (1024 * 1024))} MB</span>
+              <span className="image-hint">Add as many as you like · they play as a slider on the homepage · up to {Math.round(MAX_IMAGE_BYTES / (1024 * 1024))} MB each</span>
             </div>
             {heroUploadError && <p className="f-err">{heroUploadError}</p>}
-            {form.heroImage && <div className="hero-image-setting-preview"><img src={form.heroImage} alt="Current FikarNot hero preview" /></div>}
+            {heroImages.length > 0 && (
+              <div className="hero-image-list" style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
+                {heroImages.map((src, i) => (
+                  <div className="hero-image-setting-preview" key={`${src}-${i}`} style={{ position: "relative", maxWidth: 140 }}>
+                    <img src={src} alt={`Hero slide ${i + 1}`} />
+                    <button type="button" className="btn btn-danger btn-sm" style={{ marginTop: 6, width: "100%" }} onClick={() => removeHeroImage(i)}>Remove</button>
+                  </div>
+                ))}
+              </div>
+            )}
+            {!heroImages.length && <p style={{ color: "var(--ink2)", fontSize: 13, marginTop: 8 }}>No hero images yet — the homepage will fall back to the default artwork.</p>}
           </div>
         </div>
-        <div className="f-full"><label className="lbl" htmlFor="settings-announcement">Announcement bar</label><input id="settings-announcement" className="input" value={form.announcement} onChange={(e) => set("announcement", e.target.value)} /></div>
+        <div className="f-full"><label className="lbl" htmlFor="settings-announcement">Announcement bar</label><input id="settings-announcement" className="input" value={form.announcement} onChange={(e) => set("announcement", e.target.value)} /><p style={{ color: "var(--ink2)", fontSize: 12, marginTop: 4 }}>Separate multiple messages with a newline, a pipe ( | ) or a middle dot ( · ) to scroll several items.</p></div>
+        <div className="f-full">
+          <span className="lbl">Extra navigation links</span>
+          {navLinks.map((link, i) => (
+            <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
+              <input className="input" placeholder="Label (e.g. Blog)" value={link.label} onChange={(e) => updateNavLink(i, "label", e.target.value)} style={{ flex: "1 1 160px" }} />
+              <input className="input" placeholder="/blog or https://…" value={link.url} onChange={(e) => updateNavLink(i, "url", e.target.value)} style={{ flex: "2 1 220px" }} />
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeNavLink(i)}>Remove</button>
+            </div>
+          ))}
+          <button type="button" className="btn btn-ghost btn-sm" onClick={addNavLink}>+ Add nav link</button>
+          <p style={{ color: "var(--ink2)", fontSize: 12, marginTop: 6 }}>These appear in the header (after &quot;Shop&quot;) and in the mobile menu.</p>
+        </div>
         <div className="f-full"><h4 className="display" style={{ margin: "12px 0 4px" }}>Commerce & checkout</h4></div>
         <div><label className="lbl" htmlFor="settings-currency">Currency</label><input id="settings-currency" className="input" value={form.currency} onChange={(e) => set("currency", e.target.value.toUpperCase())} maxLength={3} /></div>
         <div><label className="lbl" htmlFor="settings-locale">Currency locale</label><input id="settings-locale" className="input" value={form.currencyLocale} onChange={(e) => set("currencyLocale", e.target.value)} /></div>

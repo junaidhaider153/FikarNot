@@ -1193,6 +1193,21 @@ export const appActions = {
     }
   },
 
+  async refreshUsers() {
+    try {
+      const { users } = await usersApi.list();
+      if (Array.isArray(users)) {
+        setState({ users });
+        saveLS(STORAGE_KEYS.users, users);
+      }
+      toast("User list refreshed");
+      return true;
+    } catch (error) {
+      toast(error.message || "Could not refresh users", "err");
+      return false;
+    }
+  },
+
   async deleteUser(id) {
     if (state.session?.id === id) {
       toast("You can't delete yourself", "err");
@@ -1206,7 +1221,23 @@ export const appActions = {
       toast("User deleted");
       return true;
     } catch (error) {
-      toast(error.message || "Unable to delete user", "err");
+      if (error.code === "USER_NOT_FOUND") {
+        // The list we're showing no longer matches the server (stale cache,
+        // or someone else already removed this user). Re-sync from the
+        // server instead of just failing again on the next click.
+        try {
+          const { users } = await usersApi.list();
+          if (Array.isArray(users)) {
+            setState({ users });
+            saveLS(STORAGE_KEYS.users, users);
+          }
+        } catch {
+          // ignore — we'll still show the toast below
+        }
+        toast("That user no longer exists — the list has been refreshed.", "err");
+      } else {
+        toast(error.message || "Unable to delete user", "err");
+      }
       return false;
     }
   },
@@ -1224,7 +1255,20 @@ export const appActions = {
       toast("Role updated");
       return true;
     } catch (error) {
-      toast(error.message || "Unable to update role", "err");
+      if (error.code === "USER_NOT_FOUND") {
+        try {
+          const { users } = await usersApi.list();
+          if (Array.isArray(users)) {
+            setState({ users });
+            saveLS(STORAGE_KEYS.users, users);
+          }
+        } catch {
+          // ignore — we'll still show the toast below
+        }
+        toast("That user no longer exists — the list has been refreshed.", "err");
+      } else {
+        toast(error.message || "Unable to update role", "err");
+      }
       return false;
     }
   },
@@ -1563,6 +1607,32 @@ export const appActions = {
       return true;
     } catch (error) {
       toast(error.message || "Order status could not be updated", "err");
+      return false;
+    }
+  },
+
+  async updateSiteSettings(settings) {
+    try {
+      const { settings: saved } = await siteApi.update(settings);
+      setState({ siteSettings: saved });
+      toast("Store settings saved");
+      return saved;
+    } catch (error) {
+      toast(error.message || "Could not save settings", "err");
+      throw error;
+    }
+  },
+
+  async deleteOrder(id) {
+    try {
+      await ordersApi.remove(id);
+      const orders = state.orders.filter((order) => order.id !== id);
+      setState({ orders });
+      saveLS(STORAGE_KEYS.orders, orders);
+      toast("Order deleted");
+      return true;
+    } catch (error) {
+      toast(error.message || "Unable to delete order", "err");
       return false;
     }
   },

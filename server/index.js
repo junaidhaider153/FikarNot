@@ -4,6 +4,7 @@ import fs from "node:fs";
 import path from "node:path";
 import { DatabaseSync } from "node:sqlite";
 import { fileURLToPath } from "node:url";
+import nodemailer from "nodemailer";
 import { catalogCategories, catalogProducts } from "./catalogSeed.js";
 
 const __dirname = path.dirname(fileURLToPath(import.meta.url));
@@ -327,19 +328,27 @@ const MAX_RESET_REQUESTS = 5;
 const shouldSeedDemoData = process.env.FIKARNOT_SEED_DEMO_DATA === "1" || (!isProduction && process.env.FIKARNOT_SEED_DEMO_DATA !== "0");
 const RESEND_API_KEY = String(process.env.RESEND_API_KEY || "").trim();
 const RESEND_FROM_EMAIL = String(process.env.RESEND_FROM_EMAIL || "").trim();
+const GMAIL_USER = String(process.env.GMAIL_USER || "").trim();
+const GMAIL_APP_PASSWORD = String(process.env.GMAIL_APP_PASSWORD || "").trim();
 const APP_ORIGIN = String(process.env.FIKARNOT_APP_URL || FRONTEND_ORIGIN).replace(/\/$/, "");
 const API_PUBLIC_ORIGIN = String(process.env.FIKARNOT_API_PUBLIC_URL || "").trim().replace(/\/$/, "");
 const PAYFAST_SECRET_WORD = String(process.env.PAYFAST_SECRET_WORD || "").trim();
 const MOCK_PAYMENTS_ENABLED = process.env.FIKARNOT_ENABLE_MOCK_PAYMENTS === "1" && !isProduction;
 const UPLOADS_PUBLIC_BASE_URL = String(process.env.FIKARNOT_UPLOADS_PUBLIC_BASE_URL || "").trim().replace(/\/$/, "");
 
+const gmailTransporter = GMAIL_USER && GMAIL_APP_PASSWORD
+  ? nodemailer.createTransport({
+      service: "gmail",
+      auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
+    })
+  : null;
+
 const validateProductionStartupConfig = () => {
   if (!isProduction) return;
   const errors = [];
   if (!String(process.env.FIKARNOT_FRONTEND_ORIGIN || "").trim()) errors.push("FIKARNOT_FRONTEND_ORIGIN is required in production.");
   if (!String(process.env.FIKARNOT_APP_URL || "").trim()) errors.push("FIKARNOT_APP_URL is required in production.");
-  if (!RESEND_API_KEY) errors.push("RESEND_API_KEY is required in production.");
-  if (!RESEND_FROM_EMAIL) errors.push("RESEND_FROM_EMAIL is required in production.");
+  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) errors.push("GMAIL_USER and GMAIL_APP_PASSWORD are required in production.");
   const appUrl = String(process.env.FIKARNOT_APP_URL || "").trim();
   if (appUrl && !appUrl.startsWith("https://")) errors.push("FIKARNOT_APP_URL must use HTTPS in production.");
   if (process.env.FIKARNOT_SEED_DEMO_DATA === "1") errors.push("FIKARNOT_SEED_DEMO_DATA must be 0 in production.");
@@ -465,7 +474,8 @@ const ensureCsrfCookie = (req, res) => {
   if (!value) {
     value = crypto.randomBytes(24).toString("base64url");
     const secure = isProduction ? "; Secure" : "";
-    appendSetCookie(res, `${CSRF_COOKIE_NAME}=${value}; SameSite=Lax; Path=/; Max-Age=${SESSION_TTL_MS / 1000}${secure}`);
+    const sameSite = isProduction ? "None" : "Lax";
+    appendSetCookie(res, `${CSRF_COOKIE_NAME}=${value}; SameSite=${sameSite}; Path=/; Max-Age=${SESSION_TTL_MS / 1000}${secure}`);
   }
   return value;
 };
@@ -596,7 +606,7 @@ const getTwoFactorChallenge = (raw) => raw ? db.prepare("SELECT * FROM two_facto
 const consumeTwoFactorChallenge = (raw) => { const row = getTwoFactorChallenge(raw); if (!row) return null; db.prepare("DELETE FROM two_factor_challenges WHERE token_hash=?").run(sha256(raw)); return row; };
 const otpauthUri = (secret, email) => `otpauth://totp/FikarNot:${encodeURIComponent(email)}?secret=${secret}&issuer=FikarNot&algorithm=SHA1&digits=6&period=30`;
 
-const validatePassword = (password) => typeof password === "string" && password.length >= 12;
+const validatePassword = (password) => typeof password === "string" && password.length >= 6;
 const validateName = (name) => typeof name === "string" && name.trim().length >= 2;
 const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(email));
 
@@ -605,10 +615,14 @@ const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmai
 // so the real password/hash never leaves the server. This is a *soft* check —
 // on any network error, timeout, or non-2xx response we fail OPEN (allow the
 // password through) rather than blocking registration/reset because a third
-// party is unreachable. Set FIKARNOT_DISABLE_BREACH_CHECK=1 to skip it entirely
-// (e.g. in an environment with no outbound internet access, or during tests).
+// party is unreachable.
+//
+// Disabled by default (opt-in) since it was blocking real customer signups
+// whose passwords happened to appear in a breach corpus with no way to
+// override it in the UI. Set FIKARNOT_ENABLE_BREACH_CHECK=1 in your
+// environment to turn it back on.
 const isPasswordPwned = async (password) => {
-  if (process.env.FIKARNOT_DISABLE_BREACH_CHECK === "1") return false;
+  if (process.env.FIKARNOT_ENABLE_BREACH_CHECK !== "1") return false;
   try {
     const sha1 = crypto.createHash("sha1").update(password).digest("hex").toUpperCase();
     const prefix = sha1.slice(0, 5);
@@ -645,8 +659,8 @@ const ensureSeedUsers = () => {
       const now = Date.now();
       const email = process.env.FIKARNOT_ADMIN_EMAIL || "admin@fikarnot.shop";
       const password = crypto.randomBytes(12).toString("base64url");
-      db.prepare("INSERT INTO users (id,name,email,password_hash,role,created_at,updated_at) VALUES (?,?,?,?,?,?,?)").run(
-        uid("u-"), "Admin", normalizeEmail(email), hashPassword(password), "admin", now, now,
+      db.prepare("INSERT INTO users (id,name,email,password_hash,role,created_at,updated_at,email_verified_at) VALUES (?,?,?,?,?,?,?,?)").run(
+        uid("u-"), "Admin", normalizeEmail(email), hashPassword(password), "admin", now, now, now,
       );
       console.warn(
         `[FikarNot] No users found. Created a one-time admin account.\n  email: ${normalizeEmail(email)}\n  password: ${password}\nChange this password immediately after first login — it will not be shown again.`,
@@ -969,6 +983,9 @@ const DEFAULT_SITE_SETTINGS = {
   heroSubtitle: "Discover a refined mix of tech, desk and everyday carry — selected for utility, character and the way they fit into real life.",
   heroSticker: "NEW SEASON DROP",
   heroImage: "",
+  heroImages: "[]",
+  logoUrl: "",
+  navLinks: "[]",
   announcement: "Free shipping over PKR 5,000 · 30-day returns",
   aboutTitle: "Thoughtful things for everyday life.",
   aboutIntro: "FikarNot is a curated e-commerce project built around a calmer, more considered way to discover useful products.",
@@ -1062,15 +1079,17 @@ const createSession = (userId) => {
 
 const setSessionCookie = (res, rawToken) => {
   const secure = isProduction ? "; Secure" : "";
+  const sameSite = isProduction ? "None" : "Lax";
   res.setHeader(
     "Set-Cookie",
-    `${COOKIE_NAME}=${encodeURIComponent(rawToken)}; HttpOnly; SameSite=Lax; Path=/; Max-Age=${SESSION_TTL_MS / 1000}${secure}`,
+    `${COOKIE_NAME}=${encodeURIComponent(rawToken)}; HttpOnly; SameSite=${sameSite}; Path=/; Max-Age=${SESSION_TTL_MS / 1000}${secure}`,
   );
 };
 
 const clearSessionCookie = (res) => {
   const secure = isProduction ? "; Secure" : "";
-  res.setHeader("Set-Cookie", `${COOKIE_NAME}=; HttpOnly; SameSite=Lax; Path=/; Max-Age=0${secure}`);
+  const sameSite = isProduction ? "None" : "Lax";
+  res.setHeader("Set-Cookie", `${COOKIE_NAME}=; HttpOnly; SameSite=${sameSite}; Path=/; Max-Age=0${secure}`);
 };
 
 const escapeHtml = (value) => String(value ?? "").replace(/[&<>'"]/g, (ch) => ({ "&": "&amp;", "<": "&lt;", ">": "&gt;", "'": "&#39;", '"': "&quot;" })[ch]);
@@ -1087,33 +1106,20 @@ const reportOperationalError = async (error, req) => {
 
 const sendTransactionalEmail = async ({ to, subject, html, text, idempotencyKey }) => {
   if (!to) return { sent: false, reason: "missing_recipient" };
-  if (!RESEND_API_KEY || !RESEND_FROM_EMAIL) {
+  if (!gmailTransporter) {
     if (!isProduction) console.log(`[FikarNot] Email not configured. Would send: ${subject} -> ${to}`);
     return { sent: false, reason: "email_not_configured" };
   }
   try {
-    const response = await fetch("https://api.resend.com/emails", {
-      method: "POST",
-      signal: AbortSignal.timeout(10_000),
-      headers: {
-        "Content-Type": "application/json",
-        Authorization: `Bearer ${RESEND_API_KEY}`,
-        ...(idempotencyKey ? { "Idempotency-Key": idempotencyKey } : {}),
-      },
-      body: JSON.stringify({
-        from: RESEND_FROM_EMAIL,
-        to: [to],
-        subject,
-        html,
-        text,
-      }),
+    const info = await gmailTransporter.sendMail({
+      from: `FikarNot <${GMAIL_USER}>`,
+      to,
+      subject,
+      html,
+      text,
+      headers: idempotencyKey ? { "X-Idempotency-Key": idempotencyKey } : undefined,
     });
-    const payload = await response.json().catch(() => ({}));
-    if (!response.ok) {
-      console.error("[FikarNot] Email provider rejected message", response.status, payload);
-      return { sent: false, reason: "provider_error" };
-    }
-    return { sent: true, id: payload?.id || null };
+    return { sent: true, id: info?.messageId || null };
   } catch (error) {
     console.error("[FikarNot] Email provider request failed", error.message);
     return { sent: false, reason: "provider_unreachable" };
@@ -1591,7 +1597,7 @@ const server = http.createServer(async (req, res) => {
       if (!validateName(name)) return send(req, res, 400, { error: "INVALID_NAME", message: "Name must be at least 2 characters." });
       if (!validateEmail(email)) return send(req, res, 400, { error: "INVALID_EMAIL", message: "Enter a valid email address." });
       if (!validatePassword(password))
-        return send(req, res, 400, { error: "WEAK_PASSWORD", message: "Password must be at least 12 characters." });
+        return send(req, res, 400, { error: "WEAK_PASSWORD", message: "Password must be at least 6 characters." });
       if (await isPasswordPwned(password))
         return send(req, res, 400, { error: "PASSWORD_COMPROMISED", message: "That password has appeared in a known data breach. Please choose a different one." });
       const exists = db.prepare("SELECT id FROM users WHERE email=?").get(email);
@@ -1613,7 +1619,7 @@ const server = http.createServer(async (req, res) => {
       void sendWelcomeEmail(createdUser);
       void sendVerificationEmail(createdUser, verifyUrl);
       const response = { user: safeUser(createdUser), requiresVerification: true };
-      if (!isProduction && (!RESEND_API_KEY || !RESEND_FROM_EMAIL)) response.devVerificationUrl = verifyUrl;
+      if (!isProduction && !gmailTransporter) response.devVerificationUrl = verifyUrl;
       send(req, res, 201, response);
       return;
     }
@@ -1681,10 +1687,10 @@ const server = http.createServer(async (req, res) => {
         const rawToken = createEmailVerificationToken(user.id);
         verificationUrl = `${APP_ORIGIN}/verify-email?token=${encodeURIComponent(rawToken)}`;
         void sendVerificationEmail(user, verificationUrl);
-        if (!isProduction && (!RESEND_API_KEY || !RESEND_FROM_EMAIL)) console.log(`[FikarNot] Email verification link for ${email}: ${verificationUrl}`);
+        if (!isProduction && !gmailTransporter) console.log(`[FikarNot] Email verification link for ${email}: ${verificationUrl}`);
       }
       const response = { ok: true, message: "If the account exists and still needs verification, a new verification link has been prepared." };
-      if (verificationUrl && !isProduction && (!RESEND_API_KEY || !RESEND_FROM_EMAIL)) response.devVerificationUrl = verificationUrl;
+      if (verificationUrl && !isProduction && !gmailTransporter) response.devVerificationUrl = verificationUrl;
       return send(req, res, 200, response);
     }
 
@@ -1704,11 +1710,11 @@ const server = http.createServer(async (req, res) => {
         const rawToken = createPasswordResetToken(user.id);
         resetUrl = `${APP_ORIGIN}/reset-password?token=${encodeURIComponent(rawToken)}`;
         void sendPasswordResetEmail(db.prepare("SELECT * FROM users WHERE id=?").get(user.id), resetUrl);
-        if (!isProduction && (!RESEND_API_KEY || !RESEND_FROM_EMAIL)) console.log(`[FikarNot] Password reset link for ${email}: ${resetUrl}`);
+        if (!isProduction && !gmailTransporter) console.log(`[FikarNot] Password reset link for ${email}: ${resetUrl}`);
       }
 
       const response = { ok: true, message: "If an account exists for that email, a password reset link has been prepared." };
-      if (resetUrl && (!RESEND_API_KEY || !RESEND_FROM_EMAIL) && !isProduction) response.devResetUrl = resetUrl;
+      if (resetUrl && !gmailTransporter && !isProduction) response.devResetUrl = resetUrl;
       return send(req, res, 200, response);
     }
 
@@ -1727,7 +1733,7 @@ const server = http.createServer(async (req, res) => {
       if (!resetRow) return send(req, res, 400, { error: "INVALID_RESET_TOKEN", message: "This reset link is invalid or has expired." });
       if (!validatePassword(newPassword)) {
         db.prepare("UPDATE password_reset_tokens SET used_at=NULL WHERE token_hash=?").run(sha256(rawToken));
-        return send(req, res, 400, { error: "WEAK_PASSWORD", message: "Password must be at least 12 characters." });
+        return send(req, res, 400, { error: "WEAK_PASSWORD", message: "Password must be at least 6 characters." });
       }
       if (await isPasswordPwned(newPassword)) {
         db.prepare("UPDATE password_reset_tokens SET used_at=NULL WHERE token_hash=?").run(sha256(rawToken));
@@ -1826,7 +1832,7 @@ const server = http.createServer(async (req, res) => {
         return send(req, res, 401, { error: "INVALID_PASSWORD", message: "Current password is incorrect." });
       }
       if (!validatePassword(newPassword))
-        return send(req, res, 400, { error: "WEAK_PASSWORD", message: "New password must be at least 12 characters." });
+        return send(req, res, 400, { error: "WEAK_PASSWORD", message: "New password must be at least 6 characters." });
       if (await isPasswordPwned(newPassword))
         return send(req, res, 400, { error: "PASSWORD_COMPROMISED", message: "That password has appeared in a known data breach. Please choose a different one." });
       db.prepare("UPDATE users SET password_hash=?,updated_at=? WHERE id=?").run(hashPassword(newPassword), Date.now(), user.id);
@@ -1972,7 +1978,7 @@ const server = http.createServer(async (req, res) => {
       if (duplicate) return send(req, res, 409, { error: 'EMAIL_IN_USE', message: 'Email is already in use.' });
       const now = Date.now();
       if (existing) {
-        if (password && !validatePassword(password)) return send(req, res, 400, { error: 'WEAK_PASSWORD', message: 'Password must be at least 12 characters.' });
+        if (password && !validatePassword(password)) return send(req, res, 400, { error: 'WEAK_PASSWORD', message: 'Password must be at least 6 characters.' });
         if (user.id === existing.id && role !== existing.role) return send(req, res, 400, { error: 'SELF_ROLE_CHANGE', message: 'You cannot change your own role.' });
         if (password) {
           db.prepare("UPDATE users SET name=?,email=?,role=?,password_hash=?,updated_at=? WHERE id=?").run(name,email,role,hashPassword(password),now,id);
@@ -1980,7 +1986,7 @@ const server = http.createServer(async (req, res) => {
           db.prepare("UPDATE users SET name=?,email=?,role=?,updated_at=? WHERE id=?").run(name,email,role,now,id);
         }
       } else {
-        if (!validatePassword(password)) return send(req, res, 400, { error: 'WEAK_PASSWORD', message: 'A password of at least 12 characters is required.' });
+        if (!validatePassword(password)) return send(req, res, 400, { error: 'WEAK_PASSWORD', message: 'A password of at least 6 characters is required.' });
         db.prepare("INSERT INTO users (id,name,email,password_hash,role,created_at,updated_at,email_verified_at) VALUES (?,?,?,?,?,?,?,?)").run(id,name,email,hashPassword(password),role,now,now,now);
       }
       if (existing) {
@@ -2032,6 +2038,18 @@ const server = http.createServer(async (req, res) => {
       if (!user) return;
       const remote = listOrders(user, parsePagination(url));
       return send(req, res, 200, { ...remote, migrated: db.prepare("SELECT value FROM catalog_meta WHERE key='orders_migrated'").get()?.value === "1" });
+    }
+
+    if (req.method === "DELETE" && url.pathname.match(/^\/api\/orders\/[^/]+$/)) {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!["admin", "editor"].includes(user.role)) return send(req, res, 403, { error: "FORBIDDEN", message: "Staff permission required." });
+      const id = decodeURIComponent(url.pathname.split("/").pop());
+      const order = db.prepare("SELECT id FROM orders WHERE id=?").get(id);
+      if (!order) return send(req, res, 404, { error: "ORDER_NOT_FOUND", message: "Order not found." });
+      db.prepare("DELETE FROM orders WHERE id=?").run(id);
+      auditLog(user.id, "order.delete", "order", id);
+      return send(req, res, 200, { ok: true });
     }
 
     if (req.method === "GET" && url.pathname.match(/^\/api\/orders\/[^/]+\/invoice$/)) {

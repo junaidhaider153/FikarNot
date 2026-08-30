@@ -43,8 +43,8 @@ export default function LoginPage() {
       setErr("Please enter your name");
       return;
     }
-    if (mode === "register" && pass.length < 12) {
-      setErr("Password must be at least 12 characters");
+    if (mode === "register" && pass.length < 6) {
+      setErr("Password must be at least 6 characters");
       return;
     }
     setBusy(true);

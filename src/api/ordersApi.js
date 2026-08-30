@@ -13,6 +13,7 @@ export const ordersApi = {
     body: JSON.stringify(payload),
   }),
   cancel: (id) => request(`/api/orders/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
+  remove: (id) => request(`/api/orders/${encodeURIComponent(id)}`, { method: "DELETE" }),
   uploadPaymentProof: (id, payload) => request(`/api/orders/${encodeURIComponent(id)}/payment-proof`, { method: "POST", body: JSON.stringify(payload) }),
   confirmPayment: (id, payload = {}) => request(`/api/admin/orders/${encodeURIComponent(id)}/confirm-payment`, { method: "POST", body: JSON.stringify(payload) }),
   setFulfilment: (id, payload) => request(`/api/admin/orders/${encodeURIComponent(id)}/fulfilment`, { method: "POST", body: JSON.stringify(payload) }),
