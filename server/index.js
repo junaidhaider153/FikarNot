@@ -1617,9 +1617,12 @@ const server = http.createServer(async (req, res) => {
       const rawVerifyToken = createEmailVerificationToken(id);
       const verifyUrl = `${APP_ORIGIN}/verify-email?token=${encodeURIComponent(rawVerifyToken)}`;
       void sendWelcomeEmail(createdUser);
-      void sendVerificationEmail(createdUser, verifyUrl);
+      const verifyEmailResult = await sendVerificationEmail(createdUser, verifyUrl);
       const response = { user: safeUser(createdUser), requiresVerification: true };
-      if (!isProduction && !gmailTransporter) response.devVerificationUrl = verifyUrl;
+      // If we couldn't actually deliver the email (no mail provider configured,
+      // or the provider request failed), hand the link back directly instead of
+      // leaving the person stuck with no way to verify their account.
+      if (!verifyEmailResult.sent) response.devVerificationUrl = verifyUrl;
       send(req, res, 201, response);
       return;
     }
@@ -1689,6 +1692,9 @@ const server = http.createServer(async (req, res) => {
         void sendVerificationEmail(user, verificationUrl);
         if (!isProduction && !gmailTransporter) console.log(`[FikarNot] Email verification link for ${email}: ${verificationUrl}`);
       }
+      // Same reasoning as /forgot-password: this takes a bare email with no proof
+      // of ownership, and completing verification logs the caller in as that user
+      // — so the fallback link only appears outside production, never here.
       const response = { ok: true, message: "If the account exists and still needs verification, a new verification link has been prepared." };
       if (verificationUrl && !isProduction && !gmailTransporter) response.devVerificationUrl = verificationUrl;
       return send(req, res, 200, response);
@@ -1713,6 +1719,10 @@ const server = http.createServer(async (req, res) => {
         if (!isProduction && !gmailTransporter) console.log(`[FikarNot] Password reset link for ${email}: ${resetUrl}`);
       }
 
+      // NOTE: unlike /register below, this deliberately stays gated to non-production.
+      // This endpoint accepts a bare email with no proof of ownership, and a reset
+      // link grants a full password change — echoing it back to *any* caller
+      // whenever delivery fails would be an account-takeover hole, not a convenience.
       const response = { ok: true, message: "If an account exists for that email, a password reset link has been prepared." };
       if (resetUrl && !gmailTransporter && !isProduction) response.devResetUrl = resetUrl;
       return send(req, res, 200, response);
