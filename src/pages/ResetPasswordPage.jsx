@@ -43,8 +43,8 @@ export default function ResetPasswordPage() {
   const submit = async (e) => {
     e.preventDefault();
     setError("");
-    if (password.length < 12) {
-      setError("Password must be at least 12 characters.");
+    if (password.length < 8) {
+      setError("Password must be at least 8 characters.");
       return;
     }
     if (password !== confirm) {
@@ -86,7 +86,7 @@ export default function ResetPasswordPage() {
           <div>
             <p className="eyebrow">Account recovery</p>
             <h1 className="auth-title display">Set a new password</h1>
-            <p className="auth-sub">Choose a new password with at least 12 characters.</p>
+            <p className="auth-sub">Choose a new password with at least 8 characters.</p>
           </div>
         </div>
 
@@ -114,7 +114,7 @@ export default function ResetPasswordPage() {
                 value={password}
                 onChange={(e) => setPassword(e.target.value)}
                 autoComplete="new-password"
-                placeholder="At least 12 characters"
+                placeholder="At least 8 characters"
               />
             </div>
             <div className="field">

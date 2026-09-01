@@ -47,7 +47,8 @@ try {
 
 const envExample = read(".env.example");
 const forbiddenEnvPatterns = [
-  /^RESEND_API_KEY=.+/m,
+  /^GMAIL_OAUTH_CLIENT_SECRET=.+/m,
+  /^GMAIL_OAUTH_REFRESH_TOKEN=.+/m,
   /^DATABASE_URL=.+/m,
   /^SESSION_SECRET=.+/m,
 ];

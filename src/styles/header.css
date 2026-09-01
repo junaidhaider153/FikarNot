@@ -1,0 +1,412 @@
+/* header */
+.hdr {
+  position: sticky;
+  top: 0;
+  z-index: 60;
+  background: #17150f;
+  color: #fff;
+}
+.hdr-inner {
+  display: flex;
+  align-items: center;
+  gap: 20px;
+  height: 62px;
+}
+.logo {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  text-decoration: none;
+  font: 700 18px "Space Grotesk";
+  letter-spacing: 0.02em;
+}
+.logo-mark {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  background: var(--lime);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  font-weight: 700;
+}
+.logo-image {
+  width: 28px;
+  height: 28px;
+  border-radius: 8px;
+  object-fit: cover;
+  display: block;
+}
+.nav {
+  display: flex;
+  gap: 4px;
+  margin-left: 6px;
+}
+.hdr-link {
+  padding: 8px 12px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-weight: 500;
+  font-size: 14px;
+  color: #cfc9bd;
+  transition: 0.15s;
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+}
+.hdr-link:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.08);
+}
+.hdr-link.active {
+  color: var(--lime);
+}
+.hdr-actions {
+  margin-left: auto;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.cart-btn {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 38px;
+  height: 38px;
+  border-radius: 12px;
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  text-decoration: none;
+  transition: 0.15s;
+}
+.cart-btn:hover {
+  background: var(--lime);
+  color: var(--ink);
+}
+.count-badge {
+  position: absolute;
+  top: -6px;
+  right: -6px;
+  min-width: 19px;
+  height: 19px;
+  padding: 0 5px;
+  border-radius: 999px;
+  background: var(--lime);
+  color: var(--ink);
+  font: 700 11px/19px "Space Grotesk";
+  text-align: center;
+}
+.user-chip {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 13px;
+  font-weight: 600;
+}
+.avatar {
+  width: 30px;
+  height: 30px;
+  border-radius: 50%;
+  background: var(--lime);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  font: 700 12px "Space Grotesk";
+  flex: none;
+}
+.icon-btn {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  border: 1px solid var(--line);
+  background: #fff;
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  color: var(--ink);
+  transition: 0.15s;
+}
+.icon-btn:hover {
+  background: #f1ede2;
+}
+.icon-btn.dark {
+  background: rgba(255, 255, 255, 0.1);
+  border-color: rgba(255, 255, 255, 0.15);
+  color: #fff;
+}
+.icon-btn.dark:hover {
+  background: var(--lime);
+  color: var(--ink);
+}
+.menu-btn {
+  display: none;
+}
+.mobile-nav {
+  display: none;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 16px 16px;
+  background: #17150f;
+  color: #fff;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+.mobile-nav a {
+  padding: 10px 12px;
+  border-radius: 10px;
+  text-decoration: none;
+  font-weight: 500;
+}
+.mobile-nav a:hover,
+.mobile-nav a.active {
+  background: rgba(255, 255, 255, 0.08);
+  color: var(--lime);
+}
+.mobile-nav.open {
+  display: flex;
+}
+/* Collapse the full desktop header (text nav + search + all icon links) down
+   to logo + cart + hamburger once it can no longer fit comfortably. Every
+   item hidden here (search, notifications, wishlist, recently viewed, sign
+   in, Studio) already has an equivalent entry inside .mobile-nav. */
+@media (max-width: 860px) {
+  .hdr-inner {
+    gap: 10px;
+    height: 58px;
+  }
+  .nav {
+    display: none;
+  }
+  .searchbox {
+    display: none;
+  }
+  .notification-header,
+  .wishlist-header,
+  .recently-viewed-header,
+  .signin-header {
+    display: none;
+  }
+  .user-chip .uname {
+    display: none;
+  }
+  .menu-btn {
+    display: grid;
+  }
+}
+@media (max-width: 420px) {
+  .logo {
+    font-size: 15px;
+    gap: 7px;
+  }
+  .hdr-actions {
+    gap: 6px;
+  }
+}
+
+/* ============================ responsive overhaul ==========================
+   The layout grids below only ever had a single fixed column count and no
+   phone/tablet fallback. This block adds the missing breakpoints so the
+   storefront and Studio actually reflow on real devices instead of
+   squeezing multi-column desktop layouts into narrow viewports. */
+html {
+  overflow-x: hidden;
+}
+body {
+  overflow-x: hidden;
+}
+@media (max-width: 960px) {
+  .hero {
+    grid-template-columns: 1fr;
+    gap: 32px;
+    padding: 40px 0 36px;
+  }
+  .detail {
+    grid-template-columns: 1fr;
+    gap: 28px;
+    padding: 28px 0;
+  }
+  .cart-layout {
+    grid-template-columns: 1fr;
+    padding: 28px 0;
+  }
+  .checkout-grid {
+    grid-template-columns: 1fr;
+    padding: 28px 0;
+  }
+  .prod-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .cat-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .footer-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 28px;
+  }
+  .info-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .admin {
+    grid-template-columns: 1fr;
+  }
+  .admin-side {
+    position: static;
+    display: flex;
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    gap: 8px;
+    padding: 10px;
+    -webkit-overflow-scrolling: touch;
+  }
+  .admin-side .side-btn {
+    flex: none;
+  }
+}
+@media (max-width: 720px) {
+  .f-grid {
+    grid-template-columns: 1fr;
+  }
+  .prod-grid {
+    grid-template-columns: repeat(2, 1fr);
+    gap: 12px;
+  }
+  .cat-grid {
+    grid-template-columns: 1fr 1fr;
+    gap: 12px;
+  }
+  .footer-grid {
+    grid-template-columns: 1fr;
+    gap: 26px;
+    padding: 40px 0 28px;
+  }
+  .info-grid {
+    grid-template-columns: 1fr;
+  }
+  .checkout-line {
+    grid-template-columns: 44px 1fr auto;
+    gap: 10px;
+  }
+  .payment-option {
+    grid-template-columns: auto 1fr;
+    row-gap: 4px;
+  }
+  .order-progress {
+    grid-template-columns: repeat(2, 1fr);
+    row-gap: 18px;
+  }
+  .review-bar {
+    grid-template-columns: 30px 1fr 22px;
+  }
+  .stock-adjust-preview {
+    grid-template-columns: 1fr;
+    text-align: left;
+  }
+}
+@media (max-width: 480px) {
+  .prod-grid {
+    grid-template-columns: 1fr;
+  }
+  .cat-grid {
+    grid-template-columns: 1fr;
+  }
+  .order-progress {
+    grid-template-columns: 1fr;
+  }
+}
+/* search combobox */
+.searchbox {
+  position: relative;
+}
+.search-input {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: rgba(255, 255, 255, 0.1);
+  border: 1px solid rgba(255, 255, 255, 0.14);
+  border-radius: 12px;
+  padding: 7px 12px;
+  width: 250px;
+}
+.search-input input {
+  background: none;
+  border: none;
+  outline: none;
+  color: #fff;
+  width: 100%;
+  font: 500 13px "Inter";
+}
+.search-input input::placeholder {
+  color: #9d968a;
+}
+.suggest {
+  position: absolute;
+  top: calc(100% + 8px);
+  left: 0;
+  right: 0;
+  background: #fff;
+  color: var(--ink);
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  box-shadow: var(--shadow);
+  overflow: hidden;
+  z-index: 80;
+  list-style: none;
+}
+.suggest li {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  padding: 9px 12px;
+  cursor: pointer;
+}
+.suggest li img {
+  width: 38px;
+  height: 38px;
+  border-radius: 8px;
+  object-fit: cover;
+}
+.suggest li .nm {
+  font-weight: 600;
+  font-size: 13.5px;
+}
+.suggest li .pr {
+  margin-left: auto;
+  font: 700 13px "Space Grotesk";
+}
+.suggest li.on,
+.suggest li:hover {
+  background: #f4f0e6;
+}
+.suggest .sg-foot {
+  padding: 8px 12px;
+  font-size: 12px;
+  color: var(--ink2);
+  border-top: 1px solid var(--line);
+  cursor: pointer;
+}
+.suggest .sg-foot.on,
+.suggest .sg-foot:hover {
+  background: #f4f0e6;
+}
+/* marquee */
+.marquee {
+  overflow: hidden;
+  background: var(--lime);
+  color: var(--ink);
+}
+.marquee-track {
+  display: flex;
+  width: max-content;
+  animation: marq 26s linear infinite;
+}
+.marquee-track span {
+  padding: 7px 0 7px 48px;
+  font: 600 12px/1 "Space Grotesk";
+  letter-spacing: 0.12em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+@keyframes marq {
+  to {
+    transform: translateX(-50%);
+  }
+}

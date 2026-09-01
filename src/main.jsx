@@ -1,7 +1,7 @@
 import React from "react";
 import ReactDOM from "react-dom/client";
 import App from "./App";
-import "./styles.css"; // Ensures your Tailwind/CSS styles load cleanly
+import "./styles/index.css"; // Ensures your CSS styles load cleanly
 
 // Last-resort safety net: if something throws outside of any React error
 // boundary (an event handler, a timer callback, a rejected promise) React

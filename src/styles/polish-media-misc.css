@@ -1,0 +1,135 @@
+/* Module 24 — final interaction polish */
+.confirm-dialog-message {
+  color: var(--ink2);
+  margin: 0 0 20px;
+  max-width: 54ch;
+}
+.confirm-dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.back-to-top {
+  position: fixed;
+  right: 22px;
+  bottom: 86px;
+  z-index: 115;
+  width: 44px;
+  height: 44px;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  background: var(--surface);
+  color: var(--ink);
+  box-shadow: 0 12px 28px rgba(23, 21, 15, 0.14);
+  font: 700 18px/1 "Inter";
+  cursor: pointer;
+  transition:
+    transform 0.18s,
+    box-shadow 0.18s;
+}
+.back-to-top:hover {
+  transform: translateY(-3px);
+  box-shadow: 0 16px 34px rgba(23, 21, 15, 0.18);
+}
+@media (max-width: 720px) {
+  .back-to-top {
+    right: 14px;
+    bottom: 78px;
+    width: 42px;
+    height: 42px;
+  }
+  .confirm-dialog-actions .btn {
+    flex: 1;
+    min-width: 140px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .back-to-top {
+    transition: none;
+  }
+  .back-to-top:hover {
+    transform: none;
+  }
+}
+
+/* Module 36 — media library */
+.media-library-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.media-library-card{background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.media-library-thumb{aspect-ratio:1/1;background:#f1eee6;overflow:hidden}
+.media-library-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.media-library-info{padding:13px 14px 10px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.media-library-info strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.media-library-info span{font-size:12px;color:var(--ink2)}
+.media-library-card>.btn{margin:0 14px 14px}
+@media(max-width:1000px){.media-library-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:720px){.media-library-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:480px){.media-library-grid{grid-template-columns:1fr}}
+
+/* Module 36 — media library */
+.media-library-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:18px}
+.media-library-card{background:var(--surface);border:1px solid var(--line);border-radius:18px;overflow:hidden;display:flex;flex-direction:column;min-width:0}
+.media-library-thumb{aspect-ratio:1/1;background:#f1eee6;overflow:hidden}
+.media-library-thumb img{width:100%;height:100%;object-fit:cover;display:block}
+.media-library-info{padding:13px 14px 10px;display:flex;flex-direction:column;gap:4px;min-width:0}
+.media-library-info strong{white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.media-library-info span{font-size:12px;color:var(--ink2)}
+.media-library-card>.btn{margin:0 14px 14px}
+.media-upload-inline{display:grid;gap:10px}
+@media(max-width:1000px){.media-library-grid{grid-template-columns:repeat(3,1fr)}}
+@media(max-width:720px){.media-library-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:480px){.media-library-grid{grid-template-columns:1fr}}
+
+.hero-image-setting-preview{max-width:520px;aspect-ratio:16/7;border:1px solid var(--line);border-radius:16px;overflow:hidden;background:var(--surface)}
+.hero-image-setting-preview img{width:100%;height:100%;object-fit:cover;display:block}
+
+/* Single-operator fulfilment */
+.shipment-manager {
+  min-width: 300px;
+  display: grid;
+  gap: 8px;
+}
+.shipment-summary {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+}
+.shipment-ref {
+  color: var(--ink2);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+.shipment-actions,
+.shipment-copy-row {
+  display: flex;
+  gap: 6px;
+  flex-wrap: wrap;
+  align-items: center;
+}
+.shipment-editor {
+  border: 1px solid var(--line);
+  background: #fbf9f4;
+  border-radius: 12px;
+  padding: 10px;
+}
+.shipment-editor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 8px;
+}
+.shipment-copy-row {
+  margin-top: 10px;
+  justify-content: flex-end;
+}
+.orders-admin-table {
+  min-width: 1180px;
+}
+@media (max-width: 760px) {
+  .shipment-editor-grid {
+    grid-template-columns: 1fr;
+  }
+  .orders-admin-table {
+    min-width: 1020px;
+  }
+}

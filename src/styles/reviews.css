@@ -1,0 +1,127 @@
+/* Module 11 — reviews */
+.review-section {
+  margin-top: 8px;
+}
+.review-summary-grid {
+  display: grid;
+  grid-template-columns: 220px 1fr;
+  gap: 24px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 22px;
+}
+.review-score-card {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  justify-content: center;
+  gap: 8px;
+}
+.review-score-card strong {
+  font: 700 44px/1 "Space Grotesk";
+}
+.review-score-card > span {
+  font-size: 12px;
+  color: var(--ink2);
+}
+.review-bars {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  gap: 8px;
+}
+.review-bar {
+  display: grid;
+  grid-template-columns: 38px 1fr 24px;
+  align-items: center;
+  gap: 10px;
+  font-size: 12px;
+  color: var(--ink2);
+}
+.review-bar > div {
+  height: 8px;
+  background: #eee8dc;
+  border-radius: 99px;
+  overflow: hidden;
+}
+.review-bar > div > span {
+  display: block;
+  height: 100%;
+  background: var(--ink);
+  border-radius: 99px;
+}
+.review-bar b {
+  text-align: right;
+  font-size: 11px;
+}
+.review-list {
+  display: grid;
+  gap: 12px;
+  margin-top: 14px;
+}
+.review-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 18px;
+}
+.review-card-top {
+  display: flex;
+  justify-content: space-between;
+  gap: 16px;
+}
+.review-card-top > div:first-child {
+  min-width: 0;
+}
+.review-card-top strong {
+  font: 700 15px "Space Grotesk";
+}
+.review-card-top time {
+  font-size: 12px;
+  color: var(--ink2);
+  white-space: nowrap;
+}
+.review-card p {
+  margin: 10px 0 12px;
+  color: var(--ink2);
+}
+.review-meta {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 5px;
+  font-size: 12px;
+  color: var(--ink2);
+}
+.verified-review {
+  background: #edf7ee;
+  color: var(--ok);
+  padding: 3px 8px;
+  border-radius: 999px;
+  font-weight: 700;
+}
+.review-star-picker {
+  display: flex;
+  gap: 4px;
+}
+.review-star-picker button {
+  border: 0;
+  background: none;
+  cursor: pointer;
+  padding: 4px;
+  color: #ddd6c7;
+}
+.review-star-picker button.active {
+  color: #e9a13b;
+}
+@media (max-width: 720px) {
+  .review-summary-grid {
+    grid-template-columns: 1fr;
+  }
+  .review-card-top {
+    flex-direction: column;
+  }
+}
+

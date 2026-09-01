@@ -79,7 +79,7 @@ test("a mutating request with the matching CSRF header succeeds", async () => {
   await server.request("/api/auth/logout", { method: "POST", body: "{}" });
 });
 
-test("registration rejects a password shorter than 12 characters", async () => {
+test("registration rejects a password shorter than 8 characters", async () => {
   await server.primeCsrf();
   const { status, body } = await server.request("/api/auth/register", {
     method: "POST",

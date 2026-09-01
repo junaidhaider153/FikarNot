@@ -1,0 +1,121 @@
+/* Module 14 — inventory */
+.inventory-toolbar {
+  margin-top: 14px;
+}
+.inventory-filter {
+  width: 190px;
+}
+.inventory-stats .stat {
+  min-height: 130px;
+}
+.sku-pill {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 8px;
+  border-radius: 8px;
+  background: #f1ede2;
+  color: var(--ink2);
+  font: 600 11px "Space Grotesk";
+  letter-spacing: 0.04em;
+}
+.inventory-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 5px 10px;
+  border-radius: 999px;
+  font: 600 11px "Space Grotesk";
+}
+.inventory-status.healthy {
+  background: #edf7ee;
+  color: var(--ok);
+}
+.inventory-status.low {
+  background: #fff3e2;
+  color: #9a5b00;
+}
+.inventory-status.out {
+  background: #fbe8e2;
+  color: var(--err);
+}
+.inventory-log-card {
+  margin-top: 22px;
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 20px;
+}
+.inventory-log {
+  display: grid;
+  gap: 0;
+  border-top: 1px solid var(--line);
+}
+.inventory-log-row {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) auto minmax(160px, auto);
+  gap: 18px;
+  align-items: center;
+  padding: 13px 0;
+  border-bottom: 1px solid var(--line);
+}
+.inventory-log-row > div:first-child {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+.inventory-log-row span {
+  font-size: 12px;
+  color: var(--ink2);
+}
+.inventory-log-row time {
+  font-size: 12px;
+  color: var(--ink2);
+  text-align: right;
+}
+.inventory-plus,
+.inventory-minus {
+  font: 700 14px "Space Grotesk";
+}
+.inventory-plus {
+  color: var(--ok);
+}
+.inventory-minus {
+  color: var(--err);
+}
+.stock-adjust-preview {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 4px 12px;
+  padding: 14px;
+  background: #f7f3ea;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.stock-adjust-preview strong {
+  font: 700 28px "Space Grotesk";
+  grid-row: span 2;
+  align-self: center;
+}
+.stock-adjust-preview span:last-child {
+  font-size: 12px;
+  color: var(--ink2);
+}
+.quick-adjusts {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+@media (max-width: 720px) {
+  .inventory-filter {
+    width: 100%;
+  }
+  .inventory-log-row {
+    grid-template-columns: 1fr auto;
+  }
+  .inventory-log-row time {
+    grid-column: 1/-1;
+    text-align: left;
+  }
+}
+

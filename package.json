@@ -2,6 +2,7 @@
   "name": "fikarnot-modular",
   "private": true,
   "version": "1.8.0",
+  "license": "MIT",
   "type": "module",
   "engines": {
     "node": ">=22.5.0"
@@ -27,7 +28,7 @@
     "db:backup:schedule": "node scripts/backup-scheduler.mjs"
   },
   "dependencies": {
-    "nodemailer": "^6.9.16",
+    "googleapis": "^178.0.0",
     "react": "^19.2.8",
     "react-dom": "^19.2.8",
     "react-router-dom": "^7.18.2",

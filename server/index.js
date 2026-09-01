@@ -2,499 +2,25 @@ import http from "node:http";
 import crypto from "node:crypto";
 import fs from "node:fs";
 import path from "node:path";
-import { DatabaseSync } from "node:sqlite";
-import { fileURLToPath } from "node:url";
-import nodemailer from "nodemailer";
 import { catalogCategories, catalogProducts } from "./catalogSeed.js";
 
-const __dirname = path.dirname(fileURLToPath(import.meta.url));
-const dataDir = process.env.FIKARNOT_DATA_DIR ? path.resolve(process.env.FIKARNOT_DATA_DIR) : path.join(__dirname, "data");
-fs.mkdirSync(dataDir, { recursive: true });
-const uploadsDir = path.join(dataDir, "uploads");
-fs.mkdirSync(uploadsDir, { recursive: true });
-const dbPath = path.join(dataDir, "fikarnot.sqlite");
-const db = new DatabaseSync(dbPath);
-
-db.exec(`
-  PRAGMA journal_mode = WAL;
-  PRAGMA foreign_keys = ON;
-  CREATE TABLE IF NOT EXISTS users (
-    id TEXT PRIMARY KEY,
-    name TEXT NOT NULL,
-    email TEXT NOT NULL UNIQUE COLLATE NOCASE,
-    password_hash TEXT NOT NULL,
-    role TEXT NOT NULL DEFAULT 'customer' CHECK(role IN ('customer','editor','admin')),
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL
-  );
-  CREATE TABLE IF NOT EXISTS sessions (
-    token_hash TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    created_at INTEGER NOT NULL,
-    expires_at INTEGER NOT NULL
-  );
-  CREATE INDEX IF NOT EXISTS idx_sessions_user_id ON sessions(user_id);
-  CREATE TABLE IF NOT EXISTS two_factor_challenges (token_hash TEXT PRIMARY KEY, user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE, created_at INTEGER NOT NULL, expires_at INTEGER NOT NULL, attempts INTEGER NOT NULL DEFAULT 0);
-  CREATE INDEX IF NOT EXISTS idx_two_factor_challenges_user_id ON two_factor_challenges(user_id);
-  CREATE TABLE IF NOT EXISTS email_verification_tokens (
-    token_hash TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    created_at INTEGER NOT NULL,
-    expires_at INTEGER NOT NULL,
-    used_at INTEGER
-  );
-  CREATE INDEX IF NOT EXISTS idx_email_verification_user_id ON email_verification_tokens(user_id);
-  CREATE TABLE IF NOT EXISTS password_reset_tokens (
-    token_hash TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    created_at INTEGER NOT NULL,
-    expires_at INTEGER NOT NULL,
-    used_at INTEGER
-  );
-  CREATE INDEX IF NOT EXISTS idx_password_reset_user_id ON password_reset_tokens(user_id);
-  CREATE TABLE IF NOT EXISTS customer_state (
-    user_id TEXT PRIMARY KEY REFERENCES users(id) ON DELETE CASCADE,
-    cart_json TEXT NOT NULL DEFAULT '[]',
-    wishlist_json TEXT NOT NULL DEFAULT '[]',
-    recently_viewed_json TEXT NOT NULL DEFAULT '[]',
-    comparison_json TEXT NOT NULL DEFAULT '[]',
-    updated_at INTEGER NOT NULL
-  );
-  CREATE TABLE IF NOT EXISTS customer_addresses (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    label TEXT NOT NULL DEFAULT 'Home',
-    name TEXT NOT NULL,
-    line1 TEXT NOT NULL,
-    city TEXT NOT NULL,
-    region TEXT NOT NULL DEFAULT '',
-    postal_code TEXT NOT NULL DEFAULT '',
-    country TEXT NOT NULL,
-    is_default INTEGER NOT NULL DEFAULT 0,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL
-  );
-  CREATE INDEX IF NOT EXISTS idx_customer_addresses_user_id ON customer_addresses(user_id);
-`);
+import { uploadsDir } from "./config/paths.js";
+import { db } from "./db/schema.js";
+import {
+  PORT, COOKIE_NAME, SESSION_TTL_MS, FRONTEND_ORIGIN,
+  isProduction, LOGIN_WINDOW_MS, MAX_LOGIN_ATTEMPTS, MAX_BODY_BYTES, MAX_REGISTER_ATTEMPTS,
+  RESET_TOKEN_TTL_MS, EMAIL_VERIFY_TOKEN_TTL_MS, VERIFY_WINDOW_MS, MAX_VERIFY_REQUESTS,
+  RESET_WINDOW_MS, MAX_RESET_REQUESTS, shouldSeedDemoData,
+  APP_ORIGIN, API_PUBLIC_ORIGIN, PAYFAST_SECRET_WORD, MOCK_PAYMENTS_ENABLED, UPLOADS_PUBLIC_BASE_URL, emailConfigured,
+} from "./config/env.js";
+import { checkRateLimit, clearRateLimit, sweepExpiredRateLimits } from "./lib/rateLimit.js";
+import { clientIp, corsHeaders, send, sendHtml, parseCookies, ensureCsrfCookie, verifyCsrf } from "./lib/http.js";
+import { uid, token, sha256, hashPassword, verifyPassword, base32Encode, base32Decode, verifyTotp, otpauthUri } from "./lib/security.js";
+import { normalizeEmail, validatePassword, validateName, validateEmail, isPasswordPwned } from "./lib/validation.js";
+import { sendTransactionalEmail } from "./lib/email.js";
 
 
 
-db.exec(`
-  CREATE TABLE IF NOT EXISTS coupons (
-    id TEXT PRIMARY KEY,
-    code TEXT NOT NULL UNIQUE COLLATE NOCASE,
-    type TEXT NOT NULL CHECK(type IN ('percent','fixed','free_shipping')),
-    value REAL NOT NULL DEFAULT 0,
-    min_subtotal REAL NOT NULL DEFAULT 0,
-    max_uses INTEGER NOT NULL DEFAULT 0,
-    used_count INTEGER NOT NULL DEFAULT 0,
-    active INTEGER NOT NULL DEFAULT 1,
-    expires_at INTEGER,
-    description TEXT NOT NULL DEFAULT ''
-  );
-  CREATE TABLE IF NOT EXISTS orders (
-    id TEXT PRIMARY KEY,
-    user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
-    customer_name TEXT NOT NULL,
-    customer_email TEXT NOT NULL,
-    customer_address TEXT NOT NULL DEFAULT '',
-    payment_method TEXT NOT NULL DEFAULT 'card',
-    subtotal REAL NOT NULL,
-    discount REAL NOT NULL DEFAULT 0,
-    shipping REAL NOT NULL DEFAULT 0,
-    total REAL NOT NULL,
-    coupon_json TEXT NOT NULL DEFAULT 'null',
-    status TEXT NOT NULL DEFAULT 'paid' CHECK(status IN ('paid','processing','shipped','delivered','cancelled','return_approved','returned')),
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL DEFAULT 0,
-    cancelled_at INTEGER
-  );
-  CREATE INDEX IF NOT EXISTS idx_orders_user_id ON orders(user_id);
-  CREATE INDEX IF NOT EXISTS idx_orders_created_at ON orders(created_at);
-  CREATE TABLE IF NOT EXISTS payments (
-    id TEXT PRIMARY KEY,
-    order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-    provider TEXT NOT NULL,
-    provider_payment_id TEXT,
-    amount REAL NOT NULL,
-    currency TEXT NOT NULL,
-    status TEXT NOT NULL CHECK(status IN ('pending','paid','failed','refunded','partially_refunded')),
-    raw_status TEXT NOT NULL DEFAULT '',
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL,
-    UNIQUE(provider, provider_payment_id)
-  );
-  CREATE INDEX IF NOT EXISTS idx_payments_order_id ON payments(order_id);
-  CREATE INDEX IF NOT EXISTS idx_payments_status ON payments(status);
-  CREATE TABLE IF NOT EXISTS payment_proofs (
-    id TEXT PRIMARY KEY,
-    order_id TEXT NOT NULL UNIQUE REFERENCES orders(id) ON DELETE CASCADE,
-    original_name TEXT NOT NULL DEFAULT '',
-    filename TEXT NOT NULL UNIQUE,
-    mime_type TEXT NOT NULL,
-    byte_size INTEGER NOT NULL,
-    sha256 TEXT NOT NULL UNIQUE,
-    uploaded_by TEXT REFERENCES users(id) ON DELETE SET NULL,
-    created_at INTEGER NOT NULL
-  );
-  CREATE INDEX IF NOT EXISTS idx_payment_proofs_order_id ON payment_proofs(order_id);
-  CREATE TABLE IF NOT EXISTS refunds (
-    id TEXT PRIMARY KEY,
-    order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-    return_id TEXT REFERENCES return_requests(id) ON DELETE SET NULL,
-    payment_id TEXT REFERENCES payments(id) ON DELETE SET NULL,
-    amount REAL NOT NULL CHECK(amount > 0),
-    currency TEXT NOT NULL,
-    method TEXT NOT NULL DEFAULT 'manual',
-    status TEXT NOT NULL CHECK(status IN ('pending','processing','refunded','failed')),
-    provider_ref TEXT,
-    note TEXT NOT NULL DEFAULT '',
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL
-  );
-  CREATE INDEX IF NOT EXISTS idx_refunds_order_id ON refunds(order_id);
-  CREATE INDEX IF NOT EXISTS idx_refunds_status ON refunds(status);
-  CREATE TABLE IF NOT EXISTS order_items (
-    id TEXT PRIMARY KEY,
-    order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-    product_id TEXT NOT NULL,
-    product_name TEXT NOT NULL,
-    price REAL NOT NULL,
-    qty INTEGER NOT NULL CHECK(qty > 0)
-  );
-  CREATE INDEX IF NOT EXISTS idx_order_items_order_id ON order_items(order_id);
-`);
-
-const ensureColumn = (table, column, definition) => {
-  const columns = db.prepare(`PRAGMA table_info(${table})`).all().map((row) => row.name);
-  if (!columns.includes(column)) db.exec(`ALTER TABLE ${table} ADD COLUMN ${column} ${definition}`);
-};
-
-ensureColumn("users", "two_factor_enabled", "INTEGER NOT NULL DEFAULT 0");
-ensureColumn("users", "two_factor_secret", "TEXT");
-ensureColumn("orders", "currency", "TEXT NOT NULL DEFAULT 'PKR'");
-ensureColumn("orders", "tax", "REAL NOT NULL DEFAULT 0");
-ensureColumn("orders", "payment_status", "TEXT NOT NULL DEFAULT 'paid'");
-ensureColumn("orders", "courier", "TEXT NOT NULL DEFAULT ''");
-ensureColumn("orders", "tracking_number", "TEXT NOT NULL DEFAULT ''");
-ensureColumn("orders", "shipped_at", "INTEGER");
-ensureColumn("orders", "delivered_at", "INTEGER");
-ensureColumn("orders", "shipment_status", "TEXT NOT NULL DEFAULT 'not_created'");
-ensureColumn("orders", "tracking_url", "TEXT NOT NULL DEFAULT ''");
-ensureColumn("orders", "shipment_created_at", "INTEGER");
-ensureColumn("orders", "invoice_number", "TEXT NOT NULL DEFAULT ''");
-ensureColumn("orders", "payment_proof_token_hash", "TEXT");
-ensureColumn("orders", "payment_proof_token_expires_at", "INTEGER");
-ensureColumn("orders", "updated_at", "INTEGER NOT NULL DEFAULT 0");
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS reviews (
-    id TEXT PRIMARY KEY,
-    product_id TEXT NOT NULL,
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    author_name TEXT NOT NULL,
-    rating INTEGER NOT NULL CHECK(rating BETWEEN 1 AND 5),
-    title TEXT NOT NULL,
-    body TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'published' CHECK(status IN ('published','hidden')),
-    verified_purchase INTEGER NOT NULL DEFAULT 1,
-    created_at INTEGER NOT NULL,
-    updated_at INTEGER NOT NULL,
-    UNIQUE(product_id,user_id)
-  );
-  CREATE INDEX IF NOT EXISTS idx_reviews_product_id ON reviews(product_id);
-  CREATE INDEX IF NOT EXISTS idx_reviews_user_id ON reviews(user_id);
-
-  CREATE TABLE IF NOT EXISTS support_tickets (
-    id TEXT PRIMARY KEY,
-    user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
-    name TEXT NOT NULL, email TEXT NOT NULL, subject TEXT NOT NULL, message TEXT NOT NULL,
-    category TEXT NOT NULL DEFAULT 'general', status TEXT NOT NULL DEFAULT 'open' CHECK(status IN ('open','in_progress','resolved')),
-    created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
-  );
-  CREATE INDEX IF NOT EXISTS idx_support_user_id ON support_tickets(user_id);
-
-  CREATE TABLE IF NOT EXISTS return_requests (
-    id TEXT PRIMARY KEY,
-    order_id TEXT NOT NULL REFERENCES orders(id) ON DELETE CASCADE,
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    reason TEXT NOT NULL, note TEXT NOT NULL DEFAULT '',
-    status TEXT NOT NULL DEFAULT 'requested' CHECK(status IN ('requested','approved','rejected','completed','cancelled')),
-    created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL,
-    UNIQUE(order_id,user_id)
-  );
-  CREATE INDEX IF NOT EXISTS idx_returns_user_id ON return_requests(user_id);
-  CREATE INDEX IF NOT EXISTS idx_returns_order_id ON return_requests(order_id);
-
-  CREATE TABLE IF NOT EXISTS notifications (
-    id TEXT PRIMARY KEY,
-    user_id TEXT NOT NULL REFERENCES users(id) ON DELETE CASCADE,
-    type TEXT NOT NULL, title TEXT NOT NULL, message TEXT NOT NULL, link TEXT NOT NULL DEFAULT '/account',
-    order_id TEXT, read INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL
-  );
-  CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
-  CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at);
-  CREATE TABLE IF NOT EXISTS engagement_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-  CREATE TABLE IF NOT EXISTS rate_limits (
-    scope TEXT NOT NULL,
-    bucket_key TEXT NOT NULL,
-    count INTEGER NOT NULL DEFAULT 0,
-    reset_at INTEGER NOT NULL,
-    PRIMARY KEY (scope, bucket_key)
-  );
-  CREATE TABLE IF NOT EXISTS site_settings (
-    key TEXT PRIMARY KEY,
-    value TEXT NOT NULL,
-    updated_at INTEGER NOT NULL,
-    updated_by TEXT REFERENCES users(id) ON DELETE SET NULL
-  );
-  CREATE TABLE IF NOT EXISTS media_assets (
-    id TEXT PRIMARY KEY,
-    filename TEXT NOT NULL UNIQUE,
-    original_name TEXT NOT NULL DEFAULT '',
-    mime_type TEXT NOT NULL,
-    byte_size INTEGER NOT NULL,
-    sha256 TEXT NOT NULL UNIQUE,
-    url TEXT NOT NULL UNIQUE,
-    uploaded_by TEXT REFERENCES users(id) ON DELETE SET NULL,
-    created_at INTEGER NOT NULL
-  );
-  CREATE INDEX IF NOT EXISTS idx_media_created_at ON media_assets(created_at DESC);
-  CREATE TABLE IF NOT EXISTS audit_logs (
-    id TEXT PRIMARY KEY,
-    actor_user_id TEXT REFERENCES users(id) ON DELETE SET NULL,
-    action TEXT NOT NULL,
-    entity_type TEXT NOT NULL,
-    entity_id TEXT,
-    details_json TEXT NOT NULL DEFAULT '{}',
-    created_at INTEGER NOT NULL
-  );
-  CREATE INDEX IF NOT EXISTS idx_audit_logs_created_at ON audit_logs(created_at DESC);
-  CREATE INDEX IF NOT EXISTS idx_audit_logs_actor ON audit_logs(actor_user_id);
-`);
-
-db.exec(`
-  CREATE TABLE IF NOT EXISTS categories (
-    id TEXT PRIMARY KEY, name TEXT NOT NULL, description TEXT NOT NULL DEFAULT '', color TEXT NOT NULL DEFAULT '#3E8E5A', created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL
-  );
-  CREATE TABLE IF NOT EXISTS products (
-    id TEXT PRIMARY KEY, name TEXT NOT NULL, sku TEXT NOT NULL UNIQUE COLLATE NOCASE, category_id TEXT NOT NULL, price REAL NOT NULL, stock INTEGER NOT NULL DEFAULT 0, stock_threshold INTEGER NOT NULL DEFAULT 10, rating REAL NOT NULL DEFAULT 0, image TEXT NOT NULL DEFAULT '', images_json TEXT NOT NULL DEFAULT '[]', tags_json TEXT NOT NULL DEFAULT '[]', featured INTEGER NOT NULL DEFAULT 0, created_at INTEGER NOT NULL, updated_at INTEGER NOT NULL, description TEXT NOT NULL DEFAULT '', FOREIGN KEY(category_id) REFERENCES categories(id)
-  );
-  CREATE INDEX IF NOT EXISTS idx_products_category_id ON products(category_id);
-  CREATE TABLE IF NOT EXISTS inventory_logs (
-    id TEXT PRIMARY KEY, product_id TEXT NOT NULL, product_name TEXT NOT NULL, previous_stock INTEGER NOT NULL, next_stock INTEGER NOT NULL, change INTEGER NOT NULL, reason TEXT NOT NULL, user_id TEXT, created_at INTEGER NOT NULL, FOREIGN KEY(product_id) REFERENCES products(id) ON DELETE CASCADE, FOREIGN KEY(user_id) REFERENCES users(id) ON DELETE SET NULL
-  );
-  CREATE TABLE IF NOT EXISTS catalog_meta (key TEXT PRIMARY KEY, value TEXT NOT NULL);
-`);
-
-const userColumns = db.prepare("PRAGMA table_info(users)").all().map((row) => row.name);
-if (!userColumns.includes("email_verified_at")) {
-  db.exec("ALTER TABLE users ADD COLUMN email_verified_at INTEGER");
-}
-// One-time migration: accounts that already existed before email verification was introduced
-// are trusted so an upgrade does not lock existing customers out. New registrations remain unverified.
-const emailVerificationMigration = db.prepare("SELECT value FROM engagement_meta WHERE key='email_verification_v1'").get();
-if (!emailVerificationMigration) {
-  db.prepare("UPDATE users SET email_verified_at=COALESCE(email_verified_at, created_at)").run();
-  db.prepare("INSERT OR REPLACE INTO engagement_meta(key,value) VALUES ('email_verification_v1','1')").run();
-}
-
-const ALLOWED_ORIGINS = String(process.env.FIKARNOT_FRONTEND_ORIGIN || "http://localhost:5173")
-  .split(",")
-  .map((value) => value.trim().replace(/\/$/, ""))
-  .filter(Boolean);
-const FRONTEND_ORIGIN = ALLOWED_ORIGINS[0] || "http://localhost:5173";
-const port = process.env.PORT || process.env.FIKARNOT_API_PORT || 8787;
-const COOKIE_NAME = "fn_session";
-const CSRF_COOKIE_NAME = "fn_csrf";
-const SESSION_TTL_MS = 1000 * 60 * 60 * 24 * 7;
-const TRUST_PROXY = process.env.FIKARNOT_TRUST_PROXY === "1";
-const clientIp = (req) => TRUST_PROXY
-  ? String(req.headers["x-forwarded-for"] || req.socket.remoteAddress || "unknown").split(",")[0].trim()
-  : String(req.socket.remoteAddress || "unknown").trim();
-
-const isProduction = process.env.NODE_ENV === "production";
-const LOGIN_WINDOW_MS = 15 * 60 * 1000;
-const MAX_LOGIN_ATTEMPTS = 8;
-const MAX_BODY_BYTES = 1_000_000;
-const MAX_REGISTER_ATTEMPTS = 6;
-const RESET_TOKEN_TTL_MS = 1000 * 60 * 30;
-const EMAIL_VERIFY_TOKEN_TTL_MS = 1000 * 60 * 60 * 24;
-const VERIFY_WINDOW_MS = 15 * 60 * 1000;
-const MAX_VERIFY_REQUESTS = 5;
-const RESET_WINDOW_MS = 15 * 60 * 1000;
-const MAX_RESET_REQUESTS = 5;
-
-const shouldSeedDemoData = process.env.FIKARNOT_SEED_DEMO_DATA === "1" || (!isProduction && process.env.FIKARNOT_SEED_DEMO_DATA !== "0");
-const RESEND_API_KEY = String(process.env.RESEND_API_KEY || "").trim();
-const RESEND_FROM_EMAIL = String(process.env.RESEND_FROM_EMAIL || "").trim();
-const GMAIL_USER = String(process.env.GMAIL_USER || "").trim();
-const GMAIL_APP_PASSWORD = String(process.env.GMAIL_APP_PASSWORD || "").trim();
-const APP_ORIGIN = String(process.env.FIKARNOT_APP_URL || FRONTEND_ORIGIN).replace(/\/$/, "");
-const API_PUBLIC_ORIGIN = String(process.env.FIKARNOT_API_PUBLIC_URL || "").trim().replace(/\/$/, "");
-const PAYFAST_SECRET_WORD = String(process.env.PAYFAST_SECRET_WORD || "").trim();
-const MOCK_PAYMENTS_ENABLED = process.env.FIKARNOT_ENABLE_MOCK_PAYMENTS === "1" && !isProduction;
-const UPLOADS_PUBLIC_BASE_URL = String(process.env.FIKARNOT_UPLOADS_PUBLIC_BASE_URL || "").trim().replace(/\/$/, "");
-
-const gmailTransporter = GMAIL_USER && GMAIL_APP_PASSWORD
-  ? nodemailer.createTransport({
-      service: "gmail",
-      auth: { user: GMAIL_USER, pass: GMAIL_APP_PASSWORD },
-      // Without these, a blocked/stalled SMTP connection (common on some
-      // hosts) can hang forever with no error, freezing whatever request
-      // is awaiting the send. Fail fast instead.
-      connectionTimeout: 10_000,
-      greetingTimeout: 10_000,
-      socketTimeout: 15_000,
-    })
-  : null;
-
-const validateProductionStartupConfig = () => {
-  if (!isProduction) return;
-  const errors = [];
-  if (!String(process.env.FIKARNOT_FRONTEND_ORIGIN || "").trim()) errors.push("FIKARNOT_FRONTEND_ORIGIN is required in production.");
-  if (!String(process.env.FIKARNOT_APP_URL || "").trim()) errors.push("FIKARNOT_APP_URL is required in production.");
-  if (!GMAIL_USER || !GMAIL_APP_PASSWORD) errors.push("GMAIL_USER and GMAIL_APP_PASSWORD are required in production.");
-  const appUrl = String(process.env.FIKARNOT_APP_URL || "").trim();
-  if (appUrl && !appUrl.startsWith("https://")) errors.push("FIKARNOT_APP_URL must use HTTPS in production.");
-  if (process.env.FIKARNOT_SEED_DEMO_DATA === "1") errors.push("FIKARNOT_SEED_DEMO_DATA must be 0 in production.");
-  if (process.env.FIKARNOT_ENABLE_MOCK_PAYMENTS === "1") errors.push("FIKARNOT_ENABLE_MOCK_PAYMENTS must be disabled in production.");
-  if (process.env.FIKARNOT_ALLOW_ONLINE_PAYMENTS === "1") {
-    if (!String(process.env.PAYFAST_MERCHANT_ID || "").trim()) errors.push("PAYFAST_MERCHANT_ID is required when online payments are enabled.");
-    if (!String(process.env.PAYFAST_SECURED_KEY || "").trim()) errors.push("PAYFAST_SECURED_KEY is required when online payments are enabled.");
-    if (!String(process.env.PAYFAST_TOKEN_URL || "").trim()) errors.push("PAYFAST_TOKEN_URL is required when online payments are enabled.");
-    if (!String(process.env.PAYFAST_CHECKOUT_URL || "").trim()) errors.push("PAYFAST_CHECKOUT_URL is required when online payments are enabled.");
-    if (!API_PUBLIC_ORIGIN) errors.push("FIKARNOT_API_PUBLIC_URL is required when online payments are enabled.");
-    if (API_PUBLIC_ORIGIN && !API_PUBLIC_ORIGIN.startsWith("https://")) errors.push("FIKARNOT_API_PUBLIC_URL must use HTTPS when online payments are enabled.");
-  }
-  if (process.env.FIKARNOT_EXPOSE_RESET_LINKS === "1") errors.push("FIKARNOT_EXPOSE_RESET_LINKS must be disabled in production.");
-  if (errors.length) throw new Error(`Production configuration is invalid:\n- ${errors.join("\n- ")}`);
-};
-
-validateProductionStartupConfig();
-
-// Rate-limit counters live in SQLite rather than an in-memory Map. A Map resets
-// on every server restart/redeploy (defeating the point of throttling brute-force
-// attempts) and can't be shared if this app is ever run as more than one Node
-// process — the DB, which is already the single source of truth for everything
-// else here, doesn't have either problem.
-const checkRateLimit = (scope, bucketKey, { windowMs, max }) => {
-  const now = Date.now();
-  const row = db.prepare("SELECT * FROM rate_limits WHERE scope=? AND bucket_key=?").get(scope, bucketKey);
-  if (!row || now > row.reset_at) {
-    db.prepare("INSERT INTO rate_limits (scope,bucket_key,count,reset_at) VALUES (?,?,1,?) ON CONFLICT(scope,bucket_key) DO UPDATE SET count=1,reset_at=excluded.reset_at")
-      .run(scope, bucketKey, now + windowMs);
-    return { allowed: true };
-  }
-  if (row.count >= max) return { allowed: false, retryAfterMs: row.reset_at - now };
-  db.prepare("UPDATE rate_limits SET count=count+1 WHERE scope=? AND bucket_key=?").run(scope, bucketKey);
-  return { allowed: true };
-};
-// On a successful login, clear that IP's counter so a legitimate user isn't stuck
-// half-throttled after a few earlier typos.
-const clearRateLimit = (scope, bucketKey) => db.prepare("DELETE FROM rate_limits WHERE scope=? AND bucket_key=?").run(scope, bucketKey);
-// Occasionally sweep expired rows so this table doesn't grow forever on a
-// long-running server. Cheap: only runs when a limiter is actually consulted.
-let lastRateLimitSweep = 0;
-const sweepExpiredRateLimits = () => {
-  const now = Date.now();
-  if (now - lastRateLimitSweep < 60_000) return;
-  lastRateLimitSweep = now;
-  db.prepare("DELETE FROM rate_limits WHERE reset_at < ?").run(now - 60_000);
-};
-
-const json = (res, status, payload) => {
-  const body = JSON.stringify(payload);
-  res.writeHead(status, {
-    "Content-Type": "application/json; charset=utf-8",
-    "Cache-Control": "no-store",
-    "X-Content-Type-Options": "nosniff",
-    "Content-Length": Buffer.byteLength(body),
-  });
-  res.end(body);
-};
-
-const corsHeaders = (req, res) => {
-  const requestOrigin = String(req?.headers?.origin || "").replace(/\/$/, "");
-  // Checks your dynamic environment variables list directly
-  const allowedOrigin = requestOrigin && ALLOWED_ORIGINS.includes(requestOrigin) 
-    ? requestOrigin 
-    : FRONTEND_ORIGIN;
-
-  res.setHeader("Access-Control-Allow-Origin", allowedOrigin);
-  res.setHeader("Access-Control-Allow-Credentials", "true");
-  res.setHeader("Access-Control-Allow-Headers", "Content-Type, X-CSRF-Token, Authorization, Accept, X-Requested-With");
-  res.setHeader("Access-Control-Allow-Methods", "GET,POST,PUT,DELETE,PATCH,OPTIONS");
-  res.setHeader("Vary", "Origin");
-};
-
-const send = (req, res, status, payload) => {
-  corsHeaders(req, res);
-  json(res, status, payload);
-};
-
-const sendHtml = (req, res, status, body, { cacheControl = "no-store" } = {}) => {
-  corsHeaders(req, res);
-  res.writeHead(status, {
-    "Content-Type": "text/html; charset=utf-8",
-    "Cache-Control": cacheControl,
-    "X-Content-Type-Options": "nosniff",
-    "Content-Security-Policy": "default-src 'none'; style-src 'unsafe-inline'; img-src https: data:; base-uri 'none'; form-action 'none'",
-  });
-  res.end(body);
-};
-
-
-const parseCookies = (header = "") =>
-  Object.fromEntries(
-    header
-      .split(";")
-      .map((part) => part.trim())
-      .filter(Boolean)
-      .map((part) => {
-        const index = part.indexOf("=");
-        return index === -1 ? [part, ""] : [part.slice(0, index), decodeURIComponent(part.slice(index + 1))];
-      }),
-  );
-
-const appendSetCookie = (res, cookieStr) => {
-  const existing = res.getHeader("Set-Cookie");
-  if (!existing) return res.setHeader("Set-Cookie", cookieStr);
-  res.setHeader("Set-Cookie", Array.isArray(existing) ? [...existing, cookieStr] : [existing, cookieStr]);
-};
-
-// --- CSRF protection (double-submit cookie) --------------------------------
-// The session cookie is HttpOnly (JS can't read it), so a malicious site can
-// still trigger authenticated cross-origin requests using the browser's
-// auto-attached cookie. To block that, every response also carries a second,
-// JS-readable token in a separate cookie. The frontend echoes that value back
-// as an X-CSRF-Token header on every state-changing request; since a
-// cross-origin attacker page cannot read our cookie (browsers enforce
-// same-origin on document.cookie) or set a custom header on a simple
-// cross-origin form/fetch without triggering CORS, it cannot forge a match.
-const CSRF_SAFE_METHODS = new Set(["GET", "HEAD", "OPTIONS"]);
-
-const ensureCsrfCookie = (req, res) => {
-  const cookies = parseCookies(req.headers.cookie || "");
-  let value = cookies[CSRF_COOKIE_NAME];
-  if (!value) {
-    value = crypto.randomBytes(24).toString("base64url");
-    const secure = isProduction ? "; Secure" : "";
-    const sameSite = isProduction ? "None" : "Lax";
-    appendSetCookie(res, `${CSRF_COOKIE_NAME}=${value}; SameSite=${sameSite}; Path=/; Max-Age=${SESSION_TTL_MS / 1000}${secure}`);
-  }
-  return value;
-};
-
-const verifyCsrf = (req, res, cookieValue) => {
-  if (CSRF_SAFE_METHODS.has(req.method)) return true;
-  const header = req.headers["x-csrf-token"];
-  if (!cookieValue || !header || header !== cookieValue) {
-    send(req, res, 403, { error: "CSRF_VALIDATION_FAILED", message: "Your session could not be verified. Please refresh the page and try again." });
-    return false;
-  }
-  return true;
-};
 
 const safeUser = (row) => (row ? { id: row.id, name: row.name, email: row.email, role: row.role, createdAt: row.created_at, emailVerifiedAt: row.email_verified_at || null } : null);
 const parseJsonArray = (value) => {
@@ -526,130 +52,7 @@ const addressRow = (row) => ({
   createdAt: row.created_at,
   updatedAt: row.updated_at,
 });
-const normalizeEmail = (email) =>
-  String(email || "")
-    .trim()
-    .toLowerCase();
-const uid = (prefix = "u") => `${prefix}${crypto.randomBytes(8).toString("hex")}`;
-const token = () => crypto.randomBytes(32).toString("base64url");
-const sha256 = (value) => crypto.createHash("sha256").update(value).digest("hex");
-const scrypt = (password, salt) => crypto.scryptSync(password, salt, 64);
 
-const hashPassword = (password) => {
-  const salt = crypto.randomBytes(16).toString("hex");
-  const derived = scrypt(password, salt);
-  return `scrypt$${salt}$${derived.toString("hex")}`;
-};
-
-const verifyPassword = (password, encoded) => {
-  const [algorithm, salt, hex] = String(encoded || "").split("$");
-  if (algorithm !== "scrypt" || !salt || !hex) return false;
-  const expected = Buffer.from(hex, "hex");
-  const actual = scrypt(password, salt);
-  return expected.length === actual.length && crypto.timingSafeEqual(expected, actual);
-};
-
-
-const BASE32_ALPHABET = "ABCDEFGHIJKLMNOPQRSTUVWXYZ234567";
-const base32Encode = (buffer) => {
-  let bits = 0;
-  let value = 0;
-  let output = "";
-  for (const byte of buffer) {
-    value = (value << 8) | byte;
-    bits += 8;
-    while (bits >= 5) {
-      output += BASE32_ALPHABET[(value >>> (bits - 5)) & 31];
-      bits -= 5;
-    }
-  }
-  if (bits > 0) output += BASE32_ALPHABET[(value << (5 - bits)) & 31];
-  return output;
-};
-const base32Decode = (input) => {
-  const cleaned = String(input || "").toUpperCase().replace(/=+$/g, "");
-  let bits = 0;
-  let value = 0;
-  const bytes = [];
-  for (const char of cleaned) {
-    const index = BASE32_ALPHABET.indexOf(char);
-    if (index < 0) throw new Error("Invalid Base32 secret");
-    value = (value << 5) | index;
-    bits += 5;
-    if (bits >= 8) {
-      bytes.push((value >>> (bits - 8)) & 0xff);
-      bits -= 8;
-    }
-  }
-  return Buffer.from(bytes);
-};
-const totpCode = (secret, timestamp = Date.now()) => {
-  const key = base32Decode(secret);
-  const counter = Math.floor(timestamp / 1000 / 30);
-  const msg = Buffer.alloc(8);
-  msg.writeBigUInt64BE(BigInt(counter));
-  const digest = crypto.createHmac("sha1", key).update(msg).digest();
-  const offset = digest[digest.length - 1] & 15;
-  const binary = ((digest[offset] & 127) << 24) | (digest[offset + 1] << 16) | (digest[offset + 2] << 8) | digest[offset + 3];
-  return String(binary % 1_000_000).padStart(6, "0");
-};
-const verifyTotp = (secret, code) => {
-  const normalized = String(code || "").replace(/\s+/g, "");
-  if (!/^\d{6}$/.test(normalized)) return false;
-  const now = Date.now();
-  for (const drift of [-30_000, 0, 30_000]) if (crypto.timingSafeEqual(Buffer.from(totpCode(secret, now + drift)), Buffer.from(normalized))) return true;
-  return false;
-};
-const createTwoFactorChallenge = (userId) => {
-  const raw = token();
-  const now = Date.now();
-  db.prepare("DELETE FROM two_factor_challenges WHERE expires_at<=?").run(now);
-  db.prepare("DELETE FROM two_factor_challenges WHERE user_id=?").run(userId);
-  db.prepare("INSERT INTO two_factor_challenges(token_hash,user_id,created_at,expires_at,attempts) VALUES (?,?,?,?,0)").run(sha256(raw), userId, now, now + 5 * 60_000);
-  return raw;
-};
-const getTwoFactorChallenge = (raw) => raw ? db.prepare("SELECT * FROM two_factor_challenges WHERE token_hash=? AND expires_at>? AND attempts<5").get(sha256(raw), Date.now()) : null;
-const consumeTwoFactorChallenge = (raw) => { const row = getTwoFactorChallenge(raw); if (!row) return null; db.prepare("DELETE FROM two_factor_challenges WHERE token_hash=?").run(sha256(raw)); return row; };
-const otpauthUri = (secret, email) => `otpauth://totp/FikarNot:${encodeURIComponent(email)}?secret=${secret}&issuer=FikarNot&algorithm=SHA1&digits=6&period=30`;
-
-const validatePassword = (password) => typeof password === "string" && password.length >= 6;
-const validateName = (name) => typeof name === "string" && name.trim().length >= 2;
-const validateEmail = (email) => /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(normalizeEmail(email));
-
-// Checks a password against the Have I Been Pwned breach corpus using the
-// k-anonymity range API: only the first 5 chars of the SHA-1 hash are ever sent,
-// so the real password/hash never leaves the server. This is a *soft* check —
-// on any network error, timeout, or non-2xx response we fail OPEN (allow the
-// password through) rather than blocking registration/reset because a third
-// party is unreachable.
-//
-// Disabled by default (opt-in) since it was blocking real customer signups
-// whose passwords happened to appear in a breach corpus with no way to
-// override it in the UI. Set FIKARNOT_ENABLE_BREACH_CHECK=1 in your
-// environment to turn it back on.
-const isPasswordPwned = async (password) => {
-  if (process.env.FIKARNOT_ENABLE_BREACH_CHECK !== "1") return false;
-  try {
-    const sha1 = crypto.createHash("sha1").update(password).digest("hex").toUpperCase();
-    const prefix = sha1.slice(0, 5);
-    const suffix = sha1.slice(5);
-    const controller = new AbortController();
-    const timeout = setTimeout(() => controller.abort(), 3000);
-    const response = await fetch(`https://api.pwnedpasswords.com/range/${prefix}`, {
-      signal: controller.signal,
-      headers: { "Add-Padding": "true" },
-    }).finally(() => clearTimeout(timeout));
-    if (!response.ok) return false;
-    const body = await response.text();
-    return body.split("\n").some((line) => {
-      const [lineSuffix, count] = line.trim().split(":");
-      return lineSuffix === suffix && Number(count) > 0;
-    });
-  } catch (error) {
-    console.warn("[FikarNot] Breach check unavailable, allowing password:", error.message);
-    return false;
-  }
-};
 
 const ensureSeedUsers = () => {
   const existing = db.prepare("SELECT COUNT(*) AS count FROM users").get().count;
@@ -1110,27 +513,6 @@ const reportOperationalError = async (error, req) => {
   }
 };
 
-const sendTransactionalEmail = async ({ to, subject, html, text, idempotencyKey }) => {
-  if (!to) return { sent: false, reason: "missing_recipient" };
-  if (!gmailTransporter) {
-    if (!isProduction) console.log(`[FikarNot] Email not configured. Would send: ${subject} -> ${to}`);
-    return { sent: false, reason: "email_not_configured" };
-  }
-  try {
-    const info = await gmailTransporter.sendMail({
-      from: `FikarNot <${GMAIL_USER}>`,
-      to,
-      subject,
-      html,
-      text,
-      headers: idempotencyKey ? { "X-Idempotency-Key": idempotencyKey } : undefined,
-    });
-    return { sent: true, id: info?.messageId || null };
-  } catch (error) {
-    console.error("[FikarNot] Email provider request failed", error.message);
-    return { sent: false, reason: "provider_unreachable" };
-  }
-};
 
 const sendWelcomeEmail = async (user) => sendTransactionalEmail({
   to: user.email,
@@ -1603,7 +985,7 @@ const server = http.createServer(async (req, res) => {
       if (!validateName(name)) return send(req, res, 400, { error: "INVALID_NAME", message: "Name must be at least 2 characters." });
       if (!validateEmail(email)) return send(req, res, 400, { error: "INVALID_EMAIL", message: "Enter a valid email address." });
       if (!validatePassword(password))
-        return send(req, res, 400, { error: "WEAK_PASSWORD", message: "Password must be at least 6 characters." });
+        return send(req, res, 400, { error: "WEAK_PASSWORD", message: "Password must be at least 8 characters." });
       if (await isPasswordPwned(password))
         return send(req, res, 400, { error: "PASSWORD_COMPROMISED", message: "That password has appeared in a known data breach. Please choose a different one." });
       const exists = db.prepare("SELECT id FROM users WHERE email=?").get(email);
@@ -1632,7 +1014,7 @@ const server = http.createServer(async (req, res) => {
       const response = { user: safeUser(createdUser), requiresVerification: true };
       // If email isn't configured at all, hand the link back directly
       // instead of leaving the person stuck with no way to verify.
-      if (!isProduction && !gmailTransporter) response.devVerificationUrl = verifyUrl;
+      if (!isProduction && !emailConfigured) response.devVerificationUrl = verifyUrl;
       send(req, res, 201, response);
       return;
     }
@@ -1700,13 +1082,13 @@ const server = http.createServer(async (req, res) => {
         const rawToken = createEmailVerificationToken(user.id);
         verificationUrl = `${APP_ORIGIN}/verify-email?token=${encodeURIComponent(rawToken)}`;
         void sendVerificationEmail(user, verificationUrl);
-        if (!isProduction && !gmailTransporter) console.log(`[FikarNot] Email verification link for ${email}: ${verificationUrl}`);
+        if (!isProduction && !emailConfigured) console.log(`[FikarNot] Email verification link for ${email}: ${verificationUrl}`);
       }
       // Same reasoning as /forgot-password: this takes a bare email with no proof
       // of ownership, and completing verification logs the caller in as that user
       // — so the fallback link only appears outside production, never here.
       const response = { ok: true, message: "If the account exists and still needs verification, a new verification link has been prepared." };
-      if (verificationUrl && !isProduction && !gmailTransporter) response.devVerificationUrl = verificationUrl;
+      if (verificationUrl && !isProduction && !emailConfigured) response.devVerificationUrl = verificationUrl;
       return send(req, res, 200, response);
     }
 
@@ -1726,7 +1108,7 @@ const server = http.createServer(async (req, res) => {
         const rawToken = createPasswordResetToken(user.id);
         resetUrl = `${APP_ORIGIN}/reset-password?token=${encodeURIComponent(rawToken)}`;
         void sendPasswordResetEmail(db.prepare("SELECT * FROM users WHERE id=?").get(user.id), resetUrl);
-        if (!isProduction && !gmailTransporter) console.log(`[FikarNot] Password reset link for ${email}: ${resetUrl}`);
+        if (!isProduction && !emailConfigured) console.log(`[FikarNot] Password reset link for ${email}: ${resetUrl}`);
       }
 
       // NOTE: unlike /register below, this deliberately stays gated to non-production.
@@ -1734,7 +1116,7 @@ const server = http.createServer(async (req, res) => {
       // link grants a full password change — echoing it back to *any* caller
       // whenever delivery fails would be an account-takeover hole, not a convenience.
       const response = { ok: true, message: "If an account exists for that email, a password reset link has been prepared." };
-      if (resetUrl && !gmailTransporter && !isProduction) response.devResetUrl = resetUrl;
+      if (resetUrl && !emailConfigured && !isProduction) response.devResetUrl = resetUrl;
       return send(req, res, 200, response);
     }
 
@@ -1753,7 +1135,7 @@ const server = http.createServer(async (req, res) => {
       if (!resetRow) return send(req, res, 400, { error: "INVALID_RESET_TOKEN", message: "This reset link is invalid or has expired." });
       if (!validatePassword(newPassword)) {
         db.prepare("UPDATE password_reset_tokens SET used_at=NULL WHERE token_hash=?").run(sha256(rawToken));
-        return send(req, res, 400, { error: "WEAK_PASSWORD", message: "Password must be at least 6 characters." });
+        return send(req, res, 400, { error: "WEAK_PASSWORD", message: "Password must be at least 8 characters." });
       }
       if (await isPasswordPwned(newPassword)) {
         db.prepare("UPDATE password_reset_tokens SET used_at=NULL WHERE token_hash=?").run(sha256(rawToken));
@@ -1852,7 +1234,7 @@ const server = http.createServer(async (req, res) => {
         return send(req, res, 401, { error: "INVALID_PASSWORD", message: "Current password is incorrect." });
       }
       if (!validatePassword(newPassword))
-        return send(req, res, 400, { error: "WEAK_PASSWORD", message: "New password must be at least 6 characters." });
+        return send(req, res, 400, { error: "WEAK_PASSWORD", message: "New password must be at least 8 characters." });
       if (await isPasswordPwned(newPassword))
         return send(req, res, 400, { error: "PASSWORD_COMPROMISED", message: "That password has appeared in a known data breach. Please choose a different one." });
       db.prepare("UPDATE users SET password_hash=?,updated_at=? WHERE id=?").run(hashPassword(newPassword), Date.now(), user.id);
@@ -1998,7 +1380,7 @@ const server = http.createServer(async (req, res) => {
       if (duplicate) return send(req, res, 409, { error: 'EMAIL_IN_USE', message: 'Email is already in use.' });
       const now = Date.now();
       if (existing) {
-        if (password && !validatePassword(password)) return send(req, res, 400, { error: 'WEAK_PASSWORD', message: 'Password must be at least 6 characters.' });
+        if (password && !validatePassword(password)) return send(req, res, 400, { error: 'WEAK_PASSWORD', message: 'Password must be at least 8 characters.' });
         if (user.id === existing.id && role !== existing.role) return send(req, res, 400, { error: 'SELF_ROLE_CHANGE', message: 'You cannot change your own role.' });
         if (password) {
           db.prepare("UPDATE users SET name=?,email=?,role=?,password_hash=?,updated_at=? WHERE id=?").run(name,email,role,hashPassword(password),now,id);
@@ -2006,7 +1388,7 @@ const server = http.createServer(async (req, res) => {
           db.prepare("UPDATE users SET name=?,email=?,role=?,updated_at=? WHERE id=?").run(name,email,role,now,id);
         }
       } else {
-        if (!validatePassword(password)) return send(req, res, 400, { error: 'WEAK_PASSWORD', message: 'A password of at least 6 characters is required.' });
+        if (!validatePassword(password)) return send(req, res, 400, { error: 'WEAK_PASSWORD', message: 'A password of at least 8 characters is required.' });
         db.prepare("INSERT INTO users (id,name,email,password_hash,role,created_at,updated_at,email_verified_at) VALUES (?,?,?,?,?,?,?,?)").run(id,name,email,hashPassword(password),role,now,now,now);
       }
       if (existing) {
@@ -3044,8 +2426,6 @@ const shutdown = (signal) => {
     try { db.close(); } finally { process.exit(0); }
   });
 };
-
-const PORT = process.env.PORT || 3000;
 
 server.listen(PORT, "0.0.0.0", () => {
   console.log(`[FikarNot API] Running smoothly on port ${PORT}`);

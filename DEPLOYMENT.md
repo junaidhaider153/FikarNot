@@ -9,14 +9,20 @@ Set these on the server, never in the frontend bundle:
 - `FIKARNOT_FRONTEND_ORIGIN`
 - `FIKARNOT_APP_URL`
 - `SITE_URL`
-- `RESEND_API_KEY`
-- `RESEND_FROM_EMAIL`
+- `GMAIL_OAUTH_CLIENT_ID`
+- `GMAIL_OAUTH_CLIENT_SECRET`
+- `GMAIL_OAUTH_REFRESH_TOKEN`
+- `GMAIL_SENDER_EMAIL`
 - `FIKARNOT_DATA_DIR`
 - `FIKARNOT_SEED_DEMO_DATA=0`
 - `FIKARNOT_ENABLE_MOCK_PAYMENTS=0`
 - `FIKARNOT_EXPOSE_RESET_LINKS=0`
 
 Run `npm run check:production` before starting a production deployment.
+
+## Email
+
+Transactional email (verification, password reset, order confirmation/status, return status) is sent via the **Gmail REST API over HTTPS (port 443)**, not SMTP — this avoids relying on outbound SMTP ports, which some hosts (including Railway) restrict or don't guarantee. See `.env.example` for the one-time Google Cloud setup, and run `node scripts/get-gmail-refresh-token.mjs` once to obtain `GMAIL_OAUTH_REFRESH_TOKEN`. If the four `GMAIL_OAUTH_*`/`GMAIL_SENDER_EMAIL` variables are not set, the API logs email content instead of sending (non-production only) — sending is required in production.
 
 ## Database
 

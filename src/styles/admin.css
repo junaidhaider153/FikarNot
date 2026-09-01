@@ -1,0 +1,157 @@
+/* admin */
+.admin {
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  gap: 26px;
+  padding: 36px 0;
+}
+.admin-side {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 14px;
+  height: fit-content;
+  position: sticky;
+  top: 86px;
+}
+.side-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  padding: 11px 13px;
+  border: none;
+  background: none;
+  border-radius: 12px;
+  font: 600 14px "Inter";
+  color: var(--ink2);
+  cursor: pointer;
+  transition: 0.15s;
+  text-align: left;
+  text-decoration: none;
+}
+.side-btn:hover {
+  background: #f4f0e6;
+  color: var(--ink);
+}
+.side-btn.active {
+  background: var(--ink);
+  color: var(--lime);
+}
+.side-btn .n {
+  margin-left: auto;
+  font: 700 11px "Space Grotesk";
+  background: #efeae0;
+  color: var(--ink2);
+  border-radius: 999px;
+  padding: 2px 8px;
+}
+.side-btn.active .n {
+  background: rgba(255, 255, 255, 0.15);
+  color: var(--lime);
+}
+.stat-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.stat {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 18px;
+}
+.stat .ic {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--lime);
+  display: grid;
+  place-items: center;
+  margin-bottom: 12px;
+}
+.stat b {
+  font: 700 24px "Space Grotesk";
+  display: block;
+}
+.stat span {
+  font-size: 12.5px;
+  color: var(--ink2);
+}
+.chart-row {
+  display: grid;
+  grid-template-columns: 1.5fr 1fr;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.chart-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 18px;
+}
+.chart-card h4 {
+  font: 700 14px "Space Grotesk";
+  margin-bottom: 12px;
+}
+.table-wrap {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  overflow: auto;
+}
+.tbl {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 14px;
+  min-width: 640px;
+}
+.tbl th {
+  font: 600 11px "Space Grotesk";
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink2);
+  text-align: left;
+  padding: 13px 16px;
+  border-bottom: 1px solid var(--line);
+  background: #fbf9f4;
+}
+.tbl td {
+  padding: 12px 16px;
+  border-bottom: 1px solid var(--line);
+  vertical-align: middle;
+}
+.tbl tr:last-child td {
+  border-bottom: none;
+}
+.tbl tbody tr:hover {
+  background: #fbf9f4;
+}
+.thumb {
+  width: 44px;
+  height: 44px;
+  border-radius: 10px;
+  object-fit: cover;
+}
+.role-badge {
+  font: 600 11px "Space Grotesk";
+  letter-spacing: 0.06em;
+  text-transform: uppercase;
+  padding: 4px 10px;
+  border-radius: 999px;
+  background: #f1ede2;
+}
+.role-badge.admin {
+  background: var(--lime);
+}
+.role-badge.editor {
+  background: #e4e9ff;
+}
+.status-sel {
+  border: 1px solid var(--line);
+  border-radius: 999px;
+  padding: 5px 10px;
+  font: 600 12px "Inter";
+  background: #fff;
+}

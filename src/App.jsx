@@ -4,7 +4,7 @@ import { AppRouter } from "./router/AppRouter";
 import { Boot } from "./router/routes";
 import { ErrorCard } from "./components/common";
 import { ErrorBoundary } from "./components/common/ErrorBoundary";
-import "./styles.css";
+import "./styles/index.css";
 
 export default function App() {
   const state = useApp();

@@ -860,7 +860,7 @@ export const appActions = {
   async changePassword(currentPassword, newPassword) {
     if (!state.session) return false;
     if (newPassword.length < 8) {
-      toast("New password must be at least 12 characters", "err");
+      toast("New password must be at least 8 characters", "err");
       return false;
     }
     try {

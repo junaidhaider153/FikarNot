@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
-import { useApp, appActions } from "../store/appStore";
-import { useDebounced } from "../hooks/useDebounced";
-import { fmt } from "../utils/helpers";
-import { relevance } from "../utils/search";
-import { Ic } from "./icons";
+import { useApp, appActions } from "../../store/appStore";
+import { useDebounced } from "../../hooks/useDebounced";
+import { fmt } from "../../utils/helpers";
+import { relevance } from "../../utils/search";
+import { Ic } from "../icons";
+import { WHATSAPP_NUMBER } from "../../config/appConfig";
 
 export function HeaderSearch() {
   const s = useApp();
@@ -346,6 +347,53 @@ export function Toast() {
       <span className="dot" />
       {s.toast.msg}
     </div>
+  );
+}
+
+function WhatsAppIcon() {
+  // Generic chat-bubble/phone glyph — deliberately not a reproduction of the
+  // WhatsApp brand logo, just an icon that reads clearly against the
+  // existing .whatsapp-float-icon badge styling.
+  return (
+    <svg viewBox="0 0 24 24" width="16" height="16" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="M21 11.5a8.38 8.38 0 0 1-.9 3.8 8.5 8.5 0 0 1-7.6 4.7 8.38 8.38 0 0 1-3.8-.9L3 21l1.9-5.7a8.38 8.38 0 0 1-.9-3.8 8.5 8.5 0 0 1 4.7-7.6 8.38 8.38 0 0 1 3.8-.9h.5a8.48 8.48 0 0 1 8 8v.5z" />
+    </svg>
+  );
+}
+
+function WhatsAppFloat() {
+  const s = useApp();
+  const number = String(s.siteSettings?.whatsappNumber || WHATSAPP_NUMBER || "").replace(/[^0-9]/g, "");
+  if (!number) return null;
+  return (
+    <a
+      className="whatsapp-float"
+      href={`https://wa.me/${number}`}
+      target="_blank"
+      rel="noreferrer noopener"
+      aria-label="Chat with us on WhatsApp"
+    >
+      <span className="whatsapp-float-icon">
+        <WhatsAppIcon />
+      </span>
+      <span>Chat with us</span>
+    </a>
+  );
+}
+
+export function Layout({ children }) {
+  return (
+    <>
+      <a className="skip-link" href="#main-content">
+        Skip to content
+      </a>
+      <Marquee />
+      <Header />
+      <main id="main-content">{children}</main>
+      <Footer />
+      <Toast />
+      <WhatsAppFloat />
+    </>
   );
 }
 

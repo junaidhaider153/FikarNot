@@ -15,8 +15,10 @@ const requireEnv = (name) => {
 
 requireEnv("FIKARNOT_FRONTEND_ORIGIN");
 requireEnv("FIKARNOT_APP_URL");
-requireEnv("RESEND_API_KEY");
-requireEnv("RESEND_FROM_EMAIL");
+requireEnv("GMAIL_OAUTH_CLIENT_ID");
+requireEnv("GMAIL_OAUTH_CLIENT_SECRET");
+requireEnv("GMAIL_OAUTH_REFRESH_TOKEN");
+requireEnv("GMAIL_SENDER_EMAIL");
 requireEnv("SITE_URL");
 requireEnv("SITEMAP_API_URL");
 

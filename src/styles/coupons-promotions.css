@@ -1,0 +1,130 @@
+/* Module 15 — coupons & promotions */
+.coupon-form {
+  margin: 18px 0;
+  padding: 14px;
+  background: #fbf9f4;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.coupon-input-row {
+  display: flex;
+  gap: 8px;
+}
+.coupon-input-row .input {
+  min-width: 0;
+}
+.coupon-input-row .btn {
+  flex: none;
+}
+.coupon-success {
+  margin-top: 7px;
+  font-size: 12.5px;
+  color: var(--ok);
+  font-weight: 700;
+}
+.coupon-discount-row {
+  color: var(--ok);
+  font-weight: 600;
+}
+.form-hint {
+  margin-top: 5px;
+  font-size: 11.5px;
+  color: var(--ink2);
+}
+.admin-tab-actions {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 18px;
+}
+.table-actions {
+  display: flex;
+  gap: 6px;
+}
+.coupon-status {
+  display: inline-flex;
+  align-items: center;
+  padding: 4px 9px;
+  border-radius: 999px;
+  font: 700 11px "Space Grotesk";
+  text-transform: uppercase;
+  letter-spacing: 0.06em;
+  background: #f1ede2;
+  color: var(--ink2);
+}
+.coupon-status.active {
+  background: #edf7ee;
+  color: var(--ok);
+}
+.coupon-status.paused {
+  background: #f1ede2;
+  color: var(--ink2);
+}
+.coupon-status.expired {
+  background: #fbe8e2;
+  color: var(--err);
+}
+.coupon-table-wrap .tbl {
+  min-width: 860px;
+}
+.offers-section {
+  padding-top: 8px;
+}
+.offer-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+}
+.offer-card {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  background: #17150f;
+  color: #fff;
+  border-radius: var(--r);
+  padding: 18px;
+  min-height: 120px;
+}
+.offer-card p {
+  color: #b9b2a5;
+  font-size: 12.5px;
+  margin-top: 4px;
+}
+.offer-code {
+  display: inline-flex;
+  margin-bottom: 7px;
+  padding: 4px 9px;
+  border-radius: 999px;
+  background: var(--lime);
+  color: var(--ink);
+  font: 700 11px "Space Grotesk";
+  letter-spacing: 0.08em;
+}
+.offer-card strong {
+  display: block;
+  font: 700 20px/1.15 "Space Grotesk";
+}
+@media (max-width: 900px) {
+  .offer-grid {
+    grid-template-columns: 1fr;
+  }
+  .admin-tab-actions {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+}
+@media (max-width: 520px) {
+  .coupon-input-row {
+    flex-direction: column;
+  }
+  .coupon-input-row .btn {
+    width: 100%;
+  }
+  .offer-card {
+    flex-direction: column;
+    align-items: flex-start;
+  }
+}
+

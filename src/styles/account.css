@@ -1,0 +1,511 @@
+/* ============================ account ==================================== */
+.user-link {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  text-decoration: none;
+  color: inherit;
+}
+.user-link:hover .uname {
+  text-decoration: underline;
+}
+.auth-panel {
+  padding: 28px;
+  max-width: 560px;
+  margin: 0 auto;
+}
+.auth-intro {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  margin-bottom: 24px;
+}
+.auth-intro .eyebrow {
+  margin-top: 2px;
+}
+.auth-title {
+  font-size: 30px;
+  margin-top: 4px;
+}
+.auth-sub {
+  color: var(--ink2);
+  margin-top: 4px;
+  max-width: 48ch;
+}
+.field {
+  margin-bottom: 12px;
+}
+.auth-submit {
+  width: 100%;
+  margin-top: 4px;
+}
+.demo-login {
+  border-top: 1px solid var(--line);
+  margin-top: 22px;
+  padding-top: 18px;
+}
+.demo-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+}
+.auth-footnote {
+  border-top: 1px solid var(--line);
+  margin-top: 22px;
+  padding-top: 18px;
+  font-size: 13px;
+}
+.auth-footnote a {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  text-decoration: none;
+  color: var(--ink2);
+  font-weight: 600;
+}
+.auth-footnote a:hover {
+  color: var(--ink);
+}
+.account-layout {
+  display: grid;
+  grid-template-columns: 230px 1fr;
+  gap: 26px;
+  padding: 36px 0;
+}
+.account-side {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 16px;
+  height: fit-content;
+  position: sticky;
+  top: 86px;
+}
+.account-identity {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 4px 4px 16px;
+  border-bottom: 1px solid var(--line);
+}
+.account-identity > div {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+}
+.account-identity b {
+  font: 700 14px "Space Grotesk";
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.account-identity span {
+  font-size: 11.5px;
+  color: var(--ink2);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.account-avatar {
+  width: 42px;
+  height: 42px;
+  border-radius: 14px;
+  background: var(--lime);
+  display: grid;
+  place-items: center;
+  font: 700 14px "Space Grotesk";
+  color: var(--ink);
+  flex: none;
+}
+.account-nav {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 12px;
+}
+.account-nav-btn {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  width: 100%;
+  border: 0;
+  background: none;
+  border-radius: 12px;
+  padding: 11px 12px;
+  color: var(--ink2);
+  font: 600 13.5px "Inter";
+  text-align: left;
+  cursor: pointer;
+}
+.account-nav-btn:hover {
+  background: #f4f0e6;
+  color: var(--ink);
+}
+.account-nav-btn.active {
+  background: var(--ink);
+  color: var(--lime);
+}
+.account-nav-btn.danger {
+  margin-top: 8px;
+  color: var(--err);
+}
+.account-count {
+  margin-left: auto;
+  font: 700 11px "Space Grotesk";
+  background: #efeae0;
+  border-radius: 999px;
+  padding: 2px 7px;
+}
+.account-nav-btn.active .account-count {
+  background: rgba(255, 255, 255, 0.14);
+  color: var(--lime);
+}
+.account-main {
+  min-width: 0;
+}
+.account-heading {
+  display: flex;
+  align-items: flex-end;
+  justify-content: space-between;
+  gap: 18px;
+  margin-bottom: 22px;
+  flex-wrap: wrap;
+}
+.account-heading p:not(.eyebrow) {
+  color: var(--ink2);
+  margin-top: 5px;
+}
+.account-stats {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.account-stat {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 18px;
+}
+.account-stat .ic {
+  width: 36px;
+  height: 36px;
+  border-radius: 10px;
+  background: var(--lime);
+  display: grid;
+  place-items: center;
+  margin-bottom: 12px;
+}
+.account-stat b {
+  display: block;
+  font: 700 22px "Space Grotesk";
+}
+.account-stat span:last-child {
+  font-size: 12px;
+  color: var(--ink2);
+}
+.account-grid-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+}
+.account-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 22px;
+  margin-bottom: 14px;
+}
+.account-card-head {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 14px;
+}
+.account-card h2 {
+  font: 700 19px "Space Grotesk";
+}
+.account-muted {
+  color: var(--ink2);
+  font-size: 13px;
+  margin-bottom: 14px;
+}
+.account-note {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  background: #f1ede2;
+  border-radius: 10px;
+  padding: 10px 12px;
+  font-size: 13px;
+  color: var(--ink2);
+}
+.account-status {
+  display: inline-flex;
+  align-items: center;
+  border-radius: 999px;
+  padding: 4px 10px;
+  font: 600 11px "Space Grotesk";
+  letter-spacing: 0.04em;
+  text-transform: capitalize;
+  background: #f1ede2;
+  color: var(--ink2);
+}
+.account-status.paid {
+  background: #edf7ee;
+  color: var(--ok);
+}
+.account-status.processing {
+  background: #fff2d6;
+  color: #8a5a00;
+}
+.account-status.shipped {
+  background: #e4e9ff;
+  color: #3c4fc3;
+}
+.account-status.delivered {
+  background: #edf7ee;
+  color: var(--ok);
+}
+.account-status.cancelled {
+  background: #fbe8e2;
+  color: var(--err);
+}
+.account-order-list {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.order-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  overflow: hidden;
+}
+.order-card summary {
+  list-style: none;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 16px;
+  padding: 16px 18px;
+}
+.order-card summary::-webkit-details-marker {
+  display: none;
+}
+.order-card summary > div {
+  display: flex;
+  align-items: center;
+  gap: 14px;
+  flex-wrap: wrap;
+}
+.order-card summary strong {
+  font: 700 15px "Space Grotesk";
+}
+.order-card summary span:not(.account-status) {
+  font-size: 12px;
+  color: var(--ink2);
+}
+.order-card summary b {
+  font: 700 15px "Space Grotesk";
+}
+.order-body {
+  border-top: 1px solid var(--line);
+  padding: 16px 18px;
+}
+.order-progress {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  padding: 14px 0 18px;
+  margin-bottom: 12px;
+  border-bottom: 1px solid var(--line);
+}
+.order-progress-step {
+  display: flex;
+  gap: 9px;
+  align-items: flex-start;
+  min-width: 0;
+  opacity: 0.45;
+}
+.order-progress-step.active {
+  opacity: 1;
+}
+.order-progress-step .step-n {
+  margin-top: 1px;
+  width: 25px;
+  height: 25px;
+  border-radius: 8px;
+  flex: none;
+}
+.order-progress-step strong {
+  display: block;
+  font: 700 13px "Space Grotesk";
+}
+.order-progress-step p {
+  font-size: 11px;
+  color: var(--ink2);
+  margin-top: 2px;
+}
+.cancelled-progress {
+  grid-template-columns: 1fr;
+}
+.order-items {
+  margin-bottom: 8px;
+}
+.order-item {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 6px 0;
+  font-size: 13px;
+}
+.address-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 14px;
+}
+.address-card {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.address-card.default {
+  box-shadow: inset 0 0 0 2px rgba(205, 242, 81, 0.7);
+}
+.address-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-bottom: 8px;
+}
+.address-label {
+  font: 700 15px "Space Grotesk";
+}
+.address-card > span {
+  font-size: 13px;
+  color: var(--ink2);
+}
+.address-actions {
+  display: flex;
+  gap: 8px;
+  margin-top: 14px;
+}
+.form-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+}
+@media (max-width: 960px) {
+  .account-layout {
+    grid-template-columns: 1fr;
+  }
+  .account-side {
+    position: static;
+  }
+  .account-nav {
+    display: flex;
+    flex-direction: row;
+    overflow: auto;
+  }
+  .account-nav-btn {
+    width: auto;
+    white-space: nowrap;
+  }
+  .account-nav-btn.danger {
+    margin-top: 0;
+  }
+  .account-stats {
+    grid-template-columns: 1fr 1fr;
+  }
+  .account-grid-two {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 720px) {
+  .auth-panel {
+    padding: 20px;
+  }
+  .account-layout {
+    padding-top: 24px;
+  }
+  .account-stats {
+    grid-template-columns: 1fr;
+  }
+  .address-grid {
+    grid-template-columns: 1fr;
+  }
+  .order-card summary {
+    align-items: flex-start;
+    flex-direction: column;
+  }
+  .order-card summary > div:last-child {
+    width: 100%;
+    justify-content: space-between;
+  }
+  .form-actions {
+    justify-content: stretch;
+    flex-direction: column;
+  }
+  .form-actions .btn {
+    width: 100%;
+  }
+}
+
+/* Module 9: account deletion */
+.account-danger-zone {
+  border-color: #f3cfc5;
+  background: #fff9f7;
+}
+.account-danger-zone h2 {
+  color: var(--err);
+}
+.delete-account-warning {
+  border: 1px solid #f3cfc5;
+  background: #fdf3f0;
+  border-radius: 14px;
+  padding: 18px;
+  text-align: center;
+}
+.delete-account-warning .empty-ic {
+  background: #fbe8e2;
+  color: var(--err);
+  margin-bottom: 10px;
+}
+.delete-account-warning h3 {
+  font-size: 20px;
+}
+.delete-account-warning p {
+  color: var(--ink2);
+  font-size: 13px;
+  margin-top: 6px;
+}
+
+.checkout-access-card {
+  display: flex;
+  align-items: flex-start;
+  gap: 14px;
+  padding: 16px;
+  background: #f7f4ec;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.checkout-access-card h3 {
+  margin: 0 0 4px;
+  font: 700 18px "Space Grotesk";
+}
+.checkout-access-card p {
+  margin: 0;
+  color: var(--ink2);
+  font-size: 13.5px;
+}
+

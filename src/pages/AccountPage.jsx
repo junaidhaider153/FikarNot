@@ -747,7 +747,7 @@ export default function AccountPage() {
                   </div>
                 </div>
                 <p className="account-note">
-                  <Ic n="shield" s={15} /> Use at least 6 characters for this demo project.
+                  <Ic n="shield" s={15} /> Use at least 8 characters.
                 </p>
                 <div className="form-actions">
                   <button className="btn btn-dark">

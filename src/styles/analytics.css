@@ -1,0 +1,127 @@
+/* ============================ analytics ================================ */
+.analytics-toolbar {
+  display: flex;
+  justify-content: space-between;
+  align-items: end;
+  gap: 24px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+}
+.analytics-title {
+  font-size: 30px;
+  margin: 4px 0 4px;
+}
+.analytics-sub {
+  color: var(--ink2);
+  max-width: 60ch;
+}
+.analytics-actions {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.analytics-select-label {
+  font: 600 11px "Space Grotesk";
+  letter-spacing: 0.1em;
+  text-transform: uppercase;
+  color: var(--ink2);
+}
+.analytics-range {
+  width: auto;
+  min-width: 140px;
+}
+.analytics-signal-row {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 12px;
+  margin: 0 0 20px;
+}
+.analytics-signal {
+  background: #fff;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px 16px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+}
+.analytics-signal strong {
+  font: 700 22px "Space Grotesk";
+}
+.analytics-signal span {
+  font-size: 12.5px;
+  color: var(--ink2);
+}
+.analytics-signal.danger strong {
+  color: var(--err);
+}
+.analytics-chart-card {
+  min-width: 0;
+}
+.analytics-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 18px 18px 0;
+}
+.analytics-card-head h3 {
+  font-size: 17px;
+  margin: 0;
+}
+.analytics-card-head span {
+  font-size: 12px;
+  color: var(--ink2);
+}
+.analytics-empty {
+  min-height: 270px;
+  display: grid;
+  place-items: center;
+  color: var(--ink2);
+  font-size: 13px;
+  padding: 20px;
+}
+.analytics-grid-two {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 14px;
+  margin-bottom: 20px;
+}
+.analytics-table-card {
+  min-width: 0;
+}
+.analytics-table-card .tbl {
+  min-width: 0;
+}
+.analytics-table-card small {
+  font-size: 11px;
+  color: var(--ink2);
+}
+@media (max-width: 960px) {
+  .analytics-signal-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .analytics-grid-two {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 720px) {
+  .analytics-signal-row {
+    grid-template-columns: 1fr;
+  }
+  .analytics-toolbar {
+    align-items: stretch;
+  }
+  .analytics-actions {
+    width: 100%;
+  }
+  .analytics-range {
+    flex: 1;
+  }
+  .analytics-actions .btn {
+    flex: 1;
+  }
+}
+

@@ -305,7 +305,7 @@ export function UserEditor({ initial, onClose }) {
     const er = {};
     if (!f.name.trim()) er.name = "Required";
     if (!/.+@.+\..+/.test(f.email)) er.email = "Valid email required";
-    if (!initial && f.password.length < 12) er.password = "Min 12 chars";
+    if (!initial && f.password.length < 8) er.password = "Min 8 chars";
     setErrs(er);
     if (Object.keys(er).length) return;
     const ok = await appActions.upsertUser({
