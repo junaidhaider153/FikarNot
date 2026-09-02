@@ -1854,6 +1854,7 @@ function SettingsTab() {
     heroSubtitle: "",
     heroSticker: "",
     heroImage: "",
+    heroVideo: "",
     logoUrl: "",
     announcement: "",
     aboutTitle: "",
@@ -2016,6 +2017,13 @@ function SettingsTab() {
             )}
             {!heroImages.length && <p style={{ color: "var(--ink2)", fontSize: 13, marginTop: 8 }}>No hero images yet — the homepage will fall back to the default artwork.</p>}
           </div>
+        </div>
+        <div className="f-full">
+          <label className="lbl" htmlFor="settings-hero-video">Hero video URL (optional)</label>
+          <input id="settings-hero-video" className="input" placeholder="https://…/your-hero-video.mp4" value={form.heroVideo} onChange={(e) => set("heroVideo", e.target.value)} />
+          <p style={{ color: "var(--ink2)", fontSize: 12, marginTop: 4 }}>
+            Paste a direct link to a hosted .mp4 file (e.g. from Cloudinary, S3, or your CDN). When set, it plays as the first, full-width slide on the homepage — muted, looping, and using your first hero image above as the poster frame while it loads.
+          </p>
         </div>
         <div className="f-full"><label className="lbl" htmlFor="settings-announcement">Announcement bar</label><input id="settings-announcement" className="input" value={form.announcement} onChange={(e) => set("announcement", e.target.value)} /><p style={{ color: "var(--ink2)", fontSize: 12, marginTop: 4 }}>Separate multiple messages with a newline, a pipe ( | ) or a middle dot ( · ) to scroll several items.</p></div>
         <div className="f-full">
