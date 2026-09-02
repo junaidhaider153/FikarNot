@@ -11,7 +11,12 @@ const esc = (value) => String(value ?? "").replace(/&/g, "&amp;").replace(/</g, 
 const jsonEsc = (value) => JSON.stringify(value).replace(/</g, "\\u003c").replace(/>/g, "\\u003e").replace(/&/g, "\\u0026");
 
 const loadCatalog = async () => {
-  if (!SITEMAP_API_URL) return seedData();
+  if (!SITEMAP_API_URL) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("SITEMAP_API_URL is required in production builds — refusing to prerender demo/seed data.");
+    }
+    return seedData();
+  }
   
   const first = await fetch(`${SITEMAP_API_URL}/api/catalog?limit=100&offset=0`);
   if (!first.ok || first.headers.get("content-type")?.includes("text/html")) {
@@ -77,6 +82,10 @@ const main = async () => {
   try {
     catalog = await loadCatalog();
   } catch (error) {
+    if (process.env.NODE_ENV === "production") {
+      console.error(`SEO prerender failed in production: ${error.message}`);
+      process.exit(1);
+    }
     console.warn(`⚠️ Live SEO catalog load failed (${error.message}). Using local fallback seed data.`);
     catalog = seedData();
   }
