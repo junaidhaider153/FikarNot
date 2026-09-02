@@ -393,6 +393,7 @@ const DEFAULT_SITE_SETTINGS = {
   heroSticker: "NEW SEASON DROP",
   heroImage: "",
   heroImages: "[]",
+  heroVideo: "",
   logoUrl: "",
   navLinks: "[]",
   announcement: "Free shipping over PKR 5,000 · 30-day returns",
