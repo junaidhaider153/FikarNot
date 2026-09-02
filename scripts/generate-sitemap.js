@@ -34,7 +34,12 @@ ${urls
 `;
 
 const loadCatalog = async () => {
-  if (!SITEMAP_API_URL) return seedData();
+  if (!SITEMAP_API_URL) {
+    if (process.env.NODE_ENV === "production") {
+      throw new Error("SITEMAP_API_URL is required in production builds — refusing to write a demo/seed sitemap.");
+    }
+    return seedData();
+  }
   
   const first = await fetch(`${SITEMAP_API_URL}/api/catalog?limit=100&offset=0`);
   if (!first.ok || first.headers.get("content-type")?.includes("text/html")) {
@@ -62,8 +67,12 @@ try {
   writeFileSync(outPath, toXml(urls));
   console.log(`sitemap.xml written from ${SITEMAP_API_URL ? "live API" : "seed data"} with ${urls.length} URLs`);
 } catch (error) {
+  if (process.env.NODE_ENV === "production") {
+    console.error(`Sitemap generation failed in production: ${error.message}`);
+    process.exit(1);
+  }
   const catalog = seedData();
   const urls = buildUrls(catalog);
   writeFileSync(outPath, toXml(urls));
-  console.warn(`Live sitemap generation failed (${error.message}); wrote production fallback with ${urls.length} URLs.`);
+  console.warn(`Live sitemap generation failed (${error.message}); wrote local fallback with ${urls.length} URLs.`);
 }
