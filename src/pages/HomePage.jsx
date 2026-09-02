@@ -52,12 +52,13 @@ export default function HomePage() {
   const activeOffers = (s.coupons || []).filter((coupon) => isCouponUsable(coupon)).slice(0, 3);
   const recent = resolveRecentlyViewed(s.recentlyViewed, list, 4);
 
-  // Hero slider: opens on the existing hero shot, then cycles a few catalogue images.
-  // To add a real video slide once you have footage, drop the file in `public/media/`
-  // and add an entry here, e.g.:
-  //   { id: "video", type: "video", src: "/media/hero-loop.mp4", poster: IMG.hero }
+  // Hero slider: opens on a real video when one is set in Admin → Site Settings
+  // (site.heroVideo, an .mp4 URL), otherwise falls back to the existing hero shot,
+  // then cycles a few catalogue images.
   const heroSlides = [
-    { id: "hero", type: "image", src: site.heroImage || IMG.hero, alt: "FikarNot products arranged on a warm cream surface" },
+    site.heroVideo
+      ? { id: "hero-video", type: "video", src: site.heroVideo, poster: site.heroImage || IMG.hero }
+      : { id: "hero", type: "image", src: site.heroImage || IMG.hero, alt: "FikarNot products arranged on a warm cream surface" },
     ...GALLERY.slice(0, 3).map(([key, url]) => ({ id: key, type: "image", src: url, alt: `${key} from the FikarNot catalogue` })),
   ];
 
