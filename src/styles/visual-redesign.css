@@ -60,12 +60,12 @@ body {
   min-height: 620px;
   padding-top: 76px;
   padding-bottom: 64px;
+  grid-template-columns: 1fr; /* both hero-copy and hero-media stack full-width, at every breakpoint */
 }
 .hero-modern::before {
   content: "";
   position: absolute;
-  inset: 24px 8px auto;
-  height: 540px;
+  inset: 24px 8px;
   border-radius: 42px;
   background: linear-gradient(135deg, rgba(255, 255, 255, 0.92), rgba(242, 245, 252, 0.92));
   border: 1px solid rgba(255, 255, 255, 0.8);
@@ -91,13 +91,16 @@ body {
 }
 .hero-modern .h1 {
   font-size: clamp(2.8rem, 5.4vw, 5rem);
-  line-height: 0.98;
+  line-height: 1.12; /* was 0.98 — tighter than the text itself, so the highlighted second line overlapped the first */
   letter-spacing: -0.04em;
   max-width: 10ch;
 }
 .hero-modern .h1 em {
   color: #384aa8;
   background: linear-gradient(90deg, rgba(255, 107, 74, 0.85), rgba(215, 210, 255, 0.9));
+  padding: 0.06em 0.18em; /* explicit vertical breathing room so the highlight never hugs the glyphs */
+  border-radius: 0.18em;
+  box-decoration-break: clone;
 }
 .hero-sub {
   max-width: 54ch;
@@ -177,8 +180,9 @@ body {
 .hero-img {
   border-radius: 30px;
   box-shadow: 0 24px 60px rgba(24, 32, 51, 0.15);
-  aspect-ratio: 0.94/1;
-  transform: rotate(1deg);
+  aspect-ratio: 16/9;
+  width: 100%;
+  object-fit: cover;
   transition:
     transform 0.5s ease,
     box-shadow 0.5s ease;
@@ -193,9 +197,9 @@ body {
   overflow: hidden;
   border-radius: 30px;
   box-shadow: 0 24px 60px rgba(24, 32, 51, 0.15);
-  aspect-ratio: 0.94/1;
+  aspect-ratio: 16/9;
+  width: 100%;
   background: #f2eee4;
-  transform: rotate(1deg);
   transition:
     transform 0.5s ease,
     box-shadow 0.5s ease;
@@ -594,8 +598,7 @@ body {
     padding-top: 44px;
   }
   .hero-modern::before {
-    height: 880px;
-    inset: 16px 8px auto;
+    inset: 16px 8px;
   }
   .hero-copy {
     padding: 24px 8px 10px;
@@ -610,12 +613,6 @@ body {
   .hero-float-card-bottom {
     right: 10px;
     bottom: 24px;
-  }
-  .hero-img {
-    aspect-ratio: 1/0.86;
-  }
-  .hero-slider {
-    aspect-ratio: 1/0.86;
   }
 }
 @media (max-width: 720px) {
@@ -693,4 +690,3 @@ body {
     animation: none !important;
   }
 }
-
