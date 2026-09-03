@@ -35,11 +35,26 @@ function AdminRoute({ tab, roles }) {
   );
 }
 
-export function Boot() {
+export function Boot({ title = "FikarNot", text = "Setting up your shop — curating the good stuff." }) {
   return (
-    <div className="boot" role="status" aria-live="polite">
-      <span className="logo-mark display">F</span>
-      <p style={{ color: "var(--ink2)", fontWeight: 600 }}>Loading the shop…</p>
+    <div className="boot" role="status" aria-live="polite" aria-busy="true">
+      <div className="boot-card">
+        <div className="boot-mark">
+          <span className="boot-ring" aria-hidden="true" />
+          <span className="logo-mark display">F</span>
+        </div>
+        <div>
+          <p className="boot-title">{title}</p>
+          <p className="boot-text">{text}</p>
+        </div>
+        <span className="boot-bar" aria-hidden="true" />
+        <span className="boot-dots" aria-hidden="true">
+          <i />
+          <i />
+          <i />
+        </span>
+        <span className="sr-only">Loading, please wait…</span>
+      </div>
     </div>
   );
 }
