@@ -1,10 +1,10 @@
 import { useMemo, useState } from "react";
 import { Link } from "react-router-dom";
 import { useApp, appActions } from "../store/appStore";
-import { IMG, GALLERY } from "../assets/assets";
+import { IMG } from "../assets/assets";
 import { Ic } from "../components/icons";
 import { ProductCard } from "../components/ProductCard";
-import { HeroSlider } from "../components/HeroSlider";
+import { HeroVideo } from "../components/HeroVideo";
 import { Empty, SkelGrid } from "../components/common";
 import { api } from "../api/storeApi";
 import { siteApi } from "../api/siteApi";
@@ -52,15 +52,13 @@ export default function HomePage() {
   const activeOffers = (s.coupons || []).filter((coupon) => isCouponUsable(coupon)).slice(0, 3);
   const recent = resolveRecentlyViewed(s.recentlyViewed, list, 4);
 
-  // Hero slider: opens on a real video when one is set in Admin → Site Settings
-  // (site.heroVideo, an .mp4 URL), otherwise falls back to the existing hero shot,
-  // then cycles a few catalogue images.
-  const heroSlides = [
-    site.heroVideo
-      ? { id: "hero-video", type: "video", src: site.heroVideo, poster: site.heroImage || IMG.hero }
-      : { id: "hero", type: "image", src: site.heroImage || IMG.hero, alt: "FikarNot products arranged on a warm cream surface" },
-    ...GALLERY.slice(0, 3).map(([key, url]) => ({ id: key, type: "image", src: url, alt: `${key} from the FikarNot catalogue` })),
-  ];
+  // Full-bleed hero backdrop.
+  // Drop an mp4 (and optionally a webm) in `public/media/` — e.g. /media/hero-loop.mp4 —
+  // or set `heroVideo` in Studio. Until then the poster image is used with a slow
+  // Ken-Burns pan, so the hero never looks empty.
+  const heroPoster = site.heroImage || IMG.hero;
+  const heroVideoSrc = site.heroVideo || "";
+  const heroVideoWebm = site.heroVideoWebm || "";
 
   const subscribe = (event) => {
     event.preventDefault();
@@ -75,70 +73,70 @@ export default function HomePage() {
 
   return (
     <>
-      <section className="container hero hero-modern">
-        <div className="hero-copy">
-          <span className="hero-kicker">{site.heroKicker || "Curated essentials · Free shipping over $75"}</span>
-          <span className="eyebrow">{site.heroEyebrow || "FikarNot — objects for the everyday"}</span>
-          <h1 className="h1">
-            {site.heroTitle || "Everyday essentials,"}
-            <br />
-            <em>{site.heroHighlight || "beautifully chosen."}</em>
-          </h1>
-          <p className="hero-sub">
-            {site.heroSubtitle || "Discover a refined mix of tech, desk and everyday carry — selected for utility, character and the way they fit into real life."}
-          </p>
-          <div className="hero-cta">
-            <Link className="btn btn-dark" to="/products">
-              Shop new arrivals <Ic n="arrow" s={15} />
-            </Link>
-            <Link className="btn btn-ghost" to="/products?cat=c1">
-              Browse audio
-            </Link>
-          </div>
-          <div className="hero-proof-row" aria-label="Store benefits">
-            <span>
-              <b>4.8</b> average rating
-            </span>
-            <span>
-              <b>30-day</b> easy returns
-            </span>
-            <span>
-              <b>Secure</b> checkout
-            </span>
-          </div>
-          <div className="hero-stats" aria-label="Store highlights">
-            <div>
-              <b>{averageRating}</b>catalogue rating
+      {/* Full-bleed cinematic hero: video fills the whole band, copy sits on top of it. */}
+      <section className="hero-cinema" aria-label="FikarNot introduction">
+        <HeroVideo
+          src={heroVideoSrc}
+          webm={heroVideoWebm}
+          poster={heroPoster}
+          alt="FikarNot products arranged on a warm cream surface"
+        />
+
+        <div className="container hero-cinema-inner">
+          <div className="hero-cinema-copy">
+            <span className="hero-kicker">{site.heroKicker || "Curated essentials · Free shipping over $75"}</span>
+            <span className="eyebrow">{site.heroEyebrow || "FikarNot — objects for the everyday"}</span>
+            <h1 className="h1 hero-cinema-title">
+              <span className="hero-title-line">{site.heroTitle || "Everyday essentials,"}</span>
+              <span className="hero-title-line">
+                <em>{site.heroHighlight || "beautifully chosen."}</em>
+              </span>
+            </h1>
+            <p className="hero-sub hero-cinema-sub">
+              {site.heroSubtitle || "Discover a refined mix of tech, desk and everyday carry — selected for utility, character and the way they fit into real life."}
+            </p>
+            <div className="hero-cta">
+              <Link className="btn btn-dark" to="/products">
+                Shop new arrivals <Ic n="arrow" s={15} />
+              </Link>
+              <Link className="btn btn-ghost" to="/products?cat=c1">
+                Browse audio
+              </Link>
             </div>
-            <div>
-              <b>{list.length}</b>curated products
-            </div>
-            <div>
-              <b>{s.categories.length}</b>focused categories
-            </div>
-          </div>
-        </div>
-        <div className="hero-media hero-visual">
-          <span className="hero-orb hero-orb-a" aria-hidden="true" />
-          <span className="hero-orb hero-orb-b" aria-hidden="true" />
-          <HeroSlider slides={heroSlides} />
-          <span className="sticker">{site.heroSticker || "NEW SEASON DROP"}</span>
-          <div className="hero-float-card hero-float-card-top">
-            <span className="hero-float-icon">✦</span>
-            <div>
-              <strong>Thoughtfully picked</strong>
-              <small>less clutter, better finds</small>
+            <div className="hero-proof-row" aria-label="Store benefits">
+              <span>
+                <b>4.8</b> average rating
+              </span>
+              <span>
+                <b>30-day</b> easy returns
+              </span>
+              <span>
+                <b>Secure</b> checkout
+              </span>
             </div>
           </div>
-          <div className="hero-float-card hero-float-card-bottom">
-            <span className="hero-float-score">4.8</span>
+
+          <div className="hero-cinema-stats" aria-label="Store highlights">
             <div>
-              <strong>Customer favourite</strong>
-              <small>across the catalogue</small>
+              <b>{averageRating}</b>
+              <span>catalogue rating</span>
+            </div>
+            <div>
+              <b>{list.length}</b>
+              <span>curated products</span>
+            </div>
+            <div>
+              <b>{s.categories.length}</b>
+              <span>focused categories</span>
+            </div>
+            <div>
+              <b>{site.heroSticker || "New drop"}</b>
+              <span>in store now</span>
             </div>
           </div>
         </div>
       </section>
+
 
       <section className="container section home-section section-categories" style={{ paddingTop: 8 }}>
         <div className="sec-hd">
