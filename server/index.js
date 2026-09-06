@@ -393,6 +393,8 @@ const DEFAULT_SITE_SETTINGS = {
   heroSticker: "NEW SEASON DROP",
   heroImage: "",
   heroImages: "[]",
+  heroVideo: "",
+  heroVideoWebm: "",
   logoUrl: "",
   navLinks: "[]",
   announcement: "Free shipping over PKR 5,000 · 30-day returns",
@@ -763,6 +765,60 @@ const saveUploadedImage = (dataUrl, { uploadedBy = null, originalName = "" } = {
   return mediaRow(db.prepare("SELECT * FROM media_assets WHERE id=?").get(id));
 };
 
+// --- Hero video upload support -------------------------------------------
+// Videos are posted as raw binary (not base64) so a 20MB clip does not become a
+// 27MB JSON string. Only mp4/webm are accepted and the magic bytes are checked
+// so an attacker cannot smuggle a script through a video/* Content-Type.
+const MAX_VIDEO_UPLOAD_BYTES = 32 * 1024 * 1024; // 32MB
+const ALLOWED_VIDEO_TYPES = { "video/mp4": "mp4", "video/webm": "webm" };
+
+const videoMatchesMagicBytes = (mimeType, buffer) => {
+  if (mimeType === "video/mp4") {
+    // ISO base media file format: bytes 4-8 are "ftyp"
+    return buffer.length >= 12 && buffer.subarray(4, 8).toString("ascii") === "ftyp";
+  }
+  if (mimeType === "video/webm") {
+    // Matroska/WebM EBML header
+    return buffer.length >= 4 && buffer.subarray(0, 4).equals(Buffer.from([0x1a, 0x45, 0xdf, 0xa3]));
+  }
+  return false;
+};
+
+const saveUploadedVideo = (buffer, { mimeType, uploadedBy = null, originalName = "" } = {}) => {
+  const ext = ALLOWED_VIDEO_TYPES[mimeType];
+  if (!ext) throw Object.assign(new Error("Only MP4 or WebM videos are accepted."), { code: "INVALID_VIDEO" });
+  if (!buffer || !buffer.length) throw Object.assign(new Error("The video file is empty."), { code: "INVALID_VIDEO" });
+  if (buffer.length > MAX_VIDEO_UPLOAD_BYTES) {
+    throw Object.assign(new Error("Video is too large. Please use a file under 32MB."), { code: "VIDEO_TOO_LARGE" });
+  }
+  if (!videoMatchesMagicBytes(mimeType, buffer)) {
+    throw Object.assign(new Error("The uploaded file does not look like a valid MP4 or WebM video."), { code: "INVALID_VIDEO_CONTENT" });
+  }
+  const sha256 = crypto.createHash("sha256").update(buffer).digest("hex");
+  const existing = db.prepare("SELECT * FROM media_assets WHERE sha256=?").get(sha256);
+  if (existing) return mediaRow(existing);
+  const filename = `${uid("vid-")}.${ext}`;
+  const filePath = path.join(uploadsDir, filename);
+  const tempPath = `${filePath}.tmp-${process.pid}-${Date.now()}`;
+  fs.writeFileSync(tempPath, buffer, { flag: "wx" });
+  fs.renameSync(tempPath, filePath);
+  const now = Date.now();
+  const id = uid("media-");
+  const url = `${UPLOADS_PUBLIC_BASE_URL || ""}/uploads/${filename}`;
+  try {
+    db.prepare("INSERT INTO media_assets (id,filename,original_name,mime_type,byte_size,sha256,url,uploaded_by,created_at) VALUES (?,?,?,?,?,?,?,?,?)")
+      .run(id, filename, String(originalName || "").slice(0, 255), mimeType, buffer.length, sha256, url, uploadedBy, now);
+  } catch (error) {
+    try { fs.unlinkSync(filePath); } catch (err) {}
+    if (error.code === "SQLITE_CONSTRAINT_UNIQUE") {
+      const duplicate = db.prepare("SELECT * FROM media_assets WHERE sha256=?").get(sha256);
+      if (duplicate) return mediaRow(duplicate);
+    }
+    throw error;
+  }
+  return mediaRow(db.prepare("SELECT * FROM media_assets WHERE id=?").get(id));
+};
+
 const syncExistingMediaFiles = () => {
   let files = [];
   try { files = fs.readdirSync(uploadsDir); } catch { return; }
@@ -821,6 +877,8 @@ const deleteMediaAsset = (id) => {
 };
 
 const IMAGE_CONTENT_TYPES = { ".jpg": "image/jpeg", ".jpeg": "image/jpeg", ".png": "image/png", ".webp": "image/webp", ".gif": "image/gif" };
+const VIDEO_CONTENT_TYPES = { ".mp4": "video/mp4", ".webm": "video/webm" };
+const UPLOAD_CONTENT_TYPES = { ...IMAGE_CONTENT_TYPES, ...VIDEO_CONTENT_TYPES };
 
 syncExistingMediaFiles();
 
@@ -838,7 +896,7 @@ const serveUploadedFile = (req, res, pathname) => {
     corsHeaders(req, res);
     const ext = path.extname(filename).toLowerCase();
     res.writeHead(200, {
-      "Content-Type": IMAGE_CONTENT_TYPES[ext] || "application/octet-stream",
+      "Content-Type": UPLOAD_CONTENT_TYPES[ext] || "application/octet-stream",
       "Cache-Control": "public, max-age=31536000, immutable",
       "X-Content-Type-Options": "nosniff",
     });
@@ -2288,6 +2346,30 @@ const server = http.createServer(async (req, res) => {
         if (mediaUsageCount(asset.url) === 0) { deleteMediaAsset(asset.id); removed += 1; }
       }
       return send(req, res, 200, { ok: true, removed });
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/uploads/video") {
+      const user = requireUser(req, res);
+      if (!user) return;
+      if (!["admin", "editor"].includes(user.role)) return send(req, res, 403, { error: "FORBIDDEN", message: "Staff permission required." });
+      const uploadLimit = checkRateLimit("video_upload", user.id, { windowMs: 15 * 60 * 1000, max: 6 });
+      if (!uploadLimit.allowed) return send(req, res, 429, { error: "TOO_MANY_UPLOADS", message: "Too many videos uploaded recently. Please try again later." });
+      const mimeType = String(req.headers["content-type"] || "").split(";")[0].trim().toLowerCase();
+      if (!ALLOWED_VIDEO_TYPES[mimeType]) return send(req, res, 400, { error: "INVALID_VIDEO", message: "Only MP4 or WebM videos are accepted." });
+      let buffer;
+      try {
+        buffer = await readRawBody(req, MAX_VIDEO_UPLOAD_BYTES);
+      } catch (e) {
+        return send(req, res, e.code === "BODY_TOO_LARGE" ? 413 : 400, { error: e.code || "INVALID_UPLOAD", message: e.message || "Could not read the upload." });
+      }
+      try {
+        const originalName = decodeURIComponent(String(req.headers["x-original-name"] || ""));
+        const asset = saveUploadedVideo(buffer, { mimeType, uploadedBy: user.id, originalName });
+        auditLog(user.id, "media.upload", "media", asset.id, { byteSize: asset.byteSize, mimeType: asset.mimeType });
+        return send(req, res, 201, { url: asset.url, asset });
+      } catch (e) {
+        return send(req, res, e.code === "VIDEO_TOO_LARGE" ? 413 : 400, { error: e.code || "INVALID_VIDEO", message: e.message });
+      }
     }
 
     if (req.method === "POST" && url.pathname === "/api/uploads/image") {

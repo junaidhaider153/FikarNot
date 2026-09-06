@@ -19,6 +19,7 @@ import { fmt, uid } from "../utils/helpers";
 import { Ic } from "../components/icons";
 import { Modal, Empty, Stars, Pagination } from "../components/common";
 import { ImageUploader } from "../components/ImageUploader";
+import { HeroVideoField } from "../components/HeroVideoField";
 import { prepareImageFile, MAX_IMAGE_BYTES } from "../utils/imageUpload";
 import { uploadsApi } from "../api/uploadsApi";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
@@ -1854,6 +1855,8 @@ function SettingsTab() {
     heroSubtitle: "",
     heroSticker: "",
     heroImage: "",
+    heroVideo: "",
+    heroVideoWebm: "",
     logoUrl: "",
     announcement: "",
     aboutTitle: "",
@@ -1993,6 +1996,25 @@ function SettingsTab() {
         <div><label className="lbl" htmlFor="settings-highlight">Hero highlight</label><input id="settings-highlight" className="input" value={form.heroHighlight} onChange={(e) => set("heroHighlight", e.target.value)} /></div>
         <div className="f-full"><label className="lbl" htmlFor="settings-subtitle">Hero subtitle</label><textarea id="settings-subtitle" className="textarea" value={form.heroSubtitle} onChange={(e) => set("heroSubtitle", e.target.value)} /></div>
         <div><label className="lbl" htmlFor="settings-sticker">Hero sticker</label><input id="settings-sticker" className="input" value={form.heroSticker} onChange={(e) => set("heroSticker", e.target.value)} /></div>
+        <div className="f-full">
+          <HeroVideoField
+            id="settings-hero-video"
+            label="Hero background video (MP4)"
+            value={form.heroVideo}
+            poster={heroImages[0] || ""}
+            onChange={(value) => set("heroVideo", value)}
+          />
+        </div>
+        <div className="f-full">
+          <HeroVideoField
+            id="settings-hero-video-webm"
+            label="Hero background video — WebM (optional, smaller file)"
+            hint="Optional WebM version. Browsers that support it will load this instead of the MP4."
+            value={form.heroVideoWebm}
+            poster={heroImages[0] || ""}
+            onChange={(value) => set("heroVideoWebm", value)}
+          />
+        </div>
         <div className="f-full">
           <label className="lbl" htmlFor="settings-hero-image">Hero slider images</label>
           <div className="media-upload-inline">
