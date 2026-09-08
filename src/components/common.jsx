@@ -190,6 +190,27 @@ export function SkelDetail() {
     </div>
   );
 }
+export function SkelMediaGrid({ n = 8 }) {
+  return (
+    <div className="media-library-grid" aria-hidden="true">
+      {Array.from({ length: n }).map((_, i) => (
+        <div className="skeleton" key={i} style={{ aspectRatio: "1/1", borderRadius: 12 }} />
+      ))}
+    </div>
+  );
+}
+export function SkelForm({ rows = 5 }) {
+  return (
+    <div className="skel-form" aria-hidden="true">
+      {Array.from({ length: rows }).map((_, i) => (
+        <div key={i} style={{ marginBottom: 18 }}>
+          <div className="skeleton sk-line" style={{ width: 110, height: 12, marginBottom: 8 }} />
+          <div className="skeleton" style={{ height: 40, borderRadius: 10 }} />
+        </div>
+      ))}
+    </div>
+  );
+}
 export function Pagination({ page, pageCount, setPage, start, end, total, noun = "items" }) {
   if (pageCount <= 1) return null;
   const pages = Array.from({ length: pageCount }, (_, i) => i + 1).filter((p) => p === 1 || p === pageCount || Math.abs(p - page) <= 1);

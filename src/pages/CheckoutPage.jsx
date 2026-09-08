@@ -1,11 +1,10 @@
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useApp, appActions, cartLines } from "../store/appStore";
 import { fmt, delay } from "../utils/helpers";
 import { Ic } from "../components/icons";
 import { paymentsApi } from "../api/paymentsApi";
 import { ordersApi } from "../api/ordersApi";
-import { uploadsApi } from "../api/uploadsApi";
 import { Empty } from "../components/common";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
 
@@ -23,11 +22,15 @@ const INITIAL_FORM = {
 export default function CheckoutPage() {
   const s = useApp();
   const commerce = { currency: s.siteSettings?.currency || "PKR", currencyLocale: s.siteSettings?.currencyLocale || "en-PK", freeShippingThreshold: Number(s.siteSettings?.freeShippingThreshold || 5000), shippingFlatRate: Number(s.siteSettings?.shippingFlatRate || 500), taxRate: Number(s.siteSettings?.taxRate || 0), taxLabel: s.siteSettings?.taxLabel || "GST", allowCod: s.siteSettings?.allowCod !== "0", allowOnlinePayments: s.siteSettings?.allowOnlinePayments === "1", allowManualPayments: s.siteSettings?.allowManualPayments !== "0", manualPaymentDetails: { jazzcashNumber: s.siteSettings?.jazzcashNumber || "", easypaisaNumber: s.siteSettings?.easypaisaNumber || "", bankName: s.siteSettings?.bankName || "", bankAccountTitle: s.siteSettings?.bankAccountTitle || "", bankAccountNumber: s.siteSettings?.bankAccountNumber || "", bankIban: s.siteSettings?.bankIban || "", bankInstructions: s.siteSettings?.bankInstructions || "" } };
-  const manualMethods = [
-    { key: "jazzcash", label: "JazzCash", detail: commerce.manualPaymentDetails.jazzcashNumber },
-    { key: "easypaisa", label: "Easypaisa", detail: commerce.manualPaymentDetails.easypaisaNumber },
-    { key: "bank_transfer", label: "Bank transfer", detail: commerce.manualPaymentDetails.bankName || commerce.manualPaymentDetails.bankAccountNumber || commerce.manualPaymentDetails.bankIban },
-  ].filter((method) => method.detail && commerce.allowManualPayments);
+  const manualMethods = useMemo(
+    () =>
+      [
+        { key: "jazzcash", label: "JazzCash", detail: commerce.manualPaymentDetails.jazzcashNumber },
+        { key: "easypaisa", label: "Easypaisa", detail: commerce.manualPaymentDetails.easypaisaNumber },
+        { key: "bank_transfer", label: "Bank transfer", detail: commerce.manualPaymentDetails.bankName || commerce.manualPaymentDetails.bankAccountNumber || commerce.manualPaymentDetails.bankIban },
+      ].filter((method) => method.detail && commerce.allowManualPayments),
+    [commerce.manualPaymentDetails.jazzcashNumber, commerce.manualPaymentDetails.easypaisaNumber, commerce.manualPaymentDetails.bankName, commerce.manualPaymentDetails.bankAccountNumber, commerce.manualPaymentDetails.bankIban, commerce.allowManualPayments],
+  );
   useDocumentMeta({ title: "Checkout", noindex: true });
   const lines = cartLines(s);
   const [guestUnlocked, setGuestUnlocked] = useState(Boolean(s.session));
@@ -45,6 +48,28 @@ export default function CheckoutPage() {
   const [couponCode, setCouponCode] = useState("");
   const [appliedCoupon, setAppliedCoupon] = useState(null);
   const [couponError, setCouponError] = useState("");
+  const detailsRef = useRef(null);
+  const paymentRef = useRef(null);
+  const summaryRef = useRef(null);
+
+  const detailsComplete = Boolean(form.name.trim() && form.email.trim() && form.address.trim() && form.city.trim());
+  const paymentComplete = Boolean(paymentMethod);
+  const checkoutSteps = [
+    { key: "details", label: "Details", ref: detailsRef, status: detailsComplete ? "complete" : "current" },
+    {
+      key: "payment",
+      label: "Payment",
+      ref: paymentRef,
+      status: !detailsComplete ? "upcoming" : paymentComplete ? "complete" : "current",
+    },
+    {
+      key: "review",
+      label: "Review & place",
+      ref: summaryRef,
+      status: detailsComplete && paymentComplete ? "current" : "upcoming",
+    },
+  ];
+  const scrollToStep = (ref) => ref.current?.scrollIntoView({ behavior: "smooth", block: "start" });
 
   useEffect(() => {
     const available = [
@@ -57,7 +82,7 @@ export default function CheckoutPage() {
       return;
     }
     if (!available.includes(paymentMethod)) setPaymentMethod(available[0]);
-  }, [commerce.allowOnlinePayments, commerce.allowCod, paymentMethod]);
+  }, [commerce.allowOnlinePayments, commerce.allowCod, paymentMethod, manualMethods]);
 
   const totals = useMemo(() => {
     const subtotal = +lines.reduce((total, line) => total + line.p.price * line.qty, 0).toFixed(2);
@@ -337,9 +362,24 @@ export default function CheckoutPage() {
         </Link>
       </div>
 
+      <ul className="checkout-steps" aria-label="Checkout progress">
+        {checkoutSteps.map((step, index) => (
+          <li key={step.key}>
+            <button
+              type="button"
+              className={`checkout-step checkout-step-${step.status}`}
+              onClick={() => scrollToStep(step.ref)}
+            >
+              <span className="checkout-step-dot">{step.status === "complete" ? <Ic n="check" s={12} /> : index + 1}</span>
+              <span className="checkout-step-label">{step.label}</span>
+            </button>
+          </li>
+        ))}
+      </ul>
+
       <div className="checkout-grid">
         <form onSubmit={submit} noValidate>
-          <section className="panel checkout-panel">
+          <section className="panel checkout-panel" ref={detailsRef}>
             <h3>
               <span className="step-n">1</span> Contact &amp; shipping
             </h3>
@@ -400,7 +440,7 @@ export default function CheckoutPage() {
             </div>
           </section>
 
-          <section className="panel checkout-panel">
+          <section className="panel checkout-panel" ref={paymentRef}>
             <h3>
               <span className="step-n">2</span> Payment method
             </h3>
@@ -460,7 +500,7 @@ export default function CheckoutPage() {
           </button>
         </form>
 
-        <aside className="summary checkout-summary">
+        <aside className="summary checkout-summary" ref={summaryRef}>
           <div className="checkout-summary-head">
             <div>
               <span className="eyebrow">Your bag</span>
@@ -591,11 +631,39 @@ function OrderConfirmation({ order }) {
   return (
     <div className="container order-confirmation-wrap">
       <div className="success order-confirmation">
-        <div className="success-ic"><Ic n="check" s={28} /></div>
+        <div className="confetti-burst" aria-hidden="true">
+          {Array.from({ length: 10 }).map((_, i) => (
+            <span key={i} className={`confetti-piece piece-${i}`} />
+          ))}
+        </div>
+        <div className="success-ic celebrate">
+          <svg viewBox="0 0 24 24" width="28" height="28" fill="none" aria-hidden="true">
+            <polyline points="20 6 9 17 4 12" className="success-check-path" />
+          </svg>
+        </div>
         <p className="eyebrow" style={{ justifyContent: "center" }}>FikarNot order received</p>
         <h1 className="display" style={{ fontSize: 32 }}>Thanks for your order.</h1>
         <p className="confirmation-copy">Your order <strong>{order.id}</strong> has been created for <strong>{order.customer.name}</strong>.</p>
-        
+
+        <ol className="order-next-steps">
+          <li className="done">
+            <span className="order-next-dot"><Ic n="check" s={12} /></span>
+            Order placed
+          </li>
+          <li className={manual ? "" : "current"}>
+            <span className="order-next-dot">2</span>
+            {manual ? "Awaiting payment confirmation" : "Processing"}
+          </li>
+          <li>
+            <span className="order-next-dot">3</span>
+            Shipped
+          </li>
+          <li>
+            <span className="order-next-dot">4</span>
+            Delivered
+          </li>
+        </ol>
+
         <div className="confirmation-grid">
           <div><span>Items</span><strong>{totalItems}</strong></div>
           <div><span>Total</span><strong>{fmt(order.total, order.currency || "PKR", order.currency === "PKR" ? "en-PK" : undefined)}</strong></div>

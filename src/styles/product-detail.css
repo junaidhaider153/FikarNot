@@ -20,6 +20,70 @@
   object-fit: cover;
   aspect-ratio: 1/1;
 }
+/* Hover-magnify: on pointer devices, the image scales up and pans to follow
+   the cursor (via --zoom-x/--zoom-y set inline from mousemove), giving a
+   magnifier effect without the blur that scaling a small <img> would cause. */
+@media (hover: hover) and (pointer: fine) {
+  .detail-image-button {
+    overflow: hidden;
+  }
+  .detail-image-button.is-magnifying img {
+    transform: scale(2.2);
+    transform-origin: var(--zoom-x, 50%) var(--zoom-y, 50%);
+  }
+}
+.detail-image-button img {
+  transition: transform 0.15s ease-out;
+}
+.detail-image-counter {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  background: rgba(20, 18, 12, 0.72);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  pointer-events: none;
+}
+.detail-gallery-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  transition:
+    opacity 0.15s ease,
+    background 0.15s ease;
+}
+.detail-gallery-main:hover .detail-gallery-nav {
+  opacity: 1;
+}
+.detail-gallery-nav:hover {
+  background: #fff;
+}
+.detail-gallery-nav.prev {
+  left: 12px;
+}
+.detail-gallery-nav.next {
+  right: 12px;
+}
+@media (hover: none) {
+  .detail-gallery-nav {
+    opacity: 1;
+  }
+}
 .detail-thumbs {
   display: flex;
   gap: 10px;
@@ -148,13 +212,16 @@
   inset: 0;
   background: rgba(20, 18, 12, 0.86);
   z-index: 130;
-  display: grid;
-  place-items: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
   padding: 40px;
 }
 .image-lightbox img {
   max-width: min(1100px, 92vw);
-  max-height: 86vh;
+  max-height: 74vh;
   object-fit: contain;
   border-radius: 16px;
   box-shadow: var(--shadow);
@@ -164,6 +231,61 @@
   top: 20px;
   right: 20px;
   z-index: 2;
+}
+.lightbox-nav {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+}
+.lightbox-nav.prev {
+  left: 20px;
+}
+.lightbox-nav.next {
+  right: 20px;
+}
+.lightbox-counter {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 5px 12px;
+  border-radius: 999px;
+}
+.lightbox-thumbs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: min(1100px, 92vw);
+}
+.lightbox-thumb {
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+.lightbox-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.lightbox-thumb:hover {
+  opacity: 0.85;
+}
+.lightbox-thumb.active {
+  opacity: 1;
+  border-color: var(--lime, #fff);
 }
 .image-uploader {
   background: #fbf9f4;
@@ -257,7 +379,29 @@
     height: 60px;
   }
   .image-lightbox {
-    padding: 20px;
+    padding: 16px;
+    gap: 12px;
+  }
+  .image-lightbox img {
+    max-height: 62vh;
+  }
+  .lightbox-nav {
+    width: 34px;
+    height: 34px;
+  }
+  .lightbox-nav.prev {
+    left: 10px;
+  }
+  .lightbox-nav.next {
+    right: 10px;
+  }
+  .lightbox-thumb {
+    width: 44px;
+    height: 44px;
+  }
+  .detail-gallery-nav {
+    width: 32px;
+    height: 32px;
   }
 }
 

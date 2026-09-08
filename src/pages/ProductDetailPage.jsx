@@ -1,4 +1,4 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
 import { useApp, appActions } from "../store/appStore";
 import { api } from "../api/storeApi";
@@ -21,6 +21,9 @@ export default function ProductDetailPage() {
   const [qty, setQty] = useState(1);
   const [activeImage, setActiveImage] = useState(0);
   const [zoomed, setZoomed] = useState(false);
+  const [magnify, setMagnify] = useState(false);
+  const [magnifyPos, setMagnifyPos] = useState({ x: 50, y: 50 });
+  const touchStartX = useRef(null);
   const [reviewOpen, setReviewOpen] = useState(false);
   const [reviewRating, setReviewRating] = useState(5);
   const [reviewTitle, setReviewTitle] = useState("");
@@ -103,6 +106,33 @@ export default function ProductDetailPage() {
 
   const addToCart = () => appActions.addToCart(p.id, qty);
 
+  const showNextImage = () => setActiveImage((i) => (i + 1) % images.length);
+  const showPrevImage = () => setActiveImage((i) => (i - 1 + images.length) % images.length);
+
+  const handleMagnifyMove = (event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * 100;
+    const y = ((event.clientY - rect.top) / rect.height) * 100;
+    setMagnifyPos({ x: Math.min(100, Math.max(0, x)), y: Math.min(100, Math.max(0, y)) });
+  };
+
+  const handleLightboxKeyDown = (event) => {
+    if (event.key === "Escape") setZoomed(false);
+    else if (event.key === "ArrowRight" && images.length > 1) showNextImage();
+    else if (event.key === "ArrowLeft" && images.length > 1) showPrevImage();
+  };
+
+  const handleTouchStart = (event) => {
+    touchStartX.current = event.touches[0]?.clientX ?? null;
+  };
+  const handleTouchEnd = (event) => {
+    if (touchStartX.current == null || images.length < 2) return;
+    const delta = (event.changedTouches[0]?.clientX ?? touchStartX.current) - touchStartX.current;
+    if (delta > 40) showPrevImage();
+    else if (delta < -40) showNextImage();
+    touchStartX.current = null;
+  };
+
   const productStructuredData = {
     "@context": "https://schema.org",
     "@type": "Product",
@@ -139,9 +169,51 @@ export default function ProductDetailPage() {
         <div className="detail">
           <div>
             <div className="detail-media detail-gallery-main">
-              <button className="detail-image-button" type="button" onClick={() => setZoomed(true)} aria-label="Open product image">
+              <button
+                className={"detail-image-button" + (magnify ? " is-magnifying" : "")}
+                type="button"
+                onClick={() => setZoomed(true)}
+                onMouseEnter={() => setMagnify(true)}
+                onMouseLeave={() => setMagnify(false)}
+                onMouseMove={handleMagnifyMove}
+                onTouchStart={handleTouchStart}
+                onTouchEnd={handleTouchEnd}
+                aria-label="Open product image, zoomed"
+                style={magnify ? { "--zoom-x": `${magnifyPos.x}%`, "--zoom-y": `${magnifyPos.y}%` } : undefined}
+              >
                 <img src={currentImage} alt={p.name} />
+                {images.length > 1 && (
+                  <span className="detail-image-counter">
+                    {activeImage + 1} / {images.length}
+                  </span>
+                )}
               </button>
+              {images.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    className="detail-gallery-nav prev"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      showPrevImage();
+                    }}
+                    aria-label="Previous image"
+                  >
+                    <Ic n="chevronLeft" s={18} />
+                  </button>
+                  <button
+                    type="button"
+                    className="detail-gallery-nav next"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      showNextImage();
+                    }}
+                    aria-label="Next image"
+                  >
+                    <Ic n="chevronRight" s={18} />
+                  </button>
+                </>
+              )}
             </div>
             {images.length > 1 && (
               <div className="detail-thumbs" aria-label="Product images">
@@ -482,7 +554,7 @@ export default function ProductDetailPage() {
         )}
 
         {zoomed && (
-          // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- backdrop click-to-dismiss and the Escape key here are mouse/keyboard conveniences layered on top of the explicit close button below, which is fully keyboard-accessible on its own.
+          // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- backdrop click-to-dismiss and arrow/Escape keys here are mouse/keyboard conveniences layered on top of the explicit close & nav buttons below, which are fully keyboard-accessible on their own.
           <div
             className="image-lightbox"
             role="dialog"
@@ -491,14 +563,58 @@ export default function ProductDetailPage() {
             onMouseDown={(e) => {
               if (e.target === e.currentTarget) setZoomed(false);
             }}
-            onKeyDown={(e) => {
-              if (e.key === "Escape") setZoomed(false);
-            }}
+            onKeyDown={handleLightboxKeyDown}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
           >
             <button className="icon-btn dark lightbox-close" onClick={() => setZoomed(false)} aria-label="Close image preview">
               <Ic n="x" s={18} />
             </button>
+            {images.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  className="icon-btn dark lightbox-nav prev"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    showPrevImage();
+                  }}
+                  aria-label="Previous image"
+                >
+                  <Ic n="chevronLeft" s={20} />
+                </button>
+                <button
+                  type="button"
+                  className="icon-btn dark lightbox-nav next"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    showNextImage();
+                  }}
+                  aria-label="Next image"
+                >
+                  <Ic n="chevronRight" s={20} />
+                </button>
+                <span className="lightbox-counter">
+                  {activeImage + 1} / {images.length}
+                </span>
+              </>
+            )}
             <img src={currentImage} alt={p.name} />
+            {images.length > 1 && (
+              <div className="lightbox-thumbs">
+                {images.map((image, index) => (
+                  <button
+                    type="button"
+                    key={`${image}-${index}`}
+                    className={"lightbox-thumb" + (index === activeImage ? " active" : "")}
+                    onClick={() => setActiveImage(index)}
+                    aria-label={`View product image ${index + 1}`}
+                  >
+                    <img src={image} alt="" />
+                  </button>
+                ))}
+              </div>
+            )}
           </div>
         )}
       </div>

@@ -96,6 +96,31 @@
   font: 700 11px/19px "Space Grotesk";
   text-align: center;
 }
+/* Bump: header icon + its badge briefly pulse when the count increases. */
+.cart-btn.bump,
+.icon-link.bump {
+  animation: header-badge-bump 0.5s ease;
+}
+@keyframes header-badge-bump {
+  0% {
+    transform: scale(1);
+  }
+  35% {
+    transform: scale(1.22) rotate(-4deg);
+  }
+  60% {
+    transform: scale(0.96);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cart-btn.bump,
+  .icon-link.bump {
+    animation: none;
+  }
+}
 .user-chip {
   display: flex;
   align-items: center;
@@ -163,6 +188,22 @@
 }
 .mobile-nav.open {
   display: flex;
+}
+.mobile-theme-toggle {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  border: none;
+  background: rgba(255, 255, 255, 0.06);
+  color: #fff;
+  font: 500 15px "Inter";
+  cursor: pointer;
+  margin-bottom: 4px;
+}
+.mobile-theme-toggle:hover {
+  background: rgba(255, 255, 255, 0.12);
 }
 /* Collapse the full desktop header (text nav + search + all icon links) down
    to logo + cart + hamburger once it can no longer fit comfortably. Every

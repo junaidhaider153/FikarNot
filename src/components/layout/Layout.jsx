@@ -6,6 +6,26 @@ import { fmt } from "../../utils/helpers";
 import { relevance } from "../../utils/search";
 import { Ic } from "../icons";
 import { WHATSAPP_NUMBER } from "../../config/appConfig";
+import { CursorGlow } from "../CursorGlow";
+import { useTheme } from "../../hooks/useTheme";
+
+// Flips `true` for `duration` ms whenever `value` increases, then resets —
+// drives the "bump" pop on the cart/wishlist/compare header badges.
+function useBumpOnIncrease(value, duration = 500) {
+  const [bump, setBump] = useState(false);
+  const prevValue = useRef(value);
+  useEffect(() => {
+    if (value > prevValue.current) {
+      setBump(true);
+      const timer = window.setTimeout(() => setBump(false), duration);
+      prevValue.current = value;
+      return () => window.clearTimeout(timer);
+    }
+    prevValue.current = value;
+    return undefined;
+  }, [value, duration]);
+  return bump;
+}
 
 export function HeaderSearch() {
   const s = useApp();
@@ -157,6 +177,12 @@ export function Header() {
   const canEdit = s.session && ["admin", "editor"].includes(s.session.role);
   const customLinks = useMemo(() => parseNavLinks(s.siteSettings?.navLinks), [s.siteSettings?.navLinks]);
   useEffect(() => setOpen(false), [location.pathname]);
+  const { theme, toggleTheme } = useTheme();
+
+  const cartBump = useBumpOnIncrease(count);
+  const wishlistBump = useBumpOnIncrease(s.wishlist.length);
+  const compareBump = useBumpOnIncrease(s.comparison.length);
+
   return (
     <header className="hdr">
       <div className="container hdr-inner">
@@ -181,6 +207,15 @@ export function Header() {
         </nav>
         <div className="hdr-actions">
           <HeaderSearch />
+          <button
+            type="button"
+            className="icon-btn dark theme-toggle"
+            onClick={toggleTheme}
+            aria-label={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}
+            title={theme === "dark" ? "Light mode" : "Dark mode"}
+          >
+            <Ic n={theme === "dark" ? "sun" : "moon"} s={16} />
+          </button>
           {s.session ? (
             <span className="user-chip">
               <Link className="user-link" to="/account" aria-label="Open your account">
@@ -223,7 +258,7 @@ export function Header() {
             </Link>
           )}
           <Link
-            className="icon-link dark wishlist-header"
+            className={`icon-link dark wishlist-header${wishlistBump ? " bump" : ""}`}
             to="/wishlist"
             aria-label={`Wishlist, ${s.wishlist.length} items`}
             title="Wishlist"
@@ -234,7 +269,18 @@ export function Header() {
           <Link className="icon-link dark recently-viewed-header" to="/recently-viewed" aria-label="Recently viewed products" title="Recently viewed">
             <Ic n="clock" s={17} />
           </Link>
-          <Link className="cart-btn" to="/cart" aria-label={`Cart, ${count} items`}>
+          {s.comparison.length > 0 && (
+            <Link
+              className={`icon-link dark compare-header${compareBump ? " bump" : ""}`}
+              to="/compare"
+              aria-label={`Compare, ${s.comparison.length} products`}
+              title="Compare"
+            >
+              <Ic n="chart" s={17} />
+              <span className="count-badge">{s.comparison.length}</span>
+            </Link>
+          )}
+          <Link className={`cart-btn${cartBump ? " bump" : ""}`} to="/cart" aria-label={`Cart, ${count} items`}>
             <Ic n="cart" s={17} />
             {count > 0 && <span className="count-badge">{count}</span>}
           </Link>
@@ -244,6 +290,9 @@ export function Header() {
         </div>
       </div>
       <nav className={"mobile-nav" + (open ? " open" : "")} aria-label="Mobile">
+        <button type="button" className="mobile-theme-toggle" onClick={toggleTheme}>
+          <Ic n={theme === "dark" ? "sun" : "moon"} s={15} /> {theme === "dark" ? "Light mode" : "Dark mode"}
+        </button>
         <NavLink to="/">Home</NavLink>
         <NavLink to="/products">Shop</NavLink>
         {customLinks.map((link) => (
@@ -350,6 +399,41 @@ export function Toast() {
   );
 }
 
+export function CompareTray() {
+  const s = useApp();
+  const location = useLocation();
+  const products = s.comparison.map((id) => s.products.find((p) => p.id === id)).filter(Boolean);
+  if (!products.length || location.pathname === "/compare") return null;
+  return (
+    <div className="compare-tray" role="region" aria-label="Products selected for comparison">
+      <div className="compare-tray-items">
+        {products.map((product) => (
+          <div className="compare-tray-item" key={product.id}>
+            <img src={product.image} alt="" />
+            <button
+              type="button"
+              className="compare-tray-remove"
+              aria-label={`Remove ${product.name} from comparison`}
+              onClick={() => appActions.toggleComparison(product.id)}
+            >
+              <Ic n="x" s={11} />
+            </button>
+          </div>
+        ))}
+      </div>
+      <div className="compare-tray-actions">
+        <span className="compare-tray-count">{products.length} of 3 selected</span>
+        <button type="button" className="btn btn-ghost btn-sm" onClick={appActions.clearComparison}>
+          Clear
+        </button>
+        <Link className="btn btn-dark btn-sm" to="/compare">
+          Compare now <Ic n="arrow" s={13} />
+        </Link>
+      </div>
+    </div>
+  );
+}
+
 function WhatsAppIcon() {
   // Generic chat-bubble/phone glyph — deliberately not a reproduction of the
   // WhatsApp brand logo, just an icon that reads clearly against the
@@ -384,6 +468,7 @@ function WhatsAppFloat() {
 export function Layout({ children }) {
   return (
     <>
+      <CursorGlow />
       <a className="skip-link" href="#main-content">
         Skip to content
       </a>
@@ -392,6 +477,7 @@ export function Layout({ children }) {
       <main id="main-content">{children}</main>
       <Footer />
       <Toast />
+      <CompareTray />
       <WhatsAppFloat />
     </>
   );

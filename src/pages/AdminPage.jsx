@@ -17,7 +17,7 @@ import { useApp, appActions } from "../store/appStore";
 import { GALLERY, SWATCHES } from "../assets/assets";
 import { fmt, uid } from "../utils/helpers";
 import { Ic } from "../components/icons";
-import { Modal, Empty, Stars, Pagination } from "../components/common";
+import { Modal, Empty, Stars, Pagination, SkelMediaGrid, SkelForm } from "../components/common";
 import { ImageUploader } from "../components/ImageUploader";
 import { HeroVideoField } from "../components/HeroVideoField";
 import { prepareImageFile, MAX_IMAGE_BYTES } from "../utils/imageUpload";
@@ -1788,7 +1788,7 @@ function MediaTab() {
         </div>
         <button className="btn btn-ghost" onClick={cleanup} disabled={working || loading}>Clean unused</button>
       </div>
-      {loading ? <div className="panel"><p>Loading media…</p></div> : assets.length === 0 ? (
+      {loading ? <SkelMediaGrid n={8} /> : assets.length === 0 ? (
         <Empty icon="box" title="No uploaded media" sub="Images uploaded from a device will appear here." />
       ) : (
         <div className="media-library-grid">
@@ -1966,7 +1966,7 @@ function SettingsTab() {
       setSaving(false);
     }
   };
-  if (loading) return <div className="panel"><p>Loading store settings…</p></div>;
+  if (loading) return <div className="panel"><SkelForm rows={6} /></div>;
   return (
     <form className="panel" onSubmit={save}>
       <h3 className="display">Store & homepage settings</h3>

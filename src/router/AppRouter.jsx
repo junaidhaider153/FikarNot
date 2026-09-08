@@ -15,7 +15,11 @@ function ScrollToTop() {
 }
 function RouteResetErrorBoundary({ children }) {
   const { pathname } = useLocation();
-  return <ErrorBoundary key={pathname}>{children}</ErrorBoundary>;
+  return (
+    <ErrorBoundary key={pathname}>
+      <div className="route-fade">{children}</div>
+    </ErrorBoundary>
+  );
 }
 
 export function AppRouter() {

@@ -1,3 +1,4 @@
+import { useState } from "react";
 import { fmt } from "../utils/helpers";
 import { Ic } from "./icons";
 
@@ -22,6 +23,7 @@ export function ProductFilters({
   onClear,
   hasFilters,
 }) {
+  const [mobileOpen, setMobileOpen] = useState(false);
   return (
     <>
       <div className="toolbar product-toolbar">
@@ -36,59 +38,73 @@ export function ProductFilters({
           />
         </label>
 
-        <select className="select" value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Filter by category">
-          <option value="all">All categories</option>
-          {categories.map((item) => (
-            <option key={item.id} value={item.id}>
-              {item.name}
-            </option>
-          ))}
-        </select>
-
-        <select className="select" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort products">
-          <option value="featured">Featured</option>
-          <option value="newest">Newest</option>
-          <option value="rating">Top rated</option>
-          <option value="price-asc">Price: low to high</option>
-          <option value="price-desc">Price: high to low</option>
-          <option value="name">Name: A–Z</option>
-        </select>
-
-        <select
-          className="select"
-          value={String(minRating)}
-          onChange={(e) => setMinRating(Number(e.target.value))}
-          aria-label="Filter by minimum rating"
+        <button
+          type="button"
+          className={`filters-toggle${hasFilters ? " has-filters" : ""}`}
+          aria-expanded={mobileOpen}
+          aria-controls="product-filter-fields"
+          onClick={() => setMobileOpen((v) => !v)}
         >
-          <option value="0">Any rating</option>
-          <option value="3">3★ & up</option>
-          <option value="4">4★ & up</option>
-          <option value="4.5">4.5★ & up</option>
-        </select>
+          <Ic n="filter" s={14} /> Filters
+          {hasFilters && <span className="filters-toggle-dot" aria-hidden="true" />}
+          <Ic n="chevronRight" s={12} className={`filters-toggle-chevron${mobileOpen ? " open" : ""}`} />
+        </button>
 
-        <label className="range-wrap product-range">
-          <span>Up to {fmt(priceCap)}</span>
-          <input
-            type="range"
-            min={10}
-            max={maxPrice}
-            step={5}
-            value={priceCap}
-            onChange={(e) => setPriceCap(Number(e.target.value))}
-            aria-label="Maximum price"
-          />
-        </label>
+        <div id="product-filter-fields" className={`product-filter-fields${mobileOpen ? " open" : ""}`}>
+          <select className="select" value={category} onChange={(e) => setCategory(e.target.value)} aria-label="Filter by category">
+            <option value="all">All categories</option>
+            {categories.map((item) => (
+              <option key={item.id} value={item.id}>
+                {item.name}
+              </option>
+            ))}
+          </select>
 
-        <label className="chk">
-          <input type="checkbox" checked={inStock} onChange={(e) => setInStock(e.target.checked)} />
-          In stock
-        </label>
+          <select className="select" value={sort} onChange={(e) => setSort(e.target.value)} aria-label="Sort products">
+            <option value="featured">Featured</option>
+            <option value="newest">Newest</option>
+            <option value="rating">Top rated</option>
+            <option value="price-asc">Price: low to high</option>
+            <option value="price-desc">Price: high to low</option>
+            <option value="name">Name: A–Z</option>
+          </select>
 
-        {hasFilters && (
-          <button className="btn btn-ghost btn-sm" onClick={onClear}>
-            <Ic n="x" s={13} /> Clear
-          </button>
-        )}
+          <select
+            className="select"
+            value={String(minRating)}
+            onChange={(e) => setMinRating(Number(e.target.value))}
+            aria-label="Filter by minimum rating"
+          >
+            <option value="0">Any rating</option>
+            <option value="3">3★ & up</option>
+            <option value="4">4★ & up</option>
+            <option value="4.5">4.5★ & up</option>
+          </select>
+
+          <label className="range-wrap product-range">
+            <span>Up to {fmt(priceCap)}</span>
+            <input
+              type="range"
+              min={10}
+              max={maxPrice}
+              step={5}
+              value={priceCap}
+              onChange={(e) => setPriceCap(Number(e.target.value))}
+              aria-label="Maximum price"
+            />
+          </label>
+
+          <label className="chk">
+            <input type="checkbox" checked={inStock} onChange={(e) => setInStock(e.target.checked)} />
+            In stock
+          </label>
+
+          {hasFilters && (
+            <button className="btn btn-ghost btn-sm" onClick={onClear}>
+              <Ic n="x" s={13} /> Clear
+            </button>
+          )}
+        </div>
       </div>
 
       <div className="catalog-meta">

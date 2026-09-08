@@ -26,6 +26,24 @@
   background: var(--lime);
   border-color: var(--lime);
   color: var(--ink);
+  animation: wishlist-pop 0.35s ease;
+}
+@keyframes wishlist-pop {
+  0% {
+    transform: scale(1);
+  }
+  40% {
+    transform: scale(1.28);
+  }
+  100% {
+    transform: scale(1);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .wishlist-btn.active,
+  .wishlist-detail-btn.active {
+    animation: none;
+  }
 }
 .wishlist-detail-btn {
   white-space: nowrap;
