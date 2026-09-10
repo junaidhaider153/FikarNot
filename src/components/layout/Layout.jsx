@@ -8,24 +8,7 @@ import { Ic } from "../icons";
 import { WHATSAPP_NUMBER } from "../../config/appConfig";
 import { CursorGlow } from "../CursorGlow";
 import { useTheme } from "../../hooks/useTheme";
-
-// Flips `true` for `duration` ms whenever `value` increases, then resets —
-// drives the "bump" pop on the cart/wishlist/compare header badges.
-function useBumpOnIncrease(value, duration = 500) {
-  const [bump, setBump] = useState(false);
-  const prevValue = useRef(value);
-  useEffect(() => {
-    if (value > prevValue.current) {
-      setBump(true);
-      const timer = window.setTimeout(() => setBump(false), duration);
-      prevValue.current = value;
-      return () => window.clearTimeout(timer);
-    }
-    prevValue.current = value;
-    return undefined;
-  }, [value, duration]);
-  return bump;
-}
+import { ChatWidget } from "../ChatWidget";
 
 export function HeaderSearch() {
   const s = useApp();
@@ -179,9 +162,42 @@ export function Header() {
   useEffect(() => setOpen(false), [location.pathname]);
   const { theme, toggleTheme } = useTheme();
 
-  const cartBump = useBumpOnIncrease(count);
-  const wishlistBump = useBumpOnIncrease(s.wishlist.length);
-  const compareBump = useBumpOnIncrease(s.comparison.length);
+  const [cartBump, setCartBump] = useState(false);
+  const prevCartCount = useRef(count);
+  useEffect(() => {
+    if (count > prevCartCount.current) {
+      setCartBump(true);
+      const timer = window.setTimeout(() => setCartBump(false), 500);
+      prevCartCount.current = count;
+      return () => window.clearTimeout(timer);
+    }
+    prevCartCount.current = count;
+    return undefined;
+  }, [count]);
+  const [wishlistBump, setWishlistBump] = useState(false);
+  const prevWishlistCount = useRef(s.wishlist.length);
+  useEffect(() => {
+    if (s.wishlist.length > prevWishlistCount.current) {
+      setWishlistBump(true);
+      const timer = window.setTimeout(() => setWishlistBump(false), 500);
+      prevWishlistCount.current = s.wishlist.length;
+      return () => window.clearTimeout(timer);
+    }
+    prevWishlistCount.current = s.wishlist.length;
+    return undefined;
+  }, [s.wishlist.length]);
+  const [compareBump, setCompareBump] = useState(false);
+  const prevCompareCount = useRef(s.comparison.length);
+  useEffect(() => {
+    if (s.comparison.length > prevCompareCount.current) {
+      setCompareBump(true);
+      const timer = window.setTimeout(() => setCompareBump(false), 500);
+      prevCompareCount.current = s.comparison.length;
+      return () => window.clearTimeout(timer);
+    }
+    prevCompareCount.current = s.comparison.length;
+    return undefined;
+  }, [s.comparison.length]);
 
   return (
     <header className="hdr">
@@ -479,6 +495,7 @@ export function Layout({ children }) {
       <Toast />
       <CompareTray />
       <WhatsAppFloat />
+      <ChatWidget />
     </>
   );
 }

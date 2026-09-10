@@ -28,13 +28,6 @@ export function ProductCard({ p }) {
 
   useEffect(() => {
     if (!hovered || images.length <= 1) return undefined;
-    // Respect prefers-reduced-motion: this interval auto-advances the image
-    // every 900ms purely from a mouseenter, with no per-swap user control —
-    // that's autoplaying motion, not a direct cursor-driven effect, so it's
-    // exactly what the setting exists to skip. Checked live (not cached at
-    // module scope) so toggling the OS setting mid-session takes effect
-    // without needing a reload.
-    if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) return undefined;
     const timer = window.setInterval(() => {
       setActiveImage((current) => (current + 1) % images.length);
     }, 900);

@@ -18,6 +18,7 @@ import { clientIp, corsHeaders, send, sendHtml, parseCookies, ensureCsrfCookie, 
 import { uid, token, sha256, hashPassword, verifyPassword, base32Encode, base32Decode, verifyTotp, otpauthUri } from "./lib/security.js";
 import { normalizeEmail, validatePassword, validateName, validateEmail, isPasswordPwned } from "./lib/validation.js";
 import { sendTransactionalEmail } from "./lib/email.js";
+import { askGemini, geminiConfigured } from "./lib/gemini.js";
 
 
 
@@ -1019,6 +1020,73 @@ const server = http.createServer(async (req, res) => {
         send(req, res, 200, { ok: true, service: "FikarNot API", database: "ok", timestamp: new Date().toISOString() });
       } catch (error) {
         send(req, res, 503, { ok: false, service: "FikarNot API", database: "unavailable", message: error.message });
+      }
+      return;
+    }
+
+    if (req.method === "POST" && url.pathname === "/api/chat") {
+      if (!geminiConfigured) {
+        return send(req, res, 503, { error: "CHAT_NOT_CONFIGURED", message: "The chat assistant isn't set up yet. Try WhatsApp instead." });
+      }
+      const ip = clientIp(req);
+      sweepExpiredRateLimits();
+      // Generous enough for a real conversation, tight enough that one visitor
+      // can't run up the free-tier quota (or a paid bill) for everyone else.
+      const limitCheck = checkRateLimit("chat", ip, { windowMs: 60 * 1000, max: 12 });
+      if (!limitCheck.allowed) {
+        return send(req, res, 429, { error: "TOO_MANY_MESSAGES", message: "You're sending messages a bit fast — please wait a moment." });
+      }
+      let body;
+      try {
+        body = await readBody(req, 20_000);
+      } catch {
+        return send(req, res, 400, { error: "INVALID_BODY", message: "Invalid request." });
+      }
+      const message = String(body.message || "").trim();
+      if (!message) return send(req, res, 400, { error: "EMPTY_MESSAGE", message: "Message can't be empty." });
+      if (message.length > 1200) return send(req, res, 400, { error: "MESSAGE_TOO_LONG", message: "Please keep messages under 1200 characters." });
+      // The client holds conversation state (this endpoint is stateless server-side);
+      // only the last few turns are trusted and capped in size to bound both the
+      // upstream token cost and the blast radius of a manipulated history payload.
+      const rawHistory = Array.isArray(body.history) ? body.history.slice(-10) : [];
+      const history = rawHistory
+        .map((turn) => ({
+          role: turn?.role === "assistant" ? "model" : "user",
+          text: String(turn?.text || "").trim().slice(0, 1200),
+        }))
+        .filter((turn) => turn.text);
+
+      const settings = getSiteSettings();
+      const categories = db.prepare("SELECT name FROM categories ORDER BY name").all().map((row) => row.name);
+      const products = db
+        .prepare("SELECT p.name, p.price, p.stock, c.name AS category FROM products p JOIN categories c ON c.id = p.category_id ORDER BY p.featured DESC, p.updated_at DESC LIMIT 40")
+        .all();
+      const productLines = products
+        .map((p) => `- ${p.name} (${p.category}): ${settings.currency} ${p.price}, ${p.stock > 0 ? "in stock" : "out of stock"}`)
+        .join("\n");
+
+      const systemInstruction = [
+        `You are the FikarNot store assistant — a friendly, concise shopping helper for the FikarNot e-commerce site (${settings.metaTitle || "FikarNot"}).`,
+        `About the store: ${settings.aboutIntro}`,
+        `Categories: ${categories.join(", ") || "none listed"}.`,
+        `Some current products (not the full catalogue):\n${productLines || "No products loaded."}`,
+        `Shipping: ${settings.shippingPolicy}`,
+        `Returns: ${settings.returnPolicy}`,
+        `Currency is ${settings.currency}. For anything you can't help with — order status, complaints, or something not covered here — direct the person to WhatsApp at ${settings.whatsappNumber} or suggest they check their account's Orders page.`,
+        `You do not have access to any individual customer's order history, so never guess or make up order details, tracking numbers, or delivery dates.`,
+        `Keep replies short (2-4 sentences unless asked for detail), warm, and honest. If you don't know something, say so rather than guessing.`,
+      ].join("\n\n");
+
+      try {
+        const reply = await askGemini(systemInstruction, [...history, { role: "user", text: message }]);
+        send(req, res, 200, { reply });
+      } catch (error) {
+        console.error("[FikarNot] Chat assistant error", error?.message);
+        const status = error?.code === "CHAT_UPSTREAM_ERROR" && error.status === 429 ? 429 : 502;
+        send(req, res, status, {
+          error: error?.code || "CHAT_FAILED",
+          message: status === 429 ? "The assistant is a bit busy right now — please try again shortly." : "Couldn't reach the chat assistant. Please try again.",
+        });
       }
       return;
     }

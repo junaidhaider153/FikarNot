@@ -153,6 +153,42 @@ export function Header() {
   const [open, setOpen] = useState(false);
   const location = useLocation();
   const count = s.cart.reduce((n, i) => n + i.qty, 0);
+  const [cartBump, setCartBump] = useState(false);
+  const prevCartCount = useRef(count);
+  useEffect(() => {
+    if (count > prevCartCount.current) {
+      setCartBump(true);
+      const timer = window.setTimeout(() => setCartBump(false), 500);
+      prevCartCount.current = count;
+      return () => window.clearTimeout(timer);
+    }
+    prevCartCount.current = count;
+    return undefined;
+  }, [count]);
+  const [wishlistBump, setWishlistBump] = useState(false);
+  const prevWishlistCount = useRef(s.wishlist.length);
+  useEffect(() => {
+    if (s.wishlist.length > prevWishlistCount.current) {
+      setWishlistBump(true);
+      const timer = window.setTimeout(() => setWishlistBump(false), 500);
+      prevWishlistCount.current = s.wishlist.length;
+      return () => window.clearTimeout(timer);
+    }
+    prevWishlistCount.current = s.wishlist.length;
+    return undefined;
+  }, [s.wishlist.length]);
+  const [compareBump, setCompareBump] = useState(false);
+  const prevCompareCount = useRef(s.comparison.length);
+  useEffect(() => {
+    if (s.comparison.length > prevCompareCount.current) {
+      setCompareBump(true);
+      const timer = window.setTimeout(() => setCompareBump(false), 500);
+      prevCompareCount.current = s.comparison.length;
+      return () => window.clearTimeout(timer);
+    }
+    prevCompareCount.current = s.comparison.length;
+    return undefined;
+  }, [s.comparison.length]);
   const canEdit = s.session && ["admin", "editor"].includes(s.session.role);
   const customLinks = useMemo(() => parseNavLinks(s.siteSettings?.navLinks), [s.siteSettings?.navLinks]);
   useEffect(() => setOpen(false), [location.pathname]);
@@ -222,7 +258,7 @@ export function Header() {
             </Link>
           )}
           <Link
-            className="icon-link dark wishlist-header"
+            className={`icon-link dark wishlist-header${wishlistBump ? " bump" : ""}`}
             to="/wishlist"
             aria-label={`Wishlist, ${s.wishlist.length} items`}
             title="Wishlist"
@@ -233,7 +269,18 @@ export function Header() {
           <Link className="icon-link dark recently-viewed-header" to="/recently-viewed" aria-label="Recently viewed products" title="Recently viewed">
             <Ic n="clock" s={17} />
           </Link>
-          <Link className="cart-btn" to="/cart" aria-label={`Cart, ${count} items`}>
+          {s.comparison.length > 0 && (
+            <Link
+              className={`icon-link dark compare-header${compareBump ? " bump" : ""}`}
+              to="/compare"
+              aria-label={`Compare, ${s.comparison.length} products`}
+              title="Compare"
+            >
+              <Ic n="chart" s={17} />
+              <span className="count-badge">{s.comparison.length}</span>
+            </Link>
+          )}
+          <Link className={`cart-btn${cartBump ? " bump" : ""}`} to="/cart" aria-label={`Cart, ${count} items`}>
             <Ic n="cart" s={17} />
             {count > 0 && <span className="count-badge">{count}</span>}
           </Link>

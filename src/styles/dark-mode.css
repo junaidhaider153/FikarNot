@@ -29,7 +29,6 @@
 [data-theme="dark"] .detail-gallery-nav,
 [data-theme="dark"] .filters-toggle,
 [data-theme="dark"] .upload-card,
-[data-theme="dark"] .status-sel,
 [data-theme="dark"] select,
 [data-theme="dark"] input,
 [data-theme="dark"] textarea {
@@ -37,51 +36,8 @@
   border-color: var(--line);
   color: var(--ink);
 }
-[data-theme="dark"] .icon-btn:hover,
-[data-theme="dark"] .detail-gallery-nav:hover {
+[data-theme="dark"] .icon-btn:hover {
   background: var(--surface-soft);
-}
-
-/* Checkout payment method cards (JazzCash/Easypaisa/bank/COD) — the most
-   trust-sensitive surface in the app, previously left white in dark mode. */
-[data-theme="dark"] .payment-option {
-  background: var(--surface);
-  border-color: var(--line);
-  color: var(--ink);
-}
-[data-theme="dark"] .payment-option:hover,
-[data-theme="dark"] .payment-option.selected {
-  border-color: var(--line);
-  background: var(--surface-soft);
-}
-[data-theme="dark"] .payment-icon {
-  background: var(--surface-soft);
-}
-
-/* Header search-suggestions dropdown (`.suggest`) — appears on every page. */
-[data-theme="dark"] .suggest {
-  background: var(--surface);
-  color: var(--ink);
-  border: 1px solid var(--line);
-  box-shadow: var(--shadow);
-}
-[data-theme="dark"] .suggest li.on,
-[data-theme="dark"] .suggest li:hover,
-[data-theme="dark"] .suggest .sg-foot.on,
-[data-theme="dark"] .suggest .sg-foot:hover {
-  background: var(--surface-soft);
-}
-
-/* Active auth tab (Login/Register). */
-[data-theme="dark"] .auth-tabs button.on {
-  background: var(--surface);
-  color: var(--ink);
-}
-
-/* Remove (×) button on the comparison tray. */
-[data-theme="dark"] .compare-tray-remove {
-  background: var(--surface);
-  color: var(--ink);
 }
 [data-theme="dark"] .skeleton {
   background: linear-gradient(90deg, #1d212d 25%, #262b38 50%, #1d212d 75%);
