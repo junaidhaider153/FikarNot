@@ -808,14 +808,23 @@
   }
 }
 
-/* Small phones */
-@media (max-width: 359px) {
+/* Real phones (360–480px covers the vast majority of devices: iPhone SE/12/13/14,
+   Pixel, most Android). The "Large phones" rule above forces 2 columns because it
+   was matching everything up to 640px, which fought with header.css's older
+   ≤480px "1 column" rule and — since this file loads later in the cascade — won,
+   squeezing product cards (image + wishlist/compare buttons + name + price + CTA)
+   into ~150px on almost every real phone. Force a single column here so cards
+   actually have room to breathe. */
+@media (max-width: 480px) {
   .catalog-grid,
   .wishlist-page .prod-grid,
   .prod-grid {
     grid-template-columns: 1fr;
   }
+}
 
+/* Small phones */
+@media (max-width: 359px) {
   .cart-checkout-btn,
   .checkout-submit,
   .auth-submit {

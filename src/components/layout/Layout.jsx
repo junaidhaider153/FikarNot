@@ -306,6 +306,9 @@ export function Header() {
         </div>
       </div>
       <nav className={"mobile-nav" + (open ? " open" : "")} aria-label="Mobile">
+        <div className="mobile-search">
+          <HeaderSearch />
+        </div>
         <button type="button" className="mobile-theme-toggle" onClick={toggleTheme}>
           <Ic n={theme === "dark" ? "sun" : "moon"} s={15} /> {theme === "dark" ? "Light mode" : "Dark mode"}
         </button>

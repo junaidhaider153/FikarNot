@@ -1,36 +1,117 @@
 /* ============================ chat widget ================================ */
 .chat-widget {
   position: fixed;
-  left: 22px;
+  right: 22px;
   bottom: 22px;
   z-index: 150;
   display: flex;
   flex-direction: column;
-  align-items: flex-start;
+  align-items: flex-end;
   gap: 12px;
 }
 .chat-bubble-toggle {
-  width: 56px;
+  position: relative;
   height: 56px;
-  border-radius: 50%;
+  min-width: 56px;
+  border-radius: 999px;
   border: none;
   background: var(--ink);
   color: #fff;
-  display: grid;
-  place-items: center;
+  display: inline-flex;
+  align-items: center;
+  gap: 9px;
+  padding: 0 20px 0 0;
   cursor: pointer;
   box-shadow: 0 10px 28px rgba(23, 21, 15, 0.3);
   transition:
     transform 0.2s ease,
-    background 0.2s ease;
+    background 0.2s ease,
+    padding 0.25s ease,
+    box-shadow 0.2s ease;
   animation: chat-toggle-in 0.4s cubic-bezier(0.22, 1, 0.36, 1);
 }
+.chat-bubble-toggle::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  background: rgba(196, 232, 91, 0.45);
+  z-index: -1;
+  animation: chat-toggle-pulse 2.6s ease-out infinite;
+}
+@keyframes chat-toggle-pulse {
+  0% {
+    opacity: 0.55;
+    transform: scale(1);
+  }
+  75%,
+  100% {
+    opacity: 0;
+    transform: scale(1.35);
+  }
+}
+.chat-toggle-icon {
+  width: 56px;
+  height: 56px;
+  border-radius: 50%;
+  display: grid;
+  place-items: center;
+  flex: none;
+  background: rgba(255, 255, 255, 0.14);
+}
+.chat-toggle-label {
+  font-weight: 700;
+  font-size: 13px;
+  white-space: nowrap;
+  max-width: 140px;
+  overflow: hidden;
+  opacity: 1;
+  transform: translateX(0);
+  transition:
+    max-width 0.25s ease,
+    opacity 0.18s ease,
+    transform 0.25s ease;
+}
 .chat-bubble-toggle:hover {
-  transform: scale(1.06);
+  transform: translateY(-3px) scale(1.02);
+  box-shadow: 0 14px 32px rgba(23, 21, 15, 0.36);
 }
 .chat-bubble-toggle.open {
+  padding: 0;
   background: var(--lime);
   color: var(--ink);
+}
+.chat-bubble-toggle.open .chat-toggle-icon {
+  background: rgba(23, 21, 15, 0.08);
+}
+.chat-bubble-toggle.open .chat-toggle-label {
+  max-width: 0;
+  opacity: 0;
+  transform: translateX(8px);
+  margin: 0;
+}
+.chat-bubble-toggle.open::before {
+  animation: none;
+  opacity: 0;
+}
+/* gentle attention nudge so the button doesn't sit static forever */
+.chat-bubble-toggle:not(.open) {
+  animation:
+    chat-toggle-in 0.4s cubic-bezier(0.22, 1, 0.36, 1),
+    chat-toggle-nudge 5s ease-in-out 2s infinite;
+}
+@keyframes chat-toggle-nudge {
+  0%,
+  92%,
+  100% {
+    transform: translateY(0);
+  }
+  95% {
+    transform: translateY(-5px);
+  }
+  97% {
+    transform: translateY(0);
+  }
 }
 @keyframes chat-toggle-in {
   from {
@@ -54,7 +135,7 @@
   flex-direction: column;
   overflow: hidden;
   animation: chat-panel-in 0.28s cubic-bezier(0.22, 1, 0.36, 1);
-  transform-origin: bottom left;
+  transform-origin: bottom right;
 }
 @keyframes chat-panel-in {
   from {
@@ -232,21 +313,29 @@
 
 @media (prefers-reduced-motion: reduce) {
   .chat-bubble-toggle,
+  .chat-bubble-toggle::before,
+  .chat-bubble-toggle:not(.open),
   .chat-panel,
   .chat-bubble,
   .chat-panel-dot,
   .chat-typing span {
-    animation: none;
+    animation: none !important;
   }
 }
 
 @media (max-width: 480px) {
   .chat-widget {
-    left: 12px;
+    right: 12px;
     bottom: 12px;
   }
   .chat-panel {
     width: calc(100vw - 24px);
     height: min(70vh, 560px);
+  }
+  .chat-toggle-label {
+    display: none;
+  }
+  .chat-bubble-toggle {
+    padding: 0;
   }
 }

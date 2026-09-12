@@ -175,6 +175,18 @@
   color: #fff;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
 }
+/* The header's search combobox is hidden below 860px (see the collapse rule
+   further down), so give it a full-width home inside the mobile menu instead
+   — otherwise phones simply lose product search entirely. */
+.mobile-search {
+  margin-bottom: 8px;
+}
+.mobile-search .searchbox {
+  width: 100%;
+}
+.mobile-search .search-input {
+  width: 100%;
+}
 .mobile-nav a {
   padding: 10px 12px;
   border-radius: 10px;
@@ -217,7 +229,7 @@
   .nav {
     display: none;
   }
-  .searchbox {
+  .hdr-actions > .searchbox {
     display: none;
   }
   .notification-header,
