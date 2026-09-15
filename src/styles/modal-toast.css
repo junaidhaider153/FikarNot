@@ -11,7 +11,7 @@
   animation: fade 0.18s;
 }
 .modal {
-  background: #fff;
+  background: var(--surface);
   border-radius: 20px;
   width: min(560px, 100%);
   max-height: 88vh;
@@ -29,7 +29,7 @@
   border-bottom: 1px solid var(--line);
   position: sticky;
   top: 0;
-  background: #fff;
+  background: var(--surface);
   z-index: 2;
 }
 .modal-hd h3 {
@@ -37,6 +37,17 @@
 }
 .modal-bd {
   padding: 24px;
+}
+/* Completes the .modal-hd / .modal-bd / .modal-ft set. Modal footers were
+   previously hand-rolled with repeated inline flex styles at each call site,
+   which drifted (gap 8 vs 10, some with a top margin, some without). */
+.modal-ft {
+  display: flex;
+  align-items: center;
+  justify-content: flex-end;
+  gap: 10px;
+  margin-top: 20px;
+  flex-wrap: wrap;
 }
 .img-grid {
   display: grid;
@@ -83,7 +94,10 @@
   left: 50%;
   transform: translateX(-50%);
   z-index: 120;
-  background: var(--ink);
+  /* Deliberately not var(--ink): the toast is always meant to read as a dark
+     pill with white text, in both themes — var(--ink) flips to near-white in
+     dark mode, which previously made this invisible (white text on white). */
+  background: #17150f;
   color: #fff;
   padding: 12px 20px;
   border-radius: 999px;

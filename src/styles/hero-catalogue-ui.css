@@ -73,7 +73,7 @@
   top: 18px;
   right: -10px;
   transform: rotate(6deg);
-  background: var(--ink);
+  background: var(--ink-solid);
   color: var(--lime);
   font: 700 12px "Space Grotesk";
   letter-spacing: 0.1em;
@@ -278,7 +278,7 @@
   transition: 0.16s;
 }
 .btn-dark {
-  background: var(--ink);
+  background: var(--ink-solid);
   color: #fff;
 }
 .btn-dark:hover {
@@ -337,6 +337,11 @@
   flex: 1;
   min-width: 200px;
 }
+/* Focus cue lives on the wrapper because the inner input clears its outline. */
+.search-box:focus-within {
+  border-color: var(--lime);
+  box-shadow: 0 0 0 3px var(--pp-ring, rgba(255, 107, 74, 0.25));
+}
 .search-box input {
   border: none;
   outline: none;
@@ -376,9 +381,9 @@
   cursor: pointer;
 }
 .pagination-page.on {
-  background: var(--ink);
+  background: var(--ink-solid);
   color: #fff;
-  border-color: var(--ink);
+  border-color: var(--ink-solid);
 }
 .pagination-ellipsis {
   padding: 0 4px;

@@ -106,7 +106,7 @@
   display: block;
   font: 700 20px/1.15 "Space Grotesk";
 }
-@media (max-width: 900px) {
+@media (max-width: 960px) {
   .offer-grid {
     grid-template-columns: 1fr;
   }

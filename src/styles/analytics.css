@@ -38,7 +38,7 @@
   margin: 0 0 20px;
 }
 .analytics-signal {
-  background: #fff;
+  background: var(--surface);
   border: 1px solid var(--line);
   border-radius: 14px;
   padding: 14px 16px;

@@ -4,6 +4,7 @@ import { useApp, appActions } from "../store/appStore";
 import { ProductCard } from "../components/ProductCard";
 import { Empty } from "../components/common";
 import { Ic } from "../components/icons";
+import { useDocumentMeta } from "../hooks/useDocumentMeta";
 
 export default function WishlistPage() {
   const s = useApp();
@@ -11,6 +12,8 @@ export default function WishlistPage() {
     () => s.wishlist.map((id) => s.products.find((product) => product.id === id)).filter(Boolean),
     [s.wishlist, s.products],
   );
+
+  useDocumentMeta({ title: "Your wishlist", noindex: true });
 
   return (
     <div className="container page-pad wishlist-page">

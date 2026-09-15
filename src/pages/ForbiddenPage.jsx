@@ -1,7 +1,9 @@
 import { Link } from "react-router-dom";
 import { Empty } from "../components/common";
+import { useDocumentMeta } from "../hooks/useDocumentMeta";
 
 export default function ForbiddenPage() {
+  useDocumentMeta({ title: "Access denied", noindex: true });
   return (
     <div className="container page-pad">
       <Empty

@@ -116,6 +116,7 @@ export function AppRoutes() {
       <Route path="/admin/reviews" element={<AdminRoute tab="reviews" roles={STAFF_ROLES} />} />
       <Route path="/admin/support" element={<AdminRoute tab="support" roles={STAFF_ROLES} />} />
       <Route path="/admin/returns" element={<AdminRoute tab="returns" roles={STAFF_ROLES} />} />
+      <Route path="/admin/security" element={<AdminRoute tab="security" roles={STAFF_ROLES} />} />
       <Route path="/admin/media" element={<AdminRoute tab="media" roles={ADMIN_ROLES} />} />
       <Route path="/admin/users" element={<AdminRoute tab="users" roles={ADMIN_ROLES} />} />
       <Route path="/admin/settings" element={<AdminRoute tab="settings" roles={ADMIN_ROLES} />} />

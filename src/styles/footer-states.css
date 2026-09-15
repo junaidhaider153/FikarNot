@@ -34,19 +34,6 @@
   flex-wrap: wrap;
   font-size: 12.5px;
 }
-.footer .reset {
-  background: none;
-  border: 1px solid rgba(255, 255, 255, 0.2);
-  color: #b9b2a5;
-  border-radius: 999px;
-  padding: 6px 14px;
-  font: 600 12px "Inter";
-  cursor: pointer;
-}
-.footer .reset:hover {
-  color: var(--lime);
-  border-color: var(--lime);
-}
 /* states */
 .empty {
   border: 1.5px dashed var(--line);
@@ -98,7 +85,7 @@
   border: 1px solid var(--line);
   border-radius: var(--r);
   overflow: hidden;
-  background: #fff;
+  background: var(--surface);
 }
 .sk-img {
   aspect-ratio: 1/1;
@@ -131,7 +118,7 @@
   color: #ddd6c7;
 }
 .promo {
-  background: var(--ink);
+  background: var(--ink-solid);
   color: #fff;
   border-radius: 24px;
   padding: 36px 40px;

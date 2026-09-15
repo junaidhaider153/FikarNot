@@ -320,7 +320,7 @@ export default function CheckoutPage() {
             <div className="checkout-lines">
               {lines.map((line) => (
                 <div className="checkout-line" key={line.p.id}>
-                  <img src={line.p.images?.[0] || line.p.image} alt="" />
+                  <img src={line.p.images?.[0] || line.p.image} alt="" loading="lazy" />
                   <div>
                     <strong>{line.p.name}</strong>
                     <span>Qty {line.qty}</span>
@@ -511,7 +511,7 @@ export default function CheckoutPage() {
           <div className="checkout-lines">
             {lines.map((line) => (
               <div className="checkout-line" key={line.p.id}>
-                <img src={line.p.images?.[0] || line.p.image} alt="" />
+                <img src={line.p.images?.[0] || line.p.image} alt="" loading="lazy" />
                 <div>
                   <strong>{line.p.name}</strong>
                   <span>Qty {line.qty}</span>

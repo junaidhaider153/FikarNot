@@ -541,11 +541,6 @@ export const appActions = {
     toast("Support request deleted");
   },
 
-  resetDemo() {
-    Object.values(STORAGE_KEYS).forEach((key) => localStorage.removeItem(key));
-    window.location.href = "/";
-  },
-
   async login(email, password, totp = "") {
     try {
       const { user } = await authApi.login(email, password, totp);

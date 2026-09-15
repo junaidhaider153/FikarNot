@@ -32,7 +32,7 @@ export async function apiRequest(path, options = {}, defaultErrorMessage = "Requ
   let payload = {};
   try {
     payload = await response.json();
-    // eslint-disable-next-line no-empty -- response may have no JSON body (e.g. 204)
+     
   } catch {}
 
   if (!response.ok) {
