@@ -1,0 +1,21 @@
+name: FikarNot Operations
+
+on:
+  schedule:
+    - cron: "*/5 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  healthcheck:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - name: Check API health
+        env:
+          HEALTHCHECK_URL: ${{ secrets.FIKARNOT_HEALTHCHECK_URL }}
+        run: |
+          test -n "$HEALTHCHECK_URL"
+          curl --fail --silent --show-error --max-time 10 "$HEALTHCHECK_URL"
