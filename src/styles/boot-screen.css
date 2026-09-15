@@ -1,0 +1,211 @@
+/* ==========================================================================
+   Boot / loading screen
+   Used by <Boot /> in src/router/routes.jsx (app bootstrap + lazy Studio).
+   ========================================================================== */
+
+.boot {
+  position: relative;
+  min-height: 100svh;
+  display: grid;
+  place-items: center;
+  padding: 24px;
+  text-align: center;
+  overflow: hidden;
+  background:
+    radial-gradient(60% 55% at 20% 15%, rgba(255, 157, 107, 0.16), transparent 60%),
+    radial-gradient(55% 50% at 85% 80%, rgba(120, 130, 255, 0.16), transparent 60%),
+    linear-gradient(160deg, #fbf9f4 0%, #f3f2f8 100%);
+}
+
+/* Soft drifting glow behind the card. */
+.boot::before {
+  content: "";
+  position: absolute;
+  width: min(620px, 90vw);
+  aspect-ratio: 1;
+  border-radius: 999px;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.85), rgba(255, 255, 255, 0) 65%);
+  animation: bootDrift 9s ease-in-out infinite alternate;
+  pointer-events: none;
+}
+
+@keyframes bootDrift {
+  from {
+    transform: translate3d(-4%, -3%, 0) scale(1);
+  }
+  to {
+    transform: translate3d(4%, 3%, 0) scale(1.08);
+  }
+}
+
+.boot-card {
+  position: relative;
+  display: grid;
+  justify-items: center;
+  gap: 18px;
+  padding: clamp(28px, 6vw, 44px) clamp(24px, 7vw, 52px);
+  width: min(420px, 100%);
+  border-radius: 26px;
+  border: 1px solid rgba(255, 255, 255, 0.7);
+  background: rgba(255, 255, 255, 0.62);
+  box-shadow: 0 30px 80px rgba(40, 46, 66, 0.12);
+  backdrop-filter: blur(14px);
+  animation: bootIn 0.5s ease both;
+}
+
+@keyframes bootIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+  to {
+    opacity: 1;
+    transform: none;
+  }
+}
+
+/* Logo mark with an orbiting ring. */
+.boot-mark {
+  position: relative;
+  display: grid;
+  place-items: center;
+  width: 76px;
+  height: 76px;
+}
+
+.boot-mark .logo-mark {
+  width: 56px;
+  height: 56px;
+  display: grid;
+  place-items: center;
+  border-radius: 18px;
+  font-size: 24px;
+  font-weight: 700;
+  color: #fff;
+  background: linear-gradient(135deg, #1d263a, #3a4a7a);
+  box-shadow: 0 12px 26px rgba(29, 38, 58, 0.28);
+  animation: bootPulse 1.6s ease-in-out infinite alternate;
+}
+
+@keyframes bootPulse {
+  from {
+    transform: scale(1);
+  }
+  to {
+    transform: scale(1.06);
+  }
+}
+
+.boot-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 999px;
+  border: 2px solid rgba(29, 38, 58, 0.1);
+  border-top-color: #ff9d6b;
+  border-right-color: rgba(120, 130, 255, 0.75);
+  animation: bootSpin 1.1s linear infinite;
+}
+
+@keyframes bootSpin {
+  to {
+    transform: rotate(360deg);
+  }
+}
+
+.boot-title {
+  font:
+    700 18px "Space Grotesk",
+    sans-serif;
+  letter-spacing: -0.01em;
+  color: #1d263a;
+}
+
+.boot-text {
+  font-size: 13.5px;
+  line-height: 1.6;
+  color: #6b6558;
+  max-width: 30ch;
+}
+
+/* Indeterminate progress sweep. */
+.boot-bar {
+  width: 100%;
+  height: 5px;
+  border-radius: 999px;
+  overflow: hidden;
+  background: rgba(29, 38, 58, 0.09);
+}
+
+.boot-bar::after {
+  content: "";
+  display: block;
+  width: 42%;
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #ff9d6b, #8b8cff);
+  animation: bootSweep 1.3s ease-in-out infinite;
+}
+
+@keyframes bootSweep {
+  0% {
+    transform: translateX(-110%);
+  }
+  100% {
+    transform: translateX(260%);
+  }
+}
+
+.boot-dots {
+  display: inline-flex;
+  gap: 6px;
+}
+
+.boot-dots i {
+  width: 6px;
+  height: 6px;
+  border-radius: 999px;
+  background: rgba(29, 38, 58, 0.3);
+  animation: bootBlink 1.2s ease-in-out infinite;
+}
+
+.boot-dots i:nth-child(2) {
+  animation-delay: 0.15s;
+}
+
+.boot-dots i:nth-child(3) {
+  animation-delay: 0.3s;
+}
+
+@keyframes bootBlink {
+  0%,
+  100% {
+    opacity: 0.3;
+    transform: translateY(0);
+  }
+  50% {
+    opacity: 1;
+    transform: translateY(-3px);
+  }
+}
+
+@media (max-width: 420px) {
+  .boot-card {
+    padding: 26px 20px;
+    border-radius: 22px;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .boot::before,
+  .boot-card,
+  .boot-mark .logo-mark,
+  .boot-ring,
+  .boot-bar::after,
+  .boot-dots i {
+    animation: none !important;
+  }
+  .boot-bar::after {
+    width: 100%;
+    opacity: 0.5;
+  }
+}

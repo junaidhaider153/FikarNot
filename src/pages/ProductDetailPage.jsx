@@ -1,0 +1,623 @@
+import { useEffect, useRef, useState } from "react";
+import { Link, useNavigate, useParams, useLocation } from "react-router-dom";
+import { useApp, appActions } from "../store/appStore";
+import { api } from "../api/storeApi";
+import { useAsync } from "../hooks/useAsync";
+import { useDocumentMeta } from "../hooks/useDocumentMeta";
+import { fmt, NotFoundError } from "../utils/helpers";
+import { getProductReviews, getProductReviewSummary } from "../utils/reviews";
+import { getRecommendations } from "../utils/recommendations";
+import { Ic } from "../components/icons";
+import { ProductCard } from "../components/ProductCard";
+import { ErrorCard, Empty, Modal, Qty, SkelDetail, Stars } from "../components/common";
+import { StructuredData } from "../components/seo/StructuredData";
+
+export default function ProductDetailPage() {
+  const s = useApp();
+  const { id } = useParams();
+  const navigate = useNavigate();
+  const location = useLocation();
+  const { data: p, loading, error, retry } = useAsync(() => api.getProduct(id), [id]);
+  const [qty, setQty] = useState(1);
+  const [activeImage, setActiveImage] = useState(0);
+  const [zoomed, setZoomed] = useState(false);
+  const [magnify, setMagnify] = useState(false);
+  const [magnifyPos, setMagnifyPos] = useState({ x: 50, y: 50 });
+  const touchStartX = useRef(null);
+  const [reviewOpen, setReviewOpen] = useState(false);
+  const [reviewRating, setReviewRating] = useState(5);
+  const [reviewTitle, setReviewTitle] = useState("");
+  const [reviewBody, setReviewBody] = useState("");
+  const [removeReviewOpen, setRemoveReviewOpen] = useState(false);
+
+  useEffect(() => setQty(1), [id]);
+  useEffect(() => setActiveImage(0), [id]);
+  useEffect(() => {
+    if (p) appActions.rememberRecentlyViewed(p.id);
+  }, [p]);
+  const productUrl = p ? `https://www.fikarnot.shop/product/${p.id}` : null;
+  useDocumentMeta(
+    p
+      ? {
+          title: `${p.name} — ${fmt(p.price)}`,
+          description: p.description?.slice(0, 155),
+          image: p.images?.[0] || p.image,
+          canonical: productUrl,
+          type: "product",
+        }
+      : {},
+  );
+
+  if (loading)
+    return (
+      <div className="container">
+        <SkelDetail />
+      </div>
+    );
+
+  if (error) {
+    return (
+      <div className="container" style={{ padding: "60px 24px" }}>
+        {error instanceof NotFoundError ? (
+          <Empty
+            icon="box"
+            title="Product not found"
+            sub={error.message + ". It may have been removed from the catalogue."}
+            cta={
+              <Link className="btn btn-dark" to="/products">
+                Back to shop
+              </Link>
+            }
+          />
+        ) : (
+          <ErrorCard message={error.message} onRetry={retry} />
+        )}
+      </div>
+    );
+  }
+
+  const cat = s.categories.find((c) => c.id === p.categoryId);
+  const canEdit = s.session && ["admin", "editor"].includes(s.session.role);
+  const isWishlisted = s.wishlist.includes(p.id);
+  const reviewSummary = getProductReviewSummary(s.reviews || [], p.id, p.rating);
+  const productReviews = getProductReviews(s.reviews || [], p.id);
+  const myReview = s.session ? productReviews.find((review) => review.userId === s.session.id) : null;
+  const canReview = Boolean(
+    s.session &&
+    s.orders.some(
+      (order) =>
+        (order.customer?.userId === s.session.id ||
+          (!order.customer?.userId && order.customer?.email?.toLowerCase() === s.session.email.toLowerCase())) &&
+        order.items?.some((item) => item.productId === p.id),
+    ),
+  );
+  const related = s.products.filter((x) => x.categoryId === p.categoryId && x.id !== p.id).slice(0, 4);
+  const recommended = getRecommendations(s.products, p, 4);
+  const images = (Array.isArray(p.images) && p.images.length ? p.images : [p.image]).filter(Boolean);
+  const currentImage = images[Math.min(activeImage, images.length - 1)] || p.image;
+  const stockLabel = p.stock > 0 ? `${p.stock} in stock` : "Out of stock";
+  const featureRows = [
+    { label: "Category", value: cat?.name || "General" },
+    { label: "SKU", value: p.sku || "—" },
+    { label: "Rating", value: `${p.rating.toFixed(1)} / 5` },
+    { label: "Availability", value: stockLabel },
+    { label: "Tags", value: p.tags?.length ? p.tags.map((t) => `#${t}`).join(" ") : "—" },
+  ];
+
+  const addToCart = () => appActions.addToCart(p.id, qty);
+
+  const showNextImage = () => setActiveImage((i) => (i + 1) % images.length);
+  const showPrevImage = () => setActiveImage((i) => (i - 1 + images.length) % images.length);
+
+  const handleMagnifyMove = (event) => {
+    const rect = event.currentTarget.getBoundingClientRect();
+    const x = ((event.clientX - rect.left) / rect.width) * 100;
+    const y = ((event.clientY - rect.top) / rect.height) * 100;
+    setMagnifyPos({ x: Math.min(100, Math.max(0, x)), y: Math.min(100, Math.max(0, y)) });
+  };
+
+  const handleLightboxKeyDown = (event) => {
+    if (event.key === "Escape") setZoomed(false);
+    else if (event.key === "ArrowRight" && images.length > 1) showNextImage();
+    else if (event.key === "ArrowLeft" && images.length > 1) showPrevImage();
+  };
+
+  const handleTouchStart = (event) => {
+    touchStartX.current = event.touches[0]?.clientX ?? null;
+  };
+  const handleTouchEnd = (event) => {
+    if (touchStartX.current == null || images.length < 2) return;
+    const delta = (event.changedTouches[0]?.clientX ?? touchStartX.current) - touchStartX.current;
+    if (delta > 40) showPrevImage();
+    else if (delta < -40) showNextImage();
+    touchStartX.current = null;
+  };
+
+  const productStructuredData = {
+    "@context": "https://schema.org",
+    "@type": "Product",
+    name: p.name,
+    description: p.description,
+    image: images,
+    sku: p.sku,
+    offers: {
+      "@type": "Offer",
+      url: productUrl,
+      priceCurrency: "USD",
+      price: p.price,
+      availability: p.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
+    },
+    ...(reviewSummary.count > 0
+      ? { aggregateRating: { "@type": "AggregateRating", ratingValue: reviewSummary.average, reviewCount: reviewSummary.count } }
+      : {}),
+  };
+
+  const breadcrumbStructuredData = {
+    "@context": "https://schema.org",
+    "@type": "BreadcrumbList",
+    itemListElement: [
+      { "@type": "ListItem", position: 1, name: "Home", item: "https://www.fikarnot.shop/" },
+      { "@type": "ListItem", position: 2, name: "Shop", item: "https://www.fikarnot.shop/products" },
+      { "@type": "ListItem", position: 3, name: p.name, item: productUrl },
+    ],
+  };
+
+  return (
+    <>
+      <StructuredData data={[productStructuredData, breadcrumbStructuredData]} id="fikarnot-product-json-ld" />
+      <div className="container product-detail-page">
+        <div className="detail">
+          <div>
+            <div className="detail-media detail-gallery-main">
+              <button
+                className={"detail-image-button" + (magnify ? " is-magnifying" : "")}
+                type="button"
+                onClick={() => setZoomed(true)}
+                onMouseEnter={() => setMagnify(true)}
+                onMouseLeave={() => setMagnify(false)}
+                onMouseMove={handleMagnifyMove}
+                onTouchStart={handleTouchStart}
+                onTouchEnd={handleTouchEnd}
+                aria-label="Open product image, zoomed"
+                style={magnify ? { "--zoom-x": `${magnifyPos.x}%`, "--zoom-y": `${magnifyPos.y}%` } : undefined}
+              >
+                <img src={currentImage} alt={p.name} fetchPriority="high" />
+                {images.length > 1 && (
+                  <span className="detail-image-counter">
+                    {activeImage + 1} / {images.length}
+                  </span>
+                )}
+              </button>
+              {images.length > 1 && (
+                <>
+                  <button
+                    type="button"
+                    className="detail-gallery-nav prev"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      showPrevImage();
+                    }}
+                    aria-label="Previous image"
+                  >
+                    <Ic n="chevronLeft" s={18} />
+                  </button>
+                  <button
+                    type="button"
+                    className="detail-gallery-nav next"
+                    onClick={(event) => {
+                      event.stopPropagation();
+                      showNextImage();
+                    }}
+                    aria-label="Next image"
+                  >
+                    <Ic n="chevronRight" s={18} />
+                  </button>
+                </>
+              )}
+            </div>
+            {images.length > 1 && (
+              <div className="detail-thumbs" aria-label="Product images">
+                {images.map((image, index) => (
+                  <button
+                    type="button"
+                    key={`${image}-${index}`}
+                    className={"detail-thumb" + (index === activeImage ? " active" : "")}
+                    onClick={() => setActiveImage(index)}
+                    aria-label={`View product image ${index + 1}`}
+                  >
+                    <img src={image} alt="" loading="lazy" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+
+          <div className="detail-copy">
+            <p className="crumbs">
+              <Link to="/">Home</Link> / <Link to="/products">Shop</Link>
+              {cat && (
+                <>
+                  {" "}
+                  / <Link to={`/products?cat=${cat.id}`}>{cat.name}</Link>
+                </>
+              )}
+            </p>
+            <span className="eyebrow">Product details</span>
+            <h1 className="display">{p.name}</h1>
+            <div className="card-meta product-rating-row" style={{ margin: "10px 0 4px" }}>
+              <Stars v={p.rating} size={15} />
+              <span>
+                {reviewSummary.average.toFixed(1)} ·{" "}
+                {reviewSummary.count ? `${reviewSummary.count} review${reviewSummary.count === 1 ? "" : "s"}` : stockLabel}
+              </span>
+            </div>
+            <div className="price product-price">{fmt(p.price)}</div>
+            <p className="desc product-description">{p.description}</p>
+
+            <div className="product-benefits">
+              <div>
+                <Ic n="check" s={15} />
+                <span>Carefully selected by FikarNot</span>
+              </div>
+              <div>
+                <Ic n="truck" s={15} />
+                <span>Free shipping over $75</span>
+              </div>
+              <div>
+                <Ic n="shield" s={15} />
+                <span>Simple 30-day returns</span>
+              </div>
+            </div>
+
+            <div className="product-actions">
+              <Qty value={qty} set={setQty} max={Math.max(1, p.stock)} />
+              <button className="btn btn-dark" disabled={p.stock === 0} onClick={addToCart}>
+                <Ic n="cart" s={16} /> Add to cart
+              </button>
+              <button
+                className="btn btn-lime"
+                disabled={p.stock === 0}
+                onClick={() => {
+                  addToCart();
+                  navigate("/checkout");
+                }}
+              >
+                Buy now
+              </button>
+              <button
+                className={`btn btn-ghost wishlist-detail-btn${isWishlisted ? " active" : ""}`}
+                onClick={() => {
+                  if (!s.session) {
+                    navigate(`/login?redirect=${encodeURIComponent(`${location.pathname}${location.search}`)}`);
+                    return;
+                  }
+                  appActions.toggleWishlist(p.id);
+                }}
+                aria-pressed={isWishlisted}
+              >
+                <Ic n="heart" s={15} filled={isWishlisted} /> {isWishlisted ? "Saved" : "Wishlist"}
+              </button>
+              {canEdit && (
+                <button className="btn btn-ghost" onClick={() => navigate(`/admin/products?edit=${p.id}`)}>
+                  <Ic n="edit" s={15} /> Edit
+                </button>
+              )}
+            </div>
+
+            <div className="tag-row">
+              {p.tags?.map((t) => (
+                <span key={t} className="tag">
+                  #{t}
+                </span>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <section className="section review-section" aria-labelledby="reviews-heading">
+          <div className="sec-hd">
+            <div>
+              <span className="eyebrow">Customer voice</span>
+              <h2 id="reviews-heading" className="sec-title display">
+                Reviews & ratings
+              </h2>
+            </div>
+            {canReview ? (
+              <button
+                className="btn btn-dark"
+                onClick={() => {
+                  setReviewRating(myReview?.rating || 5);
+                  setReviewTitle(myReview?.title || "");
+                  setReviewBody(myReview?.body || "");
+                  setReviewOpen(true);
+                }}
+              >
+                {myReview ? "Edit your review" : "Write a review"}
+              </button>
+            ) : !s.session ? (
+              <Link className="btn btn-ghost" to={`/login?redirect=${encodeURIComponent(`${location.pathname}${location.search}`)}`}>
+                Sign in to review
+              </Link>
+            ) : null}
+          </div>
+          <div className="review-summary-grid">
+            <div className="review-score-card">
+              <strong>{reviewSummary.average.toFixed(1)}</strong>
+              <Stars v={reviewSummary.average} size={16} />
+              <span>
+                {reviewSummary.count ? `${reviewSummary.count} verified review${reviewSummary.count === 1 ? "" : "s"}` : "No reviews yet"}
+              </span>
+            </div>
+            <div className="review-bars">
+              {[5, 4, 3, 2, 1].map((score) => {
+                const count = reviewSummary.distribution[score] || 0;
+                const pct = reviewSummary.count ? Math.round((count / reviewSummary.count) * 100) : 0;
+                return (
+                  <div className="review-bar" key={score}>
+                    <span>{score} ★</span>
+                    <div>
+                      <span style={{ width: `${pct}%` }} />
+                    </div>
+                    <b>{count}</b>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+          {productReviews.length ? (
+            <div className="review-list">
+              {productReviews.map((review) => (
+                <article className="review-card" key={review.id}>
+                  <div className="review-card-top">
+                    <div>
+                      <strong>{review.title}</strong>
+                      <div className="review-meta">
+                        <Stars v={review.rating} size={13} /> <span>{review.authorName}</span>
+                        {review.verifiedPurchase && <span className="verified-review">Verified purchase</span>}
+                      </div>
+                    </div>
+                    <time dateTime={new Date(review.createdAt).toISOString()}>{new Date(review.createdAt).toLocaleDateString()}</time>
+                  </div>
+                  <p>{review.body}</p>
+                  {myReview?.id === review.id && (
+                    <button className="btn btn-danger btn-sm" onClick={() => setRemoveReviewOpen(true)}>
+                      <Ic n="trash" s={13} /> Remove your review
+                    </button>
+                  )}
+                </article>
+              ))}
+            </div>
+          ) : (
+            <Empty icon="star" title="Be the first to review" sub="Purchase this product and share what you think." />
+          )}
+        </section>
+
+        <div className="product-info-grid section">
+          <div className="product-info-panel">
+            <span className="eyebrow">At a glance</span>
+            <h2 className="sec-title display">Product information</h2>
+            <div className="product-spec-grid">
+              {featureRows.map((row) => (
+                <div className="product-spec" key={row.label}>
+                  <span>{row.label}</span>
+                  <strong>{row.value}</strong>
+                </div>
+              ))}
+            </div>
+          </div>
+          <div className="product-info-panel">
+            <span className="eyebrow">Need to know</span>
+            <h2 className="sec-title display">Shopping with confidence</h2>
+            <div className="confidence-list">
+              <div>
+                <span className="step-n">1</span>
+                <p>
+                  <b>Choose your quantity.</b> Stock is checked before items are added to the cart.
+                </p>
+              </div>
+              <div>
+                <span className="step-n">2</span>
+                <p>
+                  <b>Review your order.</b> Your cart keeps quantities and totals in sync.
+                </p>
+              </div>
+              <div>
+                <span className="step-n">3</span>
+                <p>
+                  <b>Keep browsing.</b> Related products are shown below so you can compare similar items.
+                </p>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {recommended.length > 0 && (
+          <div className="section recommendation-section">
+            <div className="sec-hd">
+              <div>
+                <span className="eyebrow">Picked for this product</span>
+                <h2 className="sec-title display">You may also like</h2>
+              </div>
+              <Link className="sec-link" to="/products">
+                Explore the collection <Ic n="arrow" s={14} />
+              </Link>
+            </div>
+            <div className="prod-grid">
+              {recommended.map((item) => (
+                <ProductCard key={item.id} p={item} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {related.length > 0 && (
+          <div className="section">
+            <div className="sec-hd">
+              <h2 className="sec-title display">More in {cat ? cat.name : "this range"}</h2>
+              <Link className="sec-link" to={`/products?cat=${cat?.id || ""}`}>
+                View category <Ic n="arrow" s={14} />
+              </Link>
+            </div>
+            <div className="prod-grid">
+              {related.map((r) => (
+                <ProductCard key={r.id} p={r} />
+              ))}
+            </div>
+          </div>
+        )}
+
+        {removeReviewOpen && myReview && (
+          <Modal title="Remove your review" onClose={() => setRemoveReviewOpen(false)}>
+            <div className="delete-account-warning">
+              <span className="empty-ic">
+                <Ic n="alert" s={26} />
+              </span>
+              <h3 className="display">Remove this review?</h3>
+              <p>Your review and rating will be removed from this product. This action cannot be undone.</p>
+            </div>
+            <div className="form-actions">
+              <button type="button" className="btn btn-ghost" onClick={() => setRemoveReviewOpen(false)}>
+                Keep review
+              </button>
+              <button
+                type="button"
+                className="btn btn-danger"
+                onClick={() => {
+                  appActions.deleteReview(myReview.id);
+                  setRemoveReviewOpen(false);
+                }}
+              >
+                Remove review
+              </button>
+            </div>
+          </Modal>
+        )}
+
+        {reviewOpen && (
+          <Modal title={myReview ? "Edit your review" : "Write a review"} onClose={() => setReviewOpen(false)}>
+            <form
+              onSubmit={(e) => {
+                e.preventDefault();
+                const ok = appActions.submitReview({ productId: p.id, rating: reviewRating, title: reviewTitle, body: reviewBody });
+                if (ok) setReviewOpen(false);
+              }}
+            >
+              <div className="review-star-picker" role="radiogroup" aria-label="Rating">
+                {[1, 2, 3, 4, 5].map((score) => (
+                  <button
+                    type="button"
+                    key={score}
+                    className={score <= reviewRating ? "active" : ""}
+                    onClick={() => setReviewRating(score)}
+                    aria-label={`${score} star${score === 1 ? "" : "s"}`}
+                  >
+                    <Ic n="star" s={22} filled={score <= reviewRating} />
+                  </button>
+                ))}
+              </div>
+              <div style={{ marginTop: 16 }}>
+                <label className="lbl" htmlFor="review-title">
+                  Title
+                </label>
+                <input
+                  id="review-title"
+                  className="input"
+                  value={reviewTitle}
+                  onChange={(e) => setReviewTitle(e.target.value)}
+                  maxLength={80}
+                  placeholder="What stood out?"
+                />
+              </div>
+              <div style={{ marginTop: 14 }}>
+                <label className="lbl" htmlFor="review-body">
+                  Review
+                </label>
+                <textarea
+                  id="review-body"
+                  className="textarea"
+                  value={reviewBody}
+                  onChange={(e) => setReviewBody(e.target.value)}
+                  maxLength={600}
+                  placeholder="Tell other shoppers about your experience."
+                />
+              </div>
+              <div style={{ display: "flex", justifyContent: "flex-end", gap: 10, marginTop: 18 }}>
+                <button type="button" className="btn btn-ghost" onClick={() => setReviewOpen(false)}>
+                  Cancel
+                </button>
+                <button className="btn btn-dark">
+                  <Ic n="check" s={15} /> Save review
+                </button>
+              </div>
+            </form>
+          </Modal>
+        )}
+
+        {zoomed && (
+          // eslint-disable-next-line jsx-a11y/no-noninteractive-element-interactions -- backdrop click-to-dismiss and arrow/Escape keys here are mouse/keyboard conveniences layered on top of the explicit close & nav buttons below, which are fully keyboard-accessible on their own.
+          <div
+            className="image-lightbox"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Product image preview"
+            onMouseDown={(e) => {
+              if (e.target === e.currentTarget) setZoomed(false);
+            }}
+            onKeyDown={handleLightboxKeyDown}
+            onTouchStart={handleTouchStart}
+            onTouchEnd={handleTouchEnd}
+          >
+            <button className="icon-btn dark lightbox-close" onClick={() => setZoomed(false)} aria-label="Close image preview">
+              <Ic n="x" s={18} />
+            </button>
+            {images.length > 1 && (
+              <>
+                <button
+                  type="button"
+                  className="icon-btn dark lightbox-nav prev"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    showPrevImage();
+                  }}
+                  aria-label="Previous image"
+                >
+                  <Ic n="chevronLeft" s={20} />
+                </button>
+                <button
+                  type="button"
+                  className="icon-btn dark lightbox-nav next"
+                  onClick={(event) => {
+                    event.stopPropagation();
+                    showNextImage();
+                  }}
+                  aria-label="Next image"
+                >
+                  <Ic n="chevronRight" s={20} />
+                </button>
+                <span className="lightbox-counter">
+                  {activeImage + 1} / {images.length}
+                </span>
+              </>
+            )}
+            <img src={currentImage} alt={p.name} />
+            {images.length > 1 && (
+              <div className="lightbox-thumbs">
+                {images.map((image, index) => (
+                  <button
+                    type="button"
+                    key={`${image}-${index}`}
+                    className={"lightbox-thumb" + (index === activeImage ? " active" : "")}
+                    onClick={() => setActiveImage(index)}
+                    aria-label={`View product image ${index + 1}`}
+                  >
+                    <img src={image} alt="" loading="lazy" />
+                  </button>
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </>
+  );
+}

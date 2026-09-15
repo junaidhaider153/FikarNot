@@ -1,0 +1,52 @@
+{
+  "name": "fikarnot-modular",
+  "private": true,
+  "version": "1.8.0",
+  "license": "MIT",
+  "type": "module",
+  "engines": {
+    "node": ">=22.5.0"
+  },
+  "scripts": {
+    "dev": "node scripts/dev-all.mjs",
+    "build": "vite build",
+    "postbuild": "node scripts/generate-sitemap.js && node scripts/prerender-seo.js",
+    "preview": "vite preview",
+    "lint": "eslint .",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "dev:frontend": "vite",
+    "dev:server": "node server/index.js",
+    "test": "node --test --test-concurrency=1 tests/*.test.js",
+    "db:clear-demo": "node scripts/clear-demo-data.mjs",
+    "verify": "npm run lint && npm test && npm run build && npm run check:production && npm run release:audit",
+    "db:backup": "node scripts/backup-db.mjs",
+    "check:production": "node scripts/check-production-config.mjs",
+    "release:audit": "node scripts/release-audit.mjs",
+    "db:restore": "node scripts/restore-db.mjs",
+    "ops:healthcheck": "node scripts/healthcheck.mjs",
+    "db:backup:schedule": "node scripts/backup-scheduler.mjs"
+  },
+  "dependencies": {
+    "googleapis": "^178.0.0",
+    "react": "^19.2.8",
+    "react-dom": "^19.2.8",
+    "react-router-dom": "^7.18.2",
+    "recharts": "^3.10.1"
+  },
+  "devDependencies": {
+    "@eslint/js": "^9.39.5",
+    "@testing-library/react": "^16.3.3",
+    "@testing-library/user-event": "^14.6.6",
+    "@vitejs/plugin-react": "^6.1.0",
+    "eslint": "^9.39.5",
+    "eslint-plugin-jsx-a11y": "^6.10.2",
+    "eslint-plugin-react": "^7.37.5",
+    "eslint-plugin-react-hooks": "^7.1.1",
+    "globals": "^17.11.0",
+    "jsdom": "^30.0.1",
+    "prettier": "^3.9.6",
+    "vite": "^8.2.2",
+    "vitest": "^4.1.11"
+  }
+}

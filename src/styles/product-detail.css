@@ -1,0 +1,424 @@
+/* ============================ module 4 · product details & images ========= */
+.product-detail-page {
+  padding-bottom: 32px;
+}
+.detail-gallery-main {
+  position: relative;
+}
+.detail-image-button {
+  border: 0;
+  background: none;
+  padding: 0;
+  width: 100%;
+  height: 100%;
+  display: block;
+  cursor: zoom-in;
+}
+.detail-image-button img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  aspect-ratio: 1/1;
+}
+/* Hover-magnify: on pointer devices, the image scales up and pans to follow
+   the cursor (via --zoom-x/--zoom-y set inline from mousemove), giving a
+   magnifier effect without the blur that scaling a small <img> would cause. */
+@media (hover: hover) and (pointer: fine) {
+  .detail-image-button {
+    overflow: hidden;
+  }
+  .detail-image-button.is-magnifying img {
+    transform: scale(2.2);
+    transform-origin: var(--zoom-x, 50%) var(--zoom-y, 50%);
+  }
+}
+.detail-image-button img {
+  transition: transform 0.15s ease-out;
+}
+.detail-image-counter {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  background: rgba(20, 18, 12, 0.72);
+  color: #fff;
+  font-size: 12px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  padding: 4px 10px;
+  border-radius: 999px;
+  pointer-events: none;
+}
+.detail-gallery-nav {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  border: none;
+  background: rgba(255, 255, 255, 0.9);
+  color: var(--ink);
+  display: grid;
+  place-items: center;
+  cursor: pointer;
+  box-shadow: var(--shadow);
+  opacity: 0;
+  transition:
+    opacity 0.15s ease,
+    background 0.15s ease;
+}
+.detail-gallery-main:hover .detail-gallery-nav {
+  opacity: 1;
+}
+.detail-gallery-nav:hover {
+  background: var(--surface);
+}
+.detail-gallery-nav.prev {
+  left: 12px;
+}
+.detail-gallery-nav.next {
+  right: 12px;
+}
+@media (hover: none) {
+  .detail-gallery-nav {
+    opacity: 1;
+  }
+}
+.detail-thumbs {
+  display: flex;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-top: 12px;
+}
+.detail-thumb {
+  width: 72px;
+  height: 72px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 12px;
+  overflow: hidden;
+  background: #f2eee4;
+  cursor: pointer;
+}
+.detail-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.detail-thumb:hover {
+  border-color: #c8c0af;
+}
+.detail-thumb.active {
+  border-color: var(--ink);
+  box-shadow: 0 0 0 2px #fff inset;
+}
+.detail-copy {
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+}
+.product-rating-row {
+  margin-bottom: 4px;
+}
+.product-price {
+  font-size: 30px;
+  margin: 12px 0;
+}
+.product-description {
+  max-width: 58ch;
+}
+.product-benefits {
+  display: grid;
+  gap: 8px;
+  margin: 20px 0;
+  padding: 14px 16px;
+  background: #fbf9f4;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+}
+.product-benefits div {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  font-size: 13px;
+  color: var(--ink2);
+}
+.product-benefits svg {
+  color: var(--ok);
+  flex: none;
+}
+.product-actions {
+  display: flex;
+  gap: 10px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.product-info-grid {
+  display: grid;
+  grid-template-columns: 1.1fr 0.9fr;
+  gap: 16px;
+}
+.product-info-panel {
+  background: var(--surface);
+  border: 1px solid var(--line);
+  border-radius: var(--r);
+  padding: 24px;
+}
+.product-info-panel .sec-title {
+  margin-top: 6px;
+  margin-bottom: 18px;
+}
+.product-spec-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 10px;
+}
+.product-spec {
+  background: #fbf9f4;
+  border: 1px solid var(--line);
+  border-radius: 12px;
+  padding: 12px;
+}
+.product-spec span {
+  display: block;
+  font-size: 11px;
+  color: var(--ink2);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  margin-bottom: 4px;
+}
+.product-spec strong {
+  font: 600 14px "Space Grotesk";
+  word-break: break-word;
+}
+.confidence-list {
+  display: grid;
+  gap: 13px;
+}
+.confidence-list > div {
+  display: flex;
+  gap: 10px;
+  align-items: flex-start;
+}
+.confidence-list .step-n {
+  margin-top: 1px;
+}
+.confidence-list p {
+  font-size: 13.5px;
+  color: var(--ink2);
+}
+.image-lightbox {
+  position: fixed;
+  inset: 0;
+  background: rgba(20, 18, 12, 0.86);
+  z-index: 130;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 16px;
+  padding: 40px;
+}
+.image-lightbox img {
+  max-width: min(1100px, 92vw);
+  max-height: 74vh;
+  object-fit: contain;
+  border-radius: 16px;
+  box-shadow: var(--shadow);
+}
+.lightbox-close {
+  position: fixed;
+  top: 20px;
+  right: 20px;
+  z-index: 2;
+}
+.lightbox-nav {
+  position: fixed;
+  top: 50%;
+  transform: translateY(-50%);
+  z-index: 2;
+}
+.lightbox-nav.prev {
+  left: 20px;
+}
+.lightbox-nav.next {
+  right: 20px;
+}
+.lightbox-counter {
+  position: fixed;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  color: #fff;
+  font-size: 13px;
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  background: rgba(255, 255, 255, 0.12);
+  padding: 5px 12px;
+  border-radius: 999px;
+}
+.lightbox-thumbs {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  justify-content: center;
+  max-width: min(1100px, 92vw);
+}
+.lightbox-thumb {
+  width: 56px;
+  height: 56px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 10px;
+  overflow: hidden;
+  cursor: pointer;
+  opacity: 0.6;
+  transition: opacity 0.15s ease, border-color 0.15s ease;
+}
+.lightbox-thumb img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.lightbox-thumb:hover {
+  opacity: 0.85;
+}
+.lightbox-thumb.active {
+  opacity: 1;
+  border-color: var(--lime, #fff);
+}
+.image-uploader {
+  background: #fbf9f4;
+  border: 1px solid var(--line);
+  border-radius: 14px;
+  padding: 14px;
+}
+.image-uploader-actions {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.image-hint {
+  font-size: 12px;
+  color: var(--ink2);
+}
+.image-url-row {
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 8px;
+  margin-top: 10px;
+}
+.upload-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+  margin-top: 14px;
+}
+.upload-card {
+  background: var(--surface);
+  border: 2px solid transparent;
+  border-radius: 12px;
+  overflow: hidden;
+}
+.upload-card.primary {
+  border-color: var(--ink);
+}
+.upload-card img {
+  width: 100%;
+  aspect-ratio: 1/1;
+  object-fit: cover;
+  background: #f2eee4;
+}
+.upload-card-actions {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 6px;
+  padding: 7px;
+}
+.upload-card-actions .btn {
+  flex: 1;
+}
+.upload-empty {
+  display: grid;
+  place-items: center;
+  text-align: center;
+  gap: 4px;
+  padding: 24px 12px;
+  color: var(--ink2);
+  font-size: 12px;
+}
+.upload-empty .empty-ic {
+  width: 46px;
+  height: 46px;
+  margin: 0 0 4px;
+}
+.image-helper {
+  font-size: 12px;
+  color: var(--ink2);
+  margin-top: 8px;
+}
+@media (max-width: 960px) {
+  .product-info-grid {
+    grid-template-columns: 1fr;
+  }
+}
+@media (max-width: 720px) {
+  .product-spec-grid {
+    grid-template-columns: 1fr;
+  }
+  .upload-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+  .image-url-row {
+    grid-template-columns: 1fr;
+  }
+  .detail-thumb {
+    width: 60px;
+    height: 60px;
+  }
+  .image-lightbox {
+    padding: 16px;
+    gap: 12px;
+  }
+  .image-lightbox img {
+    max-height: 62vh;
+  }
+  .lightbox-nav {
+    width: 34px;
+    height: 34px;
+  }
+  .lightbox-nav.prev {
+    left: 10px;
+  }
+  .lightbox-nav.next {
+    right: 10px;
+  }
+  .lightbox-thumb {
+    width: 44px;
+    height: 44px;
+  }
+  .detail-gallery-nav {
+    width: 32px;
+    height: 32px;
+  }
+}
+
+/* Module 4.1 product-card hover gallery */
+.card-media {
+  position: relative;
+}
+.card-media .image-count {
+  position: absolute;
+  right: 12px;
+  bottom: 12px;
+  background: rgba(23, 21, 15, 0.82);
+  color: #fff;
+  border-radius: 999px;
+  padding: 4px 8px;
+  font: 600 11px/1 "Space Grotesk";
+  letter-spacing: 0.04em;
+  pointer-events: none;
+}
+

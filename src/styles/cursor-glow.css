@@ -1,0 +1,73 @@
+/* ============================ cursor glow ================================= */
+.cursor-glow {
+  position: fixed;
+  inset: 0;
+  z-index: 200;
+  pointer-events: none;
+}
+.cursor-glow-dot,
+.cursor-glow-ring {
+  position: fixed;
+  top: 0;
+  left: 0;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  will-change: transform;
+}
+.cursor-glow-dot {
+  width: 8px;
+  height: 8px;
+  margin: -4px 0 0 -4px;
+  border-radius: 50%;
+  background: var(--lime);
+}
+.cursor-glow-ring {
+  width: 36px;
+  height: 36px;
+  margin: -18px 0 0 -18px;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(196, 232, 91, 0.28) 0%, rgba(196, 232, 91, 0) 72%);
+  transition:
+    opacity 0.2s ease,
+    width 0.25s ease,
+    height 0.25s ease,
+    margin 0.25s ease;
+}
+.cursor-glow-ring.is-active {
+  width: 64px;
+  height: 64px;
+  margin: -32px 0 0 -32px;
+  background: radial-gradient(circle, rgba(196, 232, 91, 0.4) 0%, rgba(196, 232, 91, 0) 72%);
+}
+/* Hidden entirely on touch/coarse-pointer devices — no cursor to follow, and
+   the always-mounted node should never intercept layout or paint there. */
+@media (hover: none), (pointer: coarse) {
+  .cursor-glow {
+    display: none;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .cursor-glow {
+    display: none;
+  }
+}
+
+/* ============================ page transitions ============================= */
+.route-fade {
+  animation: route-fade-in 0.28s ease both;
+}
+@keyframes route-fade-in {
+  from {
+    opacity: 0;
+    transform: translateY(6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .route-fade {
+    animation: none;
+  }
+}
