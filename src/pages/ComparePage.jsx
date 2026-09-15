@@ -3,15 +3,13 @@ import { useApp, appActions } from "../store/appStore";
 import { fmt } from "../utils/helpers";
 import { Stars, Empty } from "../components/common";
 import { Ic } from "../components/icons";
-import { useDocumentMeta } from "../hooks/useDocumentMeta";
 
 export default function ComparePage() {
   const s = useApp();
   const products = s.comparison.map((id) => s.products.find((p) => p.id === id)).filter(Boolean);
-  useDocumentMeta({ title: "Compare products", noindex: true });
   if (!products.length) {
     return (
-      <div className="container page-pad">
+      <div className="container" style={{ padding: "60px 24px" }}>
         <Empty
           icon="box"
           title="Nothing to compare"
@@ -61,7 +59,7 @@ export default function ComparePage() {
               {products.map((p) => (
                 <th key={p.id}>
                   <div className="compare-product">
-                    <img src={p.images?.[0] || p.image} alt="" loading="lazy" />
+                    <img src={p.images?.[0] || p.image} alt="" />
                     <Link to={`/product/${p.id}`}>{p.name}</Link>
                     <button
                       className="icon-btn"

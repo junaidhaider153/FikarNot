@@ -104,7 +104,7 @@ export function HeaderSearch() {
                 pick(p);
               }}
             >
-              <img src={p.image} alt="" loading="lazy" />
+              <img src={p.image} alt="" />
               <span className="nm">{p.name}</span>
               <span className="pr">{fmt(p.price)}</span>
             </li>
@@ -306,6 +306,9 @@ export function Header() {
         </div>
       </div>
       <nav className={"mobile-nav" + (open ? " open" : "")} aria-label="Mobile">
+        <div className="mobile-search">
+          <HeaderSearch />
+        </div>
         <button type="button" className="mobile-theme-toggle" onClick={toggleTheme}>
           <Ic n={theme === "dark" ? "sun" : "moon"} s={15} /> {theme === "dark" ? "Light mode" : "Dark mode"}
         </button>
@@ -354,6 +357,8 @@ export function Marquee() {
   );
 }
 export function Footer() {
+  const s = useApp();
+  const isStaff = s.session && ["admin", "editor"].includes(s.session.role);
   return (
     <footer className="footer">
       <div className="container">
@@ -391,7 +396,12 @@ export function Footer() {
           </div>
         </div>
         <div className="footer-bottom">
-          <span>© {new Date().getFullYear()} FikarNot. All rights reserved.</span>
+          <span>© {new Date().getFullYear()} FikarNot Demo Store — no real orders.</span>
+          {isStaff && (
+            <button className="reset" onClick={appActions.resetDemo}>
+              <Ic n="refresh" s={12} /> Reset demo data
+            </button>
+          )}
         </div>
       </div>
     </footer>
@@ -418,7 +428,7 @@ export function CompareTray() {
       <div className="compare-tray-items">
         {products.map((product) => (
           <div className="compare-tray-item" key={product.id}>
-            <img src={product.image} alt="" loading="lazy" />
+            <img src={product.image} alt="" />
             <button
               type="button"
               className="compare-tray-remove"

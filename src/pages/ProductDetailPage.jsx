@@ -181,7 +181,7 @@ export default function ProductDetailPage() {
                 aria-label="Open product image, zoomed"
                 style={magnify ? { "--zoom-x": `${magnifyPos.x}%`, "--zoom-y": `${magnifyPos.y}%` } : undefined}
               >
-                <img src={currentImage} alt={p.name} fetchPriority="high" />
+                <img src={currentImage} alt={p.name} />
                 {images.length > 1 && (
                   <span className="detail-image-counter">
                     {activeImage + 1} / {images.length}
@@ -225,7 +225,7 @@ export default function ProductDetailPage() {
                     onClick={() => setActiveImage(index)}
                     aria-label={`View product image ${index + 1}`}
                   >
-                    <img src={image} alt="" loading="lazy" />
+                    <img src={image} alt="" />
                   </button>
                 ))}
               </div>
@@ -610,7 +610,7 @@ export default function ProductDetailPage() {
                     onClick={() => setActiveImage(index)}
                     aria-label={`View product image ${index + 1}`}
                   >
-                    <img src={image} alt="" loading="lazy" />
+                    <img src={image} alt="" />
                   </button>
                 ))}
               </div>

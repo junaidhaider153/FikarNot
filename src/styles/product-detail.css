@@ -71,7 +71,7 @@
   opacity: 1;
 }
 .detail-gallery-nav:hover {
-  background: var(--surface);
+  background: #fff;
 }
 .detail-gallery-nav.prev {
   left: 12px;
@@ -316,7 +316,7 @@
   margin-top: 14px;
 }
 .upload-card {
-  background: var(--surface);
+  background: #fff;
   border: 2px solid transparent;
   border-radius: 12px;
   overflow: hidden;

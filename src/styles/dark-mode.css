@@ -23,13 +23,21 @@
     radial-gradient(circle at 92% 8%, rgba(77, 124, 255, 0.06), transparent 22%), var(--bg);
 }
 
-/* Components that still use a literal white/translucent background instead of
-   the surface token — most #fff cases were fixed at the source (swapped to
-   var(--surface)) so they theme correctly; these few use rgba()/other patterns
-   that need an explicit dark-mode value instead. */
-[data-theme="dark"] .detail-gallery-nav {
-  background: rgba(30, 33, 45, 0.85);
+/* Components that hardcode a literal white background/border instead of the
+   surface token. */
+[data-theme="dark"] .icon-btn,
+[data-theme="dark"] .detail-gallery-nav,
+[data-theme="dark"] .filters-toggle,
+[data-theme="dark"] .upload-card,
+[data-theme="dark"] select,
+[data-theme="dark"] input,
+[data-theme="dark"] textarea {
+  background: var(--surface);
+  border-color: var(--line);
   color: var(--ink);
+}
+[data-theme="dark"] .icon-btn:hover {
+  background: var(--surface-soft);
 }
 [data-theme="dark"] .skeleton {
   background: linear-gradient(90deg, #1d212d 25%, #262b38 50%, #1d212d 75%);
@@ -38,6 +46,11 @@
 [data-theme="dark"] .tbl thead th,
 [data-theme="dark"] .compare-table thead th {
   background: var(--surface-soft);
+}
+[data-theme="dark"] .toast {
+  background: var(--surface);
+  color: var(--ink);
+  border: 1px solid var(--line);
 }
 
 @media (prefers-color-scheme: dark) {

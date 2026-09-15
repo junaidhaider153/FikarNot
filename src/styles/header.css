@@ -144,7 +144,7 @@
   height: 36px;
   border-radius: 10px;
   border: 1px solid var(--line);
-  background: var(--surface);
+  background: #fff;
   display: grid;
   place-items: center;
   cursor: pointer;
@@ -174,6 +174,18 @@
   background: #17150f;
   color: #fff;
   border-top: 1px solid rgba(255, 255, 255, 0.08);
+}
+/* The header's search combobox is hidden below 860px (see the collapse rule
+   further down), so give it a full-width home inside the mobile menu instead
+   — otherwise phones simply lose product search entirely. */
+.mobile-search {
+  margin-bottom: 8px;
+}
+.mobile-search .searchbox {
+  width: 100%;
+}
+.mobile-search .search-input {
+  width: 100%;
 }
 .mobile-nav a {
   padding: 10px 12px;
@@ -217,7 +229,7 @@
   .nav {
     display: none;
   }
-  .searchbox {
+  .hdr-actions > .searchbox {
     display: none;
   }
   .notification-header,
@@ -378,19 +390,12 @@ body {
 .search-input input::placeholder {
   color: #9d968a;
 }
-/* The inner <input> clears its own outline (it sits flush inside the pill),
-   so the visible focus indicator has to live on the wrapper instead —
-   otherwise keyboard users get no focus cue at all here. */
-.search-input:focus-within {
-  outline: 2px solid var(--lime);
-  outline-offset: 2px;
-}
 .suggest {
   position: absolute;
   top: calc(100% + 8px);
   left: 0;
   right: 0;
-  background: var(--surface);
+  background: #fff;
   color: var(--ink);
   border: 1px solid var(--line);
   border-radius: 14px;

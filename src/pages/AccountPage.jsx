@@ -278,7 +278,7 @@ export default function AccountPage() {
                       <span>{fmt(orders[0].total)}</span>
                     </div>
                     {orders[0].trackingNumber && (
-                      <div className="confirmation-address u-mt">
+                      <div className="confirmation-address" style={{ marginTop: 12 }}>
                         <span>Shipment</span>
                         <strong>{orders[0].courier || "Courier"} · {orders[0].trackingNumber}</strong>
                         {orders[0].trackingUrl && <a href={orders[0].trackingUrl} target="_blank" rel="noreferrer">Track shipment</a>}
@@ -429,7 +429,7 @@ export default function AccountPage() {
                         <span>{fmt(order.total)}</span>
                       </div>
                       {order.customer?.email && (
-                        <p className="account-note u-mt">
+                        <p className="account-note" style={{ marginTop: 12 }}>
                           <Ic n="check" s={15} /> Updates for this order are associated with <b>{order.customer.email}</b>.
                         </p>
                       )}
@@ -573,11 +573,11 @@ export default function AccountPage() {
                     </div>
                   </div>
                   {addressError && (
-                    <p className="f-err u-mt">
+                    <p className="f-err" style={{ marginTop: 12 }}>
                       {addressError}
                     </p>
                   )}
-                  <label className="chk u-mt">
+                  <label className="chk" style={{ marginTop: 16 }}>
                     <input
                       type="checkbox"
                       checked={address.isDefault}
@@ -780,8 +780,8 @@ export default function AccountPage() {
       {returnOrder && (
         <Modal title={`Request a return · ${returnOrder.id}`} onClose={() => setReturnOrder(null)}>
           <form onSubmit={submitReturn}>
-            <p className="account-muted">Returns are available for delivered orders within 30 days.</p>
-            <div className="field">
+            <p className="account-muted">Returns are available for delivered orders within 30 days in this demo.</p>
+            <div style={{ marginBottom: 14 }}>
               <label className="lbl" htmlFor="return-reason">
                 Reason
               </label>
@@ -791,7 +791,7 @@ export default function AccountPage() {
                 ))}
               </select>
             </div>
-            <div className="field">
+            <div style={{ marginBottom: 18 }}>
               <label className="lbl" htmlFor="return-note">
                 Additional details
               </label>
@@ -828,7 +828,7 @@ export default function AccountPage() {
             </p>
           </div>
           <form onSubmit={confirmDeleteAccount}>
-            <div className="field">
+            <div style={{ marginTop: 18 }}>
               <label className="lbl" htmlFor="delete-pass">
                 Current password
               </label>
@@ -842,7 +842,7 @@ export default function AccountPage() {
                 required
               />
             </div>
-            <div className="field">
+            <div style={{ marginTop: 14 }}>
               <label className="lbl" htmlFor="delete-confirm">
                 Type DELETE to confirm
               </label>

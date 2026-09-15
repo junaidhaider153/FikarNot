@@ -570,7 +570,7 @@ export function CouponsTab() {
                   <tr key={coupon.id}>
                     <td>
                       <strong>{coupon.code}</strong>
-                      <div className="field-hint">{coupon.description || "—"}</div>
+                      <div style={{ fontSize: 12, color: "var(--ink2)" }}>{coupon.description || "—"}</div>
                     </td>
                     <td>{offer}</td>
                     <td>{coupon.minSubtotal ? fmt(coupon.minSubtotal) : "No minimum"}</td>
@@ -773,7 +773,7 @@ export function ProductsTab() {
               <th>Price</th>
               <th>Stock</th>
               <th>Featured</th>
-              <th className="u-right">Actions</th>
+              <th style={{ textAlign: "right" }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -781,10 +781,10 @@ export function ProductsTab() {
               <tr key={p.id}>
                 <td>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <img className="thumb" src={p.image} alt="" loading="lazy" />
+                    <img className="thumb" src={p.image} alt="" />
                     <div>
                       <b>{p.name}</b>
-                      <div className="field-hint">{p.tags.map((t) => "#" + t).join(" ")}</div>
+                      <div style={{ fontSize: 12, color: "var(--ink2)" }}>{p.tags.map((t) => "#" + t).join(" ")}</div>
                     </div>
                   </div>
                 </td>
@@ -813,8 +813,8 @@ export function ProductsTab() {
                     <Ic n="star" s={14} filled={p.featured} />
                   </button>
                 </td>
-                <td className="u-right">
-                  <div className="u-row-end">
+                <td style={{ textAlign: "right" }}>
+                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                     <button className="icon-btn" aria-label={`Edit ${p.name}`} onClick={() => setEditing(p)}>
                       <Ic n="edit" s={14} />
                     </button>
@@ -924,7 +924,7 @@ export function InventoryTab() {
               <th>On hand</th>
               <th>Threshold</th>
               <th>Status</th>
-              <th className="u-right">Action</th>
+              <th style={{ textAlign: "right" }}>Action</th>
             </tr>
           </thead>
           <tbody>
@@ -935,10 +935,10 @@ export function InventoryTab() {
                 <tr key={p.id}>
                   <td>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <img className="thumb" src={p.image} alt="" loading="lazy" />
+                      <img className="thumb" src={p.image} alt="" />
                       <div>
                         <b>{p.name}</b>
-                        <div className="field-hint">{fmt(p.price)} each</div>
+                        <div style={{ fontSize: 12, color: "var(--ink2)" }}>{fmt(p.price)} each</div>
                       </div>
                     </div>
                   </td>
@@ -954,7 +954,7 @@ export function InventoryTab() {
                       {status}
                     </span>
                   </td>
-                  <td className="u-right">
+                  <td style={{ textAlign: "right" }}>
                     <button className="btn btn-ghost btn-sm" onClick={() => setEditing(p)}>
                       <Ic n="plus" s={13} /> Adjust stock
                     </button>
@@ -1068,7 +1068,7 @@ export function CategoriesTab() {
               <th>Category</th>
               <th>Description</th>
               <th>Products</th>
-              <th className="u-right">Actions</th>
+              <th style={{ textAlign: "right" }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -1082,8 +1082,8 @@ export function CategoriesTab() {
                 </td>
                 <td style={{ color: "var(--ink2)" }}>{c.description}</td>
                 <td>{s.products.filter((p) => p.categoryId === c.id).length}</td>
-                <td className="u-right">
-                  <div className="u-row-end">
+                <td style={{ textAlign: "right" }}>
+                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                     <button className="icon-btn" aria-label={`Edit ${c.name}`} onClick={() => setEditing(c)}>
                       <Ic n="edit" s={14} />
                     </button>
@@ -1145,7 +1145,7 @@ export function UsersTab() {
               <th>Email</th>
               <th>Role</th>
               <th>Joined</th>
-              <th className="u-right">Actions</th>
+              <th style={{ textAlign: "right" }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -1178,8 +1178,8 @@ export function UsersTab() {
                   </select>
                 </td>
                 <td style={{ color: "var(--ink2)" }}>{new Date(u.createdAt).toLocaleDateString()}</td>
-                <td className="u-right">
-                  <div className="u-row-end">
+                <td style={{ textAlign: "right" }}>
+                  <div style={{ display: "flex", gap: 8, justifyContent: "flex-end" }}>
                     <button className="icon-btn" aria-label={`Edit ${u.name}`} onClick={() => setEditing(u)}>
                       <Ic n="edit" s={14} />
                     </button>
@@ -1364,7 +1364,7 @@ export function OrdersTab() {
               <th>Status</th>
               <th>Payment</th>
               <th>Shipment</th>
-              <th className="u-right">Actions</th>
+              <th style={{ textAlign: "right" }}>Actions</th>
             </tr>
           </thead>
           <tbody>
@@ -1373,7 +1373,7 @@ export function OrdersTab() {
                 <td><b>{o.id}</b></td>
                 <td>
                   <div>{o.customer.name}</div>
-                  <div className="field-hint">{o.customer.email}</div>
+                  <div style={{ fontSize: 12, color: "var(--ink2)" }}>{o.customer.email}</div>
                 </td>
                 <td style={{ maxWidth: 260 }}>{o.items.map((i) => `${i.qty}× ${i.name}`).join(", ")}</td>
                 <td>{fmt(o.total)}</td>
@@ -1385,7 +1385,7 @@ export function OrdersTab() {
                 </td>
                 <td>
                   <div style={{ fontSize: 12 }}><b>{o.paymentStatus || "—"}</b></div>
-                  {o.paymentMethod && <div className="field-hint">{o.paymentMethod}</div>}
+                  {o.paymentMethod && <div style={{ fontSize: 12, color: "var(--ink2)" }}>{o.paymentMethod}</div>}
                   {o.paymentProof && (
                     <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>
                       <a className="btn btn-ghost btn-sm" href={`${import.meta.env.VITE_API_URL || ""}/api/admin/orders/${encodeURIComponent(o.id)}/payment-proof`} target="_blank" rel="noreferrer">View slip</a>
@@ -1394,7 +1394,7 @@ export function OrdersTab() {
                   )}
                 </td>
                 <td><ShipmentManager order={o} /></td>
-                <td className="u-right">
+                <td style={{ textAlign: "right" }}>
                   <button
                     className="icon-btn"
                     aria-label={`Delete order ${o.id}`}
@@ -1451,14 +1451,14 @@ function ReviewsTab() {
                     </td>
                     <td>
                       <div>{review.authorName}</div>
-                      <div className="field-hint">{review.verifiedPurchase ? "Verified purchase" : "Customer"}</div>
+                      <div style={{ fontSize: 12, color: "var(--ink2)" }}>{review.verifiedPurchase ? "Verified purchase" : "Customer"}</div>
                     </td>
                     <td>
                       <Stars v={review.rating} size={13} />
                     </td>
                     <td style={{ maxWidth: 320 }}>
                       <strong>{review.title}</strong>
-                      <div className="field-hint">{review.body}</div>
+                      <div style={{ fontSize: 12, color: "var(--ink2)" }}>{review.body}</div>
                     </td>
                     <td>{new Date(review.createdAt).toLocaleDateString()}</td>
                     <td>
@@ -1531,15 +1531,15 @@ export function ReturnsTab() {
                   <tr key={request.id}>
                     <td>
                       <b>#{request.id.replace(/^ret-/, "RET-")}</b>
-                      <div className="field-hint">{request.note || "No additional note"}</div>
+                      <div style={{ fontSize: 12, color: "var(--ink2)" }}>{request.note || "No additional note"}</div>
                     </td>
                     <td>
                       <b>{request.orderId}</b>
-                      <div className="field-hint">{order ? fmt(order.total) : "Order unavailable"}</div>
+                      <div style={{ fontSize: 12, color: "var(--ink2)" }}>{order ? fmt(order.total) : "Order unavailable"}</div>
                     </td>
                     <td>
                       <div>{order?.customer?.name || "Customer"}</div>
-                      <div className="field-hint">{order?.customer?.email || "—"}</div>
+                      <div style={{ fontSize: 12, color: "var(--ink2)" }}>{order?.customer?.email || "—"}</div>
                     </td>
                     <td>{request.reason}</td>
                     <td>{new Date(request.createdAt).toLocaleDateString()}</td>
@@ -1661,7 +1661,7 @@ export function SupportTab() {
                   <td>
                     <div>
                       <b>{ticket.name}</b>
-                      <div className="field-hint">{ticket.email}</div>
+                      <div style={{ fontSize: 12, color: "var(--ink2)" }}>{ticket.email}</div>
                     </div>
                   </td>
                   <td style={{ maxWidth: 260 }}>{ticket.subject}</td>
@@ -1821,42 +1821,19 @@ function TwoFactorSection() {
   const setup = async () => { setBusy(true); try { const result = await authApi.twoFactorSetup(password); setSecret(result.secret); setOtpauthUrl(result.otpauthUrl); appActions.toast("Authenticator secret generated. Add it to your authenticator app."); } catch (e) { appActions.toast(e.message || "Could not start 2FA setup", "err"); } finally { setBusy(false); } };
   const enable = async () => { setBusy(true); try { await authApi.twoFactorEnable(password, secret, code); setStatus({ enabled: true, required: true }); setPassword(""); setCode(""); setSecret(""); setOtpauthUrl(""); appActions.toast("Two-factor authentication enabled"); } catch (e) { appActions.toast(e.message || "Could not enable 2FA", "err"); } finally { setBusy(false); } };
   const disable = async () => { setBusy(true); try { await authApi.twoFactorDisable(password, code); setStatus({ enabled: false, required: true }); setPassword(""); setCode(""); appActions.toast("Two-factor authentication disabled"); } catch (e) { appActions.toast(e.message || "Could not disable 2FA", "err"); } finally { setBusy(false); } };
-  if (!status) return <SkelForm rows={2} />;
-  return (
-    <div className="twofactor-section">
-      <h4 className="display twofactor-title">Two-factor authentication</h4>
-      <p className="field-hint">
-        Protect this staff account with a 6-digit code from Google Authenticator, Microsoft Authenticator, 1Password, or another TOTP app.
-      </p>
-      <div className={`free-note twofactor-status${status.enabled ? " is-on" : ""}`}>
-        {status.enabled ? "2FA is enabled for this staff account." : "2FA is not enabled. Enabling it is strongly recommended."}
-      </div>
-      <div className="f-grid">
-        <div>
-          <label className="lbl" htmlFor="twofactor-password">Current password</label>
-          <input id="twofactor-password" className="input" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
-        </div>
-        <div>
-          <label className="lbl" htmlFor="twofactor-code">Authenticator code</label>
-          <input id="twofactor-code" className="input" inputMode="numeric" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="123456" />
-        </div>
-      </div>
-      {!status.enabled && !secret && (
-        <button type="button" className="btn btn-ghost btn-sm" disabled={busy || !password} onClick={setup}>Generate setup secret</button>
-      )}
-      {secret && (
-        <div className="panel twofactor-secret">
-          <strong>Setup secret</strong>
-          <p className="twofactor-code-text">{secret}</p>
-          <p className="field-hint">Manual setup URI: <code className="twofactor-code-text">{otpauthUrl}</code></p>
-          <button type="button" className="btn btn-dark btn-sm" disabled={busy || code.length !== 6} onClick={enable}>Verify and enable 2FA</button>
-        </div>
-      )}
-      {status.enabled && (
-        <button type="button" className="btn btn-danger btn-sm" disabled={busy || !password || code.length !== 6} onClick={disable}>Disable 2FA</button>
-      )}
+  if (!status) return <div className="f-full"><h4 className="display" style={{ margin: "12px 0 4px" }}>Staff security</h4><p style={{ color: "var(--ink2)" }}>Loading two-factor authentication…</p></div>;
+  return <div className="f-full" style={{ marginTop: 8, paddingTop: 8, borderTop: "1px solid var(--line)" }}>
+    <h4 className="display" style={{ margin: "12px 0 4px" }}>Staff security · Two-factor authentication</h4>
+    <p style={{ color: "var(--ink2)", fontSize: 13 }}>Protect this admin/editor account with a 6-digit code from Google Authenticator, Microsoft Authenticator, 1Password, or another TOTP app.</p>
+    <div className="free-note" style={{ marginBottom: 12 }}>{status.enabled ? "2FA is enabled for this staff account." : "2FA is not enabled. I strongly recommend enabling it before launch."}</div>
+    <div className="f-grid">
+      <div><label className="lbl" htmlFor="twofactor-password">Current password</label><input id="twofactor-password" className="input" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} /></div>
+      <div><label className="lbl" htmlFor="twofactor-code">Authenticator code</label><input id="twofactor-code" className="input" inputMode="numeric" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0,6))} placeholder="123456" /></div>
     </div>
-  );
+    {!status.enabled && !secret && <button type="button" className="btn btn-ghost btn-sm" disabled={busy || !password} onClick={setup}>Generate setup secret</button>}
+    {secret && <div className="panel" style={{ marginTop: 12, background: "var(--paper)" }}><strong>Setup secret</strong><p style={{ wordBreak: "break-all", fontFamily: "monospace" }}>{secret}</p><p style={{ fontSize: 12, color: "var(--ink2)" }}>Manual setup URI: <code style={{ wordBreak: "break-all" }}>{otpauthUrl}</code></p><button type="button" className="btn btn-dark btn-sm" disabled={busy || code.length !== 6} onClick={enable}>Verify and enable 2FA</button></div>}
+    {status.enabled && <button type="button" className="btn btn-danger btn-sm" disabled={busy || !password || code.length !== 6} onClick={disable}>Disable 2FA</button>}
+  </div>;
 }
 
 function SettingsTab() {
@@ -2010,7 +1987,7 @@ function SettingsTab() {
               {form.logoUrl && <button type="button" className="btn btn-ghost btn-sm" onClick={() => set("logoUrl", "")}>Remove logo</button>}
             </div>
             {logoUploadError && <p className="f-err">{logoUploadError}</p>}
-            {form.logoUrl && <div className="hero-image-setting-preview" style={{ maxWidth: 80 }}><img src={form.logoUrl} alt="Current logo preview" loading="lazy" /></div>}
+            {form.logoUrl && <div className="hero-image-setting-preview" style={{ maxWidth: 80 }}><img src={form.logoUrl} alt="Current logo preview" /></div>}
           </div>
         </div>
         <div className="f-full"><label className="lbl" htmlFor="settings-kicker">Hero kicker</label><input id="settings-kicker" className="input" value={form.heroKicker} onChange={(e) => set("heroKicker", e.target.value)} /></div>
@@ -2053,7 +2030,7 @@ function SettingsTab() {
               <div className="hero-image-list" style={{ display: "flex", gap: 10, flexWrap: "wrap", marginTop: 10 }}>
                 {heroImages.map((src, i) => (
                   <div className="hero-image-setting-preview" key={`${src}-${i}`} style={{ position: "relative", maxWidth: 140 }}>
-                    <img src={src} alt={`Hero slide ${i + 1}`} loading="lazy" />
+                    <img src={src} alt={`Hero slide ${i + 1}`} />
                     <button type="button" className="btn btn-danger btn-sm" style={{ marginTop: 6, width: "100%" }} onClick={() => removeHeroImage(i)}>Remove</button>
                   </div>
                 ))}
@@ -2157,9 +2134,6 @@ export default function AdminPage({ tab }) {
       icon: "mail",
       n: s.supportTickets?.filter((ticket) => ticket.status === "open").length || 0,
     },
-    // Security is staff-wide (not admin-only): two-factor auth protects the
-    // signed-in account itself, and editors have write access worth protecting too.
-    { id: "security", path: "/admin/security", label: "Security", icon: "shield" },
     ...(s.session.role === "admin" ? [{ id: "media", path: "/admin/media", label: "Media", icon: "box" }, { id: "users", path: "/admin/users", label: "Users", icon: "users", n: s.users.length }, { id: "settings", path: "/admin/settings", label: "Settings", icon: "tag" }] : []),
   ];
   const activeTab = tabs.find((t) => t.id === tab);
@@ -2187,11 +2161,6 @@ export default function AdminPage({ tab }) {
         {tab === "reviews" && <ReviewsTab />}
         {tab === "support" && <SupportTab />}
         {tab === "returns" && <ReturnsTab />}
-        {tab === "security" && (
-          <div className="panel">
-            <TwoFactorSection />
-          </div>
-        )}
         {tab === "media" && s.session.role === "admin" && <MediaTab />}
         {tab === "users" && s.session.role === "admin" && <UsersTab />}
         {tab === "settings" && s.session.role === "admin" && <SettingsTab />}

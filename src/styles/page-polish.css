@@ -501,7 +501,7 @@
 }
 
 .payment-option.selected .payment-icon {
-  background: var(--surface);
+  background: #fff;
 }
 
 .checkout-summary {
@@ -643,7 +643,7 @@
   width: 42px;
   height: 42px;
   border-radius: 12px;
-  background: var(--surface);
+  background: #fff;
   border: 1px solid var(--line);
   flex: none;
 }
@@ -715,7 +715,7 @@
 }
 
 /* Tablets */
-@media (max-width: 960px) {
+@media (max-width: 980px) {
   .cart-layout,
   .checkout-grid {
     grid-template-columns: 1fr;
@@ -808,14 +808,23 @@
   }
 }
 
-/* Small phones */
-@media (max-width: 359px) {
+/* Real phones (360–480px covers the vast majority of devices: iPhone SE/12/13/14,
+   Pixel, most Android). The "Large phones" rule above forces 2 columns because it
+   was matching everything up to 640px, which fought with header.css's older
+   ≤480px "1 column" rule and — since this file loads later in the cascade — won,
+   squeezing product cards (image + wishlist/compare buttons + name + price + CTA)
+   into ~150px on almost every real phone. Force a single column here so cards
+   actually have room to breathe. */
+@media (max-width: 480px) {
   .catalog-grid,
   .wishlist-page .prod-grid,
   .prod-grid {
     grid-template-columns: 1fr;
   }
+}
 
+/* Small phones */
+@media (max-width: 359px) {
   .cart-checkout-btn,
   .checkout-submit,
   .auth-submit {
@@ -843,26 +852,4 @@
     animation: none !important;
     transition: none !important;
   }
-}
-
-/* ===================== shared utilities =====================
-   Small helpers for patterns that were previously repeated as inline
-   styles across pages (mostly the admin tables and modals). Having them
-   as classes keeps spacing and secondary-text styling consistent instead of
-   drifting between 12/14/16px at each call site. */
-.field-hint {
-  font-size: 12px;
-  color: var(--ink2);
-}
-.u-right {
-  text-align: right;
-}
-.u-row-end {
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  justify-content: flex-end;
-}
-.u-mt {
-  margin-top: 12px;
 }

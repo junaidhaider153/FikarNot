@@ -109,7 +109,7 @@
   text-align: left;
   padding: 14px;
   border: 1px solid var(--line);
-  background: var(--surface);
+  background: #fff;
   border-radius: 14px;
   cursor: pointer;
   color: var(--ink);

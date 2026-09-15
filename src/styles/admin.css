@@ -35,7 +35,7 @@
   color: var(--ink);
 }
 .side-btn.active {
-  background: var(--ink-solid);
+  background: var(--ink);
   color: var(--lime);
 }
 .side-btn .n {
@@ -179,30 +179,5 @@
   border-radius: 999px;
   padding: 5px 10px;
   font: 600 12px "Inter";
-  background: var(--surface);
-}
-
-/* two-factor auth (Security tab) */
-.twofactor-section {
-  max-width: 620px;
-}
-.twofactor-title {
-  font: 700 16px "Space Grotesk";
-  margin-bottom: 6px;
-}
-.twofactor-status {
-  margin: 12px 0;
-}
-.twofactor-status.is-on {
-  border-color: var(--ok);
-  color: var(--ok);
-}
-.twofactor-secret {
-  margin-top: 14px;
-  background: var(--surface-soft);
-}
-.twofactor-code-text {
-  word-break: break-all;
-  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
-  font-size: 12.5px;
+  background: #fff;
 }

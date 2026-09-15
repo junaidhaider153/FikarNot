@@ -121,7 +121,10 @@ export function ChatWidget() {
         onClick={() => setOpen((v) => !v)}
         aria-label={open ? "Close chat" : "Chat with FikarNot assistant"}
       >
-        <Ic n={open ? "x" : "chat"} s={22} />
+        <span className="chat-toggle-icon">
+          <Ic n={open ? "x" : "chat"} s={22} />
+        </span>
+        <span className="chat-toggle-label">Ask us anything</span>
       </button>
     </div>
   );

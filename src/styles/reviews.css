@@ -48,7 +48,7 @@
 .review-bar > div > span {
   display: block;
   height: 100%;
-  background: var(--ink-solid);
+  background: var(--ink);
   border-radius: 99px;
 }
 .review-bar b {

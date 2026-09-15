@@ -62,7 +62,7 @@
   cursor: pointer;
 }
 .notification-filter button.on {
-  background: var(--surface);
+  background: #fff;
   color: var(--ink);
   box-shadow: 0 2px 8px rgba(23, 21, 15, 0.08);
 }

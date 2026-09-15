@@ -97,7 +97,7 @@ export function HeroVideoField({ id, label, hint, value, onChange, poster = "" }
 
       {value && (
         <div className="hero-video-preview">
-          { }
+          {/* eslint-disable-next-line jsx-a11y/media-has-caption -- decorative, muted background loop */}
           <video src={value} poster={poster || undefined} muted loop playsInline autoPlay preload="metadata" />
           <span className="hero-video-preview-tag">Preview · save settings to publish</span>
         </div>

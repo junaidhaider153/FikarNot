@@ -240,7 +240,7 @@ const savePaymentProof = (dataUrl, { orderId, uploadedBy = null, originalName = 
     db.prepare("INSERT INTO payment_proofs (id,order_id,original_name,filename,mime_type,byte_size,sha256,uploaded_by,created_at) VALUES (?,?,?,?,?,?,?,?,?)")
       .run(id, orderId, String(originalName || "").slice(0, 255), filename, mimeType, buffer.length, sha256, uploadedBy, Date.now());
   } catch (error) {
-    try { fs.unlinkSync(filePath); } catch {}
+    try { fs.unlinkSync(filePath); } catch (err) {}
     if (error.code === "SQLITE_CONSTRAINT_UNIQUE") throw Object.assign(new Error("This payment image has already been submitted."), { code: "PAYMENT_PROOF_DUPLICATE" });
     throw error;
   }
@@ -756,7 +756,7 @@ const saveUploadedImage = (dataUrl, { uploadedBy = null, originalName = "" } = {
     db.prepare("INSERT INTO media_assets (id,filename,original_name,mime_type,byte_size,sha256,url,uploaded_by,created_at) VALUES (?,?,?,?,?,?,?,?,?)")
       .run(id, filename, String(originalName || "").slice(0, 255), mimeType, buffer.length, sha256, url, uploadedBy, now);
   } catch (error) {
-    try { fs.unlinkSync(filePath); } catch {}
+    try { fs.unlinkSync(filePath); } catch (err) {}
     if (error.code === "SQLITE_CONSTRAINT_UNIQUE") {
       const duplicate = db.prepare("SELECT * FROM media_assets WHERE sha256=?").get(sha256);
       if (duplicate) return mediaRow(duplicate);
@@ -810,7 +810,7 @@ const saveUploadedVideo = (buffer, { mimeType, uploadedBy = null, originalName =
     db.prepare("INSERT INTO media_assets (id,filename,original_name,mime_type,byte_size,sha256,url,uploaded_by,created_at) VALUES (?,?,?,?,?,?,?,?,?)")
       .run(id, filename, String(originalName || "").slice(0, 255), mimeType, buffer.length, sha256, url, uploadedBy, now);
   } catch (error) {
-    try { fs.unlinkSync(filePath); } catch {}
+    try { fs.unlinkSync(filePath); } catch (err) {}
     if (error.code === "SQLITE_CONSTRAINT_UNIQUE") {
       const duplicate = db.prepare("SELECT * FROM media_assets WHERE sha256=?").get(sha256);
       if (duplicate) return mediaRow(duplicate);
@@ -837,7 +837,7 @@ const syncExistingMediaFiles = () => {
       const sha256 = crypto.createHash("sha256").update(buffer).digest("hex");
       const existing = db.prepare("SELECT filename FROM media_assets WHERE sha256=?").get(sha256);
       if (existing && existing.filename !== filename) {
-        try { fs.unlinkSync(filePath); } catch {}
+        try { fs.unlinkSync(filePath); } catch (err) {}
         continue;
       }
       const url = `${UPLOADS_PUBLIC_BASE_URL || ""}/uploads/${filename}`;
@@ -854,7 +854,7 @@ const mediaUsageCount = (url) => {
   for (const row of products) {
     if (row.image === url) count += 1;
     let images = [];
-    try { images = JSON.parse(row.images_json || "[]"); } catch {}
+    try { images = JSON.parse(row.images_json || "[]"); } catch (err) {}
     count += images.filter((item) => item === url).length;
   }
   const setting = db.prepare("SELECT COUNT(*) AS count FROM site_settings WHERE value=?").get(url);
@@ -887,50 +887,21 @@ const serveUploadedFile = (req, res, pathname) => {
   const filename = path.basename(decodeURIComponent(pathname.slice("/uploads/".length)));
   // path.basename strips any ../ traversal attempts, so filename can only refer to a file directly inside uploadsDir
   const filePath = path.join(uploadsDir, filename);
-  fs.stat(filePath, (statErr, stats) => {
-    if (statErr || !stats.isFile()) {
+  fs.readFile(filePath, (err, data) => {
+    if (err) {
       corsHeaders(req, res);
       res.writeHead(404, { "Content-Type": "application/json" });
-      res.end(JSON.stringify({ error: "NOT_FOUND", message: "File not found." }));
+      res.end(JSON.stringify({ error: "NOT_FOUND", message: "Image not found." }));
       return;
     }
     corsHeaders(req, res);
     const ext = path.extname(filename).toLowerCase();
-    const contentType = UPLOAD_CONTENT_TYPES[ext] || "application/octet-stream";
-    const commonHeaders = {
-      "Content-Type": contentType,
+    res.writeHead(200, {
+      "Content-Type": UPLOAD_CONTENT_TYPES[ext] || "application/octet-stream",
       "Cache-Control": "public, max-age=31536000, immutable",
       "X-Content-Type-Options": "nosniff",
-      "Accept-Ranges": "bytes",
-    };
-
-    // Mobile browsers — most notably iOS/macOS Safari — refuse to play <video>
-    // elements served without Range-request support: they open a range probe
-    // before deciding whether to start playback at all. A flat 200 with the
-    // whole file works fine on desktop Chrome/Firefox but silently fails to
-    // ever start on phones, which is why this matters specifically for video
-    // (it's harmless, if unnecessary, for images).
-    const range = req.headers.range;
-    if (!range) {
-      res.writeHead(200, { ...commonHeaders, "Content-Length": stats.size });
-      fs.createReadStream(filePath).pipe(res);
-      return;
-    }
-
-    const match = /^bytes=(\d*)-(\d*)$/.exec(range);
-    const start = match?.[1] ? Number(match[1]) : 0;
-    const end = match?.[2] ? Number(match[2]) : stats.size - 1;
-    if (!match || Number.isNaN(start) || Number.isNaN(end) || start > end || end >= stats.size) {
-      res.writeHead(416, { ...commonHeaders, "Content-Range": `bytes */${stats.size}` });
-      res.end();
-      return;
-    }
-    res.writeHead(206, {
-      ...commonHeaders,
-      "Content-Range": `bytes ${start}-${end}/${stats.size}`,
-      "Content-Length": end - start + 1,
     });
-    fs.createReadStream(filePath, { start, end }).pipe(res);
+    res.end(data);
   });
 };
 
@@ -1501,7 +1472,7 @@ const server = http.createServer(async (req, res) => {
       const total = Number(db.prepare("SELECT COUNT(*) AS count FROM audit_logs").get().count);
       const rows = db.prepare("SELECT * FROM audit_logs ORDER BY created_at DESC LIMIT ? OFFSET ?").all(limit, offset).map((row) => {
         let details = {};
-        try { details = JSON.parse(row.details_json || '{}'); } catch {}
+        try { details = JSON.parse(row.details_json || '{}'); } catch (err) {}
         return { id: row.id, actorUserId: row.actor_user_id, action: row.action, entityType: row.entity_type, entityId: row.entity_id, details, createdAt: row.created_at };
       });
       return send(req, res, 200, { logs: rows, total, limit, offset });
@@ -2592,7 +2563,7 @@ const server = http.createServer(async (req, res) => {
 server.on("error", (error) => {
   console.error(`FikarNot API could not start: ${error.code || error.message}`);
   process.exitCode = 1;
-  try { db.close(); } catch {}
+  try { db.close(); } catch (err) {}
   process.exit(1);
 });
 

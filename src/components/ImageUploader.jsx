@@ -84,7 +84,7 @@ export function ImageUploader({ images = [], onChange }) {
         <div className="upload-grid">
           {images.map((src, index) => (
             <div className={"upload-card" + (index === 0 ? " primary" : "")} key={`${src}-${index}`}>
-              <img src={src} alt={`Product preview ${index + 1}`} loading="lazy" />
+              <img src={src} alt={`Product preview ${index + 1}`} />
               <div className="upload-card-actions">
                 <button type="button" className="btn btn-ghost btn-sm" onClick={() => makePrimary(index)} disabled={index === 0}>
                   {index === 0 ? "Primary" : "Make primary"}

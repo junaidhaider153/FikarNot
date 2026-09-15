@@ -87,7 +87,7 @@
   opacity: 1;
 }
 .compare-btn.active {
-  background: var(--ink-solid);
+  background: var(--ink);
   color: var(--lime);
 }
 .nav-count {
@@ -123,7 +123,7 @@
   display: flex;
   align-items: center;
   gap: 16px;
-  background: var(--ink-solid);
+  background: var(--ink);
   color: #fff;
   border-radius: 18px;
   padding: 10px 14px;
@@ -176,7 +176,7 @@
   height: 16px;
   border-radius: 50%;
   border: none;
-  background: var(--surface);
+  background: #fff;
   color: var(--ink);
   display: grid;
   place-items: center;
