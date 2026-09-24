@@ -1815,11 +1815,12 @@ function TwoFactorSection() {
   const [password, setPassword] = useState("");
   const [code, setCode] = useState("");
   const [secret, setSecret] = useState("");
+  const [factorId, setFactorId] = useState("");
   const [otpauthUrl, setOtpauthUrl] = useState("");
   const [busy, setBusy] = useState(false);
   useEffect(() => { authApi.twoFactorStatus().then(setStatus).catch(() => {}); }, []);
-  const setup = async () => { setBusy(true); try { const result = await authApi.twoFactorSetup(password); setSecret(result.secret); setOtpauthUrl(result.otpauthUrl); appActions.toast("Authenticator secret generated. Add it to your authenticator app."); } catch (e) { appActions.toast(e.message || "Could not start 2FA setup", "err"); } finally { setBusy(false); } };
-  const enable = async () => { setBusy(true); try { await authApi.twoFactorEnable(password, secret, code); setStatus({ enabled: true, required: true }); setPassword(""); setCode(""); setSecret(""); setOtpauthUrl(""); appActions.toast("Two-factor authentication enabled"); } catch (e) { appActions.toast(e.message || "Could not enable 2FA", "err"); } finally { setBusy(false); } };
+  const setup = async () => { setBusy(true); try { const result = await authApi.twoFactorSetup(password); setSecret(result.secret); setFactorId(result.factorId); setOtpauthUrl(result.otpauthUrl); appActions.toast("Authenticator secret generated. Add it to your authenticator app."); } catch (e) { appActions.toast(e.message || "Could not start 2FA setup", "err"); } finally { setBusy(false); } };
+  const enable = async () => { setBusy(true); try { await authApi.twoFactorEnable(password, factorId, code); setStatus({ enabled: true, required: true }); setPassword(""); setCode(""); setSecret(""); setFactorId(""); setOtpauthUrl(""); appActions.toast("Two-factor authentication enabled"); } catch (e) { appActions.toast(e.message || "Could not enable 2FA", "err"); } finally { setBusy(false); } };
   const disable = async () => { setBusy(true); try { await authApi.twoFactorDisable(password, code); setStatus({ enabled: false, required: true }); setPassword(""); setCode(""); appActions.toast("Two-factor authentication disabled"); } catch (e) { appActions.toast(e.message || "Could not disable 2FA", "err"); } finally { setBusy(false); } };
   if (!status) return <SkelForm rows={2} />;
   return (

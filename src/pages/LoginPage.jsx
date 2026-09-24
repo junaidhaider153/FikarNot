@@ -69,12 +69,6 @@ export default function LoginPage() {
     if (result?.role) navigate(redirect || (result.role === "admin" || result.role === "editor" ? "/admin" : "/account"), { replace: true });
   };
 
-  const demo = import.meta.env.DEV || import.meta.env.VITE_SHOW_DEMO_LOGIN === "1" ? [
-    { label: "Admin", e: "junaid@fikarnot.shop", p: "admin123" },
-    { label: "Editor", e: "editor@fikarnot.shop", p: "editor123" },
-    { label: "Customer", e: "urwa@fikarnot.shop", p: "maya123" },
-  ] : [];
-
   return (
     <div className="container auth-wrap">
       <div className="panel auth-panel">
@@ -214,27 +208,6 @@ export default function LoginPage() {
             {busy ? "Please wait…" : mode === "login" ? "Sign in" : "Create account"} <Ic n="arrow" s={15} />
           </button>
         </form>
-
-        {mode === "login" && demo.length > 0 && (
-          <div className="demo-login">
-            <p className="lbl">Demo accounts</p>
-            <div className="demo-actions">
-              {demo.map((d) => (
-                <button
-                  key={d.label}
-                  type="button"
-                  className="btn btn-ghost btn-sm"
-                  onClick={() => {
-                    setEmail(d.e);
-                    setPass(d.p);
-                  }}
-                >
-                  {d.label}
-                </button>
-              ))}
-            </div>
-          </div>
-        )}
 
         <div className="auth-footnote">
           <Link to="/products">

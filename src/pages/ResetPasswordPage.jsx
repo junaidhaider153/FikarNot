@@ -1,6 +1,7 @@
-import { useEffect, useMemo, useState } from "react";
-import { Link, useSearchParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link } from "react-router-dom";
 import { authApi } from "../api/authApi";
+import { supabase } from "../lib/supabaseClient";
 import { useApp } from "../store/appStore";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
 import { Ic } from "../components/icons";
@@ -8,8 +9,10 @@ import { Ic } from "../components/icons";
 export default function ResetPasswordPage() {
   useDocumentMeta({ title: "Reset password", noindex: true });
   const s = useApp();
-  const [query] = useSearchParams();
-  const token = useMemo(() => query.get("token") || "", [query]);
+  // Supabase's recovery link signs the visitor in directly (no ?token= param
+  // like the old server used) — it lands here already carrying a live
+  // session, either immediately or via a PASSWORD_RECOVERY auth event fired
+  // a moment after this page mounts.
   const [validating, setValidating] = useState(true);
   const [valid, setValid] = useState(false);
   const [password, setPassword] = useState("");
@@ -19,26 +22,25 @@ export default function ResetPasswordPage() {
 
   useEffect(() => {
     let alive = true;
-    if (!token) {
+    const { data: sub } = supabase.auth.onAuthStateChange((event, session) => {
+      if (!alive) return;
+      if (event === "PASSWORD_RECOVERY" || (session && event === "SIGNED_IN")) {
+        setValid(true);
+        setValidating(false);
+      }
+    });
+    supabase.auth.getSession().then(({ data }) => {
+      if (!alive) return;
+      if (data?.session) {
+        setValid(true);
+      }
       setValidating(false);
-      setValid(false);
-      return undefined;
-    }
-    authApi
-      .verifyResetToken(token)
-      .then(() => {
-        if (alive) setValid(true);
-      })
-      .catch(() => {
-        if (alive) setValid(false);
-      })
-      .finally(() => {
-        if (alive) setValidating(false);
-      });
+    });
     return () => {
       alive = false;
+      sub.subscription.unsubscribe();
     };
-  }, [token]);
+  }, []);
 
   const submit = async (e) => {
     e.preventDefault();
@@ -53,7 +55,7 @@ export default function ResetPasswordPage() {
     }
     setBusy(true);
     try {
-      const result = await authApi.resetPassword(token, password);
+      const result = await authApi.resetPassword(null, password);
       const destination =
         result.user && (result.user.role === "admin" || result.user.role === "editor")
           ? "/admin"
