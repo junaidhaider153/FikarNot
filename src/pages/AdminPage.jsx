@@ -1,4 +1,5 @@
 import { useEffect, useState } from "react";
+import { FEATURES } from "../config/appConfig";
 import { NavLink, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ResponsiveContainer,
@@ -1186,12 +1187,19 @@ export function UsersTab() {
                     <button
                       className="icon-btn"
                       aria-label={u.role === "admin" ? `${u.name} is an admin — change their role before deleting` : `Delete ${u.name}`}
-                      title={u.role === "admin" ? "Admin accounts can't be deleted here — change the role to editor or customer first" : "Delete user"}
+                      title={
+                        u.role === "admin"
+                          ? "Admin accounts can't be deleted here — change the role to editor or customer first"
+                          : "Delete user"
+                      }
                       disabled={u.role === "admin"}
                       style={u.role === "admin" ? { opacity: 0.4, cursor: "not-allowed" } : undefined}
                       onClick={() => {
                         if (u.role === "admin") {
-                          appActions.toast("Admin accounts can't be deleted from this screen. Change the role to editor or customer first.", "err");
+                          appActions.toast(
+                            "Admin accounts can't be deleted from this screen. Change the role to editor or customer first.",
+                            "err",
+                          );
                           return;
                         }
                         if (window.confirm(`Delete ${u.name}?`)) appActions.deleteUser(u.id);
@@ -1288,15 +1296,26 @@ function ShipmentManager({ order }) {
       <div className="shipment-summary">
         <span className="status-pill">{String(order.shipmentStatus || "not_created").replaceAll("_", " ")}</span>
         {order.trackingNumber ? (
-          <span className="shipment-ref">{order.courier || "Courier"} · {order.trackingNumber}</span>
+          <span className="shipment-ref">
+            {order.courier || "Courier"} · {order.trackingNumber}
+          </span>
         ) : (
           <span className="shipment-ref">No tracking yet</span>
         )}
       </div>
       <div className="shipment-actions">
-        <button className="btn btn-ghost btn-sm" type="button" onClick={() => copyText(postexDetails, "Shipment details copied")}>Copy details</button>
+        <button className="btn btn-ghost btn-sm" type="button" onClick={() => copyText(postexDetails, "Shipment details copied")}>
+          Copy details
+        </button>
         {customerPhone && (
-          <a className="btn btn-ghost btn-sm" href={`https://wa.me/${customerPhone}?text=${encodeURIComponent(whatsappText)}`} target="_blank" rel="noreferrer noopener">WhatsApp</a>
+          <a
+            className="btn btn-ghost btn-sm"
+            href={`https://wa.me/${customerPhone}?text=${encodeURIComponent(whatsappText)}`}
+            target="_blank"
+            rel="noreferrer noopener"
+          >
+            WhatsApp
+          </a>
         )}
         <button className="btn btn-dark btn-sm" type="button" onClick={() => setOpen((current) => !current)} aria-expanded={open}>
           {open ? "Close" : order.trackingNumber ? "Update shipment" : "Create shipment"}
@@ -1306,7 +1325,9 @@ function ShipmentManager({ order }) {
         <div className="shipment-editor" aria-label={`Manage shipment for ${order.id}`}>
           <div className="shipment-editor-grid">
             <div>
-              <label className="lbl" htmlFor={`courier-${order.id}`}>Courier</label>
+              <label className="lbl" htmlFor={`courier-${order.id}`}>
+                Courier
+              </label>
               <select id={`courier-${order.id}`} className="select" value={courier} onChange={(event) => setCourier(event.target.value)}>
                 <option value="PostEx">PostEx</option>
                 <option value="TCS">TCS</option>
@@ -1316,16 +1337,40 @@ function ShipmentManager({ order }) {
               </select>
             </div>
             <div>
-              <label className="lbl" htmlFor={`tracking-${order.id}`}>Tracking number</label>
-              <input id={`tracking-${order.id}`} className="input" value={trackingNumber} onChange={(event) => setTrackingNumber(event.target.value)} placeholder="Enter courier tracking ID" />
+              <label className="lbl" htmlFor={`tracking-${order.id}`}>
+                Tracking number
+              </label>
+              <input
+                id={`tracking-${order.id}`}
+                className="input"
+                value={trackingNumber}
+                onChange={(event) => setTrackingNumber(event.target.value)}
+                placeholder="Enter courier tracking ID"
+              />
             </div>
             <div className="f-full">
-              <label className="lbl" htmlFor={`tracking-url-${order.id}`}>Tracking URL <span style={{ fontWeight: 400, color: "var(--ink2)" }}>(optional)</span></label>
-              <input id={`tracking-url-${order.id}`} className="input" value={trackingUrl} onChange={(event) => setTrackingUrl(event.target.value)} placeholder="https://…" inputMode="url" />
+              <label className="lbl" htmlFor={`tracking-url-${order.id}`}>
+                Tracking URL <span style={{ fontWeight: 400, color: "var(--ink2)" }}>(optional)</span>
+              </label>
+              <input
+                id={`tracking-url-${order.id}`}
+                className="input"
+                value={trackingUrl}
+                onChange={(event) => setTrackingUrl(event.target.value)}
+                placeholder="https://…"
+                inputMode="url"
+              />
             </div>
             <div>
-              <label className="lbl" htmlFor={`shipment-status-${order.id}`}>Shipment status</label>
-              <select id={`shipment-status-${order.id}`} className="select" value={shipmentStatus} onChange={(event) => setShipmentStatus(event.target.value)}>
+              <label className="lbl" htmlFor={`shipment-status-${order.id}`}>
+                Shipment status
+              </label>
+              <select
+                id={`shipment-status-${order.id}`}
+                className="select"
+                value={shipmentStatus}
+                onChange={(event) => setShipmentStatus(event.target.value)}
+              >
                 <option value="not_created">Not created</option>
                 <option value="ready_to_ship">Ready to ship</option>
                 <option value="shipped">Shipped</option>
@@ -1336,10 +1381,28 @@ function ShipmentManager({ order }) {
             </div>
           </div>
           <div className="shipment-copy-row">
-            <button className="btn btn-ghost btn-sm" type="button" onClick={() => copyText(order.customer?.address || "", "Customer address copied")}>Copy address</button>
-            <button className="btn btn-ghost btn-sm" type="button" onClick={() => copyText(order.customer?.phone || "", "Customer phone copied")}>Copy phone</button>
-            {order.paymentMethod === "cod" && <button className="btn btn-ghost btn-sm" type="button" onClick={() => copyText(String(order.total), "COD amount copied")}>Copy COD amount</button>}
-            <button className="btn btn-dark btn-sm" type="button" disabled={saving} onClick={save}>{saving ? "Saving…" : "Save shipment"}</button>
+            <button
+              className="btn btn-ghost btn-sm"
+              type="button"
+              onClick={() => copyText(order.customer?.address || "", "Customer address copied")}
+            >
+              Copy address
+            </button>
+            <button
+              className="btn btn-ghost btn-sm"
+              type="button"
+              onClick={() => copyText(order.customer?.phone || "", "Customer phone copied")}
+            >
+              Copy phone
+            </button>
+            {order.paymentMethod === "cod" && (
+              <button className="btn btn-ghost btn-sm" type="button" onClick={() => copyText(String(order.total), "COD amount copied")}>
+                Copy COD amount
+              </button>
+            )}
+            <button className="btn btn-dark btn-sm" type="button" disabled={saving} onClick={save}>
+              {saving ? "Saving…" : "Save shipment"}
+            </button>
           </div>
         </div>
       )}
@@ -1349,9 +1412,34 @@ function ShipmentManager({ order }) {
 
 export function OrdersTab() {
   const s = useApp();
-  const { page, pageCount, pageItems, setPage, start, end, total } = usePagination(s.orders, 10);
+  const [filter, setFilter] = useState("all");
+  const filtered = filter === "all" ? s.orders : s.orders.filter((o) => o.status === filter);
+  const { page, pageCount, pageItems, setPage, start, end, total } = usePagination(filtered, 10);
   return (
     <>
+      <div className="toolbar" style={{ marginBottom: 12 }}>
+        <label className="field-hint" htmlFor="order-status-filter" style={{ marginRight: 8 }}>
+          Filter by status:
+        </label>
+        <select
+          id="order-status-filter"
+          className="select"
+          value={filter}
+          onChange={(e) => {
+            setFilter(e.target.value);
+            setPage(1);
+          }}
+          aria-label="Filter orders by status"
+        >
+          <option value="all">All statuses ({s.orders.length})</option>
+          <option value="pending_payment">Pending payment ({s.orders.filter((o) => o.status === "pending_payment").length})</option>
+          <option value="paid">Paid ({s.orders.filter((o) => o.status === "paid").length})</option>
+          <option value="processing">Processing ({s.orders.filter((o) => o.status === "processing").length})</option>
+          <option value="shipped">Shipped ({s.orders.filter((o) => o.status === "shipped").length})</option>
+          <option value="delivered">Delivered ({s.orders.filter((o) => o.status === "delivered").length})</option>
+          <option value="cancelled">Cancelled ({s.orders.filter((o) => o.status === "cancelled").length})</option>
+        </select>
+      </div>
       <div className="table-wrap">
         <table className="tbl orders-admin-table">
           <thead>
@@ -1370,7 +1458,9 @@ export function OrdersTab() {
           <tbody>
             {pageItems.map((o) => (
               <tr key={o.id}>
-                <td><b>{o.id}</b></td>
+                <td>
+                  <b>{o.id}</b>
+                </td>
                 <td>
                   <div>{o.customer.name}</div>
                   <div className="field-hint">{o.customer.email}</div>
@@ -1379,21 +1469,53 @@ export function OrdersTab() {
                 <td>{fmt(o.total)}</td>
                 <td style={{ color: "var(--ink2)" }}>{new Date(o.createdAt).toLocaleDateString()}</td>
                 <td>
-                  <select className="status-sel" value={o.status} aria-label={`Status for order ${o.id}`} onChange={(e) => appActions.setOrderStatus(o.id, e.target.value)}>
-                    <option>paid</option><option>processing</option><option>shipped</option><option>delivered</option><option>cancelled</option>
+                  <select
+                    className="status-sel"
+                    value={o.status}
+                    aria-label={`Status for order ${o.id}`}
+                    onChange={(e) => appActions.setOrderStatus(o.id, e.target.value)}
+                  >
+                    <option>pending_payment</option>
+                    <option>paid</option>
+                    <option>processing</option>
+                    <option>shipped</option>
+                    <option>delivered</option>
+                    <option>cancelled</option>
                   </select>
                 </td>
                 <td>
-                  <div style={{ fontSize: 12 }}><b>{o.paymentStatus || "—"}</b></div>
+                  <div style={{ fontSize: 12 }}>
+                    <b>{o.paymentStatus || "—"}</b>
+                  </div>
                   {o.paymentMethod && <div className="field-hint">{o.paymentMethod}</div>}
                   {o.paymentProof && (
                     <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      <a className="btn btn-ghost btn-sm" href={`${import.meta.env.VITE_API_URL || ""}/api/admin/orders/${encodeURIComponent(o.id)}/payment-proof`} target="_blank" rel="noreferrer">View slip</a>
-                      {o.paymentStatus === "pending" && ["jazzcash", "easypaisa", "bank_transfer"].includes(o.paymentMethod) && <button className="btn btn-dark btn-sm" type="button" onClick={() => appActions.confirmPayment(o.id, {})}>Confirm</button>}
+                      <a
+                        className="btn btn-ghost btn-sm"
+                        href={`${import.meta.env.VITE_API_URL || ""}/api/admin/orders/${encodeURIComponent(o.id)}/payment-proof`}
+                        target="_blank"
+                        rel="noreferrer"
+                      >
+                        View slip
+                      </a>
+                      {o.paymentStatus === "pending" && ["jazzcash", "easypaisa", "bank_transfer"].includes(o.paymentMethod) && (
+                        <button className="btn btn-dark btn-sm" type="button" onClick={() => appActions.confirmPayment(o.id, {})}>
+                          Confirm
+                        </button>
+                      )}
+                    </div>
+                  )}
+                  {o.paymentMethod === "cod" && o.paymentStatus !== "paid" && o.status !== "cancelled" && (
+                    <div style={{ marginTop: 6 }}>
+                      <button className="btn btn-dark btn-sm" type="button" onClick={() => appActions.collectCod(o.id)}>
+                        Mark COD Collected
+                      </button>
                     </div>
                   )}
                 </td>
-                <td><ShipmentManager order={o} /></td>
+                <td>
+                  <ShipmentManager order={o} />
+                </td>
                 <td className="u-right">
                   <button
                     className="icon-btn"
@@ -1561,7 +1683,13 @@ export function ReturnsTab() {
                             <button
                               className="btn btn-ghost btn-sm"
                               style={{ marginLeft: 8 }}
-                              onClick={() => appActions.setReturnRefund(request.id, { status: "refunded", providerRef: window.prompt("Enter refund/provider reference") || "", note: "Refund confirmed by staff." })}
+                              onClick={() =>
+                                appActions.setReturnRefund(request.id, {
+                                  status: "refunded",
+                                  providerRef: window.prompt("Enter refund/provider reference") || "",
+                                  note: "Refund confirmed by staff.",
+                                })
+                              }
                             >
                               Mark refunded
                             </button>
@@ -1732,7 +1860,6 @@ export function SupportTab() {
   );
 }
 
-
 function MediaTab() {
   const [assets, setAssets] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -1748,7 +1875,9 @@ function MediaTab() {
       setLoading(false);
     }
   };
-  useEffect(() => { load(); }, []);
+  useEffect(() => {
+    load();
+  }, []);
   const remove = async (asset) => {
     if (asset.usageCount > 0) {
       appActions.toast("This image is currently in use. Remove its references first.", "err");
@@ -1786,21 +1915,31 @@ function MediaTab() {
           <h2 className="sec-title display">Media library</h2>
           <p className="section-sub">Uploaded product and storefront images stored by FikarNot.</p>
         </div>
-        <button className="btn btn-ghost" onClick={cleanup} disabled={working || loading}>Clean unused</button>
+        <button className="btn btn-ghost" onClick={cleanup} disabled={working || loading}>
+          Clean unused
+        </button>
       </div>
-      {loading ? <SkelMediaGrid n={8} /> : assets.length === 0 ? (
+      {loading ? (
+        <SkelMediaGrid n={8} />
+      ) : assets.length === 0 ? (
         <Empty icon="box" title="No uploaded media" sub="Images uploaded from a device will appear here." />
       ) : (
         <div className="media-library-grid">
           {assets.map((asset) => (
             <article className="media-library-card" key={asset.id}>
-              <div className="media-library-thumb"><img src={asset.url} alt={asset.originalName || "Uploaded media"} loading="lazy" /></div>
+              <div className="media-library-thumb">
+                <img src={asset.url} alt={asset.originalName || "Uploaded media"} loading="lazy" />
+              </div>
               <div className="media-library-info">
                 <strong title={asset.originalName || asset.filename}>{asset.originalName || asset.filename}</strong>
-                <span>{(asset.byteSize / 1024).toFixed(0)} KB · {asset.mimeType.replace("image/", "").toUpperCase()}</span>
+                <span>
+                  {(asset.byteSize / 1024).toFixed(0)} KB · {asset.mimeType.replace("image/", "").toUpperCase()}
+                </span>
                 <span>{asset.usageCount > 0 ? `Used in ${asset.usageCount} place${asset.usageCount === 1 ? "" : "s"}` : "Unused"}</span>
               </div>
-              <button className="btn btn-danger btn-sm" disabled={working || asset.usageCount > 0} onClick={() => remove(asset)}>Delete</button>
+              <button className="btn btn-danger btn-sm" disabled={working || asset.usageCount > 0} onClick={() => remove(asset)}>
+                Delete
+              </button>
             </article>
           ))}
         </div>
@@ -1808,7 +1947,6 @@ function MediaTab() {
     </div>
   );
 }
-
 
 function TwoFactorSection() {
   const [status, setStatus] = useState(null);
@@ -1818,10 +1956,57 @@ function TwoFactorSection() {
   const [factorId, setFactorId] = useState("");
   const [otpauthUrl, setOtpauthUrl] = useState("");
   const [busy, setBusy] = useState(false);
-  useEffect(() => { authApi.twoFactorStatus().then(setStatus).catch(() => {}); }, []);
-  const setup = async () => { setBusy(true); try { const result = await authApi.twoFactorSetup(password); setSecret(result.secret); setFactorId(result.factorId); setOtpauthUrl(result.otpauthUrl); appActions.toast("Authenticator secret generated. Add it to your authenticator app."); } catch (e) { appActions.toast(e.message || "Could not start 2FA setup", "err"); } finally { setBusy(false); } };
-  const enable = async () => { setBusy(true); try { await authApi.twoFactorEnable(password, factorId, code); setStatus({ enabled: true, required: true }); setPassword(""); setCode(""); setSecret(""); setFactorId(""); setOtpauthUrl(""); appActions.toast("Two-factor authentication enabled"); } catch (e) { appActions.toast(e.message || "Could not enable 2FA", "err"); } finally { setBusy(false); } };
-  const disable = async () => { setBusy(true); try { await authApi.twoFactorDisable(password, code); setStatus({ enabled: false, required: true }); setPassword(""); setCode(""); appActions.toast("Two-factor authentication disabled"); } catch (e) { appActions.toast(e.message || "Could not disable 2FA", "err"); } finally { setBusy(false); } };
+  useEffect(() => {
+    authApi
+      .twoFactorStatus()
+      .then(setStatus)
+      .catch(() => {});
+  }, []);
+  const setup = async () => {
+    setBusy(true);
+    try {
+      const result = await authApi.twoFactorSetup(password);
+      setSecret(result.secret);
+      setFactorId(result.factorId);
+      setOtpauthUrl(result.otpauthUrl);
+      appActions.toast("Authenticator secret generated. Add it to your authenticator app.");
+    } catch (e) {
+      appActions.toast(e.message || "Could not start 2FA setup", "err");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const enable = async () => {
+    setBusy(true);
+    try {
+      await authApi.twoFactorEnable(password, factorId, code);
+      setStatus({ enabled: true, required: true });
+      setPassword("");
+      setCode("");
+      setSecret("");
+      setFactorId("");
+      setOtpauthUrl("");
+      appActions.toast("Two-factor authentication enabled");
+    } catch (e) {
+      appActions.toast(e.message || "Could not enable 2FA", "err");
+    } finally {
+      setBusy(false);
+    }
+  };
+  const disable = async () => {
+    setBusy(true);
+    try {
+      await authApi.twoFactorDisable(password, code);
+      setStatus({ enabled: false, required: true });
+      setPassword("");
+      setCode("");
+      appActions.toast("Two-factor authentication disabled");
+    } catch (e) {
+      appActions.toast(e.message || "Could not disable 2FA", "err");
+    } finally {
+      setBusy(false);
+    }
+  };
   if (!status) return <SkelForm rows={2} />;
   return (
     <div className="twofactor-section">
@@ -1834,27 +2019,54 @@ function TwoFactorSection() {
       </div>
       <div className="f-grid">
         <div>
-          <label className="lbl" htmlFor="twofactor-password">Current password</label>
-          <input id="twofactor-password" className="input" type="password" autoComplete="current-password" value={password} onChange={(e) => setPassword(e.target.value)} />
+          <label className="lbl" htmlFor="twofactor-password">
+            Current password
+          </label>
+          <input
+            id="twofactor-password"
+            className="input"
+            type="password"
+            autoComplete="current-password"
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
+          />
         </div>
         <div>
-          <label className="lbl" htmlFor="twofactor-code">Authenticator code</label>
-          <input id="twofactor-code" className="input" inputMode="numeric" maxLength={6} value={code} onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="123456" />
+          <label className="lbl" htmlFor="twofactor-code">
+            Authenticator code
+          </label>
+          <input
+            id="twofactor-code"
+            className="input"
+            inputMode="numeric"
+            maxLength={6}
+            value={code}
+            onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
+            placeholder="123456"
+          />
         </div>
       </div>
       {!status.enabled && !secret && (
-        <button type="button" className="btn btn-ghost btn-sm" disabled={busy || !password} onClick={setup}>Generate setup secret</button>
+        <button type="button" className="btn btn-ghost btn-sm" disabled={busy || !password} onClick={setup}>
+          Generate setup secret
+        </button>
       )}
       {secret && (
         <div className="panel twofactor-secret">
           <strong>Setup secret</strong>
           <p className="twofactor-code-text">{secret}</p>
-          <p className="field-hint">Manual setup URI: <code className="twofactor-code-text">{otpauthUrl}</code></p>
-          <button type="button" className="btn btn-dark btn-sm" disabled={busy || code.length !== 6} onClick={enable}>Verify and enable 2FA</button>
+          <p className="field-hint">
+            Manual setup URI: <code className="twofactor-code-text">{otpauthUrl}</code>
+          </p>
+          <button type="button" className="btn btn-dark btn-sm" disabled={busy || code.length !== 6} onClick={enable}>
+            Verify and enable 2FA
+          </button>
         </div>
       )}
       {status.enabled && (
-        <button type="button" className="btn btn-danger btn-sm" disabled={busy || !password || code.length !== 6} onClick={disable}>Disable 2FA</button>
+        <button type="button" className="btn btn-danger btn-sm" disabled={busy || !password || code.length !== 6} onClick={disable}>
+          Disable 2FA
+        </button>
       )}
     </div>
   );
@@ -1910,29 +2122,35 @@ function SettingsTab() {
   });
   useEffect(() => {
     let alive = true;
-    siteApi.get().then((result) => {
-      if (!alive) return;
-      const settings = result.settings || {};
-      setForm((current) => ({ ...current, ...settings }));
-      let parsedHeroImages = [];
-      try {
-        parsedHeroImages = JSON.parse(settings.heroImages || "[]");
-      } catch {
-        parsedHeroImages = [];
-      }
-      if (!Array.isArray(parsedHeroImages) || !parsedHeroImages.length) {
-        parsedHeroImages = settings.heroImage ? [settings.heroImage] : [];
-      }
-      setHeroImages(parsedHeroImages.filter(Boolean));
-      let parsedNavLinks = [];
-      try {
-        parsedNavLinks = JSON.parse(settings.navLinks || "[]");
-      } catch {
-        parsedNavLinks = [];
-      }
-      setNavLinks(Array.isArray(parsedNavLinks) ? parsedNavLinks : []);
-    }).catch(() => appActions.toast("Could not load store settings", "err")).finally(() => alive && setLoading(false));
-    return () => { alive = false; };
+    siteApi
+      .get()
+      .then((result) => {
+        if (!alive) return;
+        const settings = result.settings || {};
+        setForm((current) => ({ ...current, ...settings }));
+        let parsedHeroImages = [];
+        try {
+          parsedHeroImages = JSON.parse(settings.heroImages || "[]");
+        } catch {
+          parsedHeroImages = [];
+        }
+        if (!Array.isArray(parsedHeroImages) || !parsedHeroImages.length) {
+          parsedHeroImages = settings.heroImage ? [settings.heroImage] : [];
+        }
+        setHeroImages(parsedHeroImages.filter(Boolean));
+        let parsedNavLinks = [];
+        try {
+          parsedNavLinks = JSON.parse(settings.navLinks || "[]");
+        } catch {
+          parsedNavLinks = [];
+        }
+        setNavLinks(Array.isArray(parsedNavLinks) ? parsedNavLinks : []);
+      })
+      .catch(() => appActions.toast("Could not load store settings", "err"))
+      .finally(() => alive && setLoading(false));
+    return () => {
+      alive = false;
+    };
   }, []);
   const set = (key, value) => setForm((current) => ({ ...current, [key]: value }));
   const uploadHeroImage = async (file) => {
@@ -1990,36 +2208,124 @@ function SettingsTab() {
       setSaving(false);
     }
   };
-  if (loading) return <div className="panel"><SkelForm rows={6} /></div>;
+  if (loading)
+    return (
+      <div className="panel">
+        <SkelForm rows={6} />
+      </div>
+    );
   return (
     <form className="panel" onSubmit={save}>
       <h3 className="display">Store & homepage settings</h3>
-      <p style={{ color: "var(--ink2)", marginBottom: 18 }}>These settings are stored in the backend. Change them here instead of editing the React source.</p>
+      <p style={{ color: "var(--ink2)", marginBottom: 18 }}>
+        These settings are stored in the backend. Change them here instead of editing the React source.
+      </p>
       <div className="f-grid">
-        <div><label className="lbl" htmlFor="settings-store-name">Store name</label><input id="settings-store-name" className="input" value={form.storeName} onChange={(e) => set("storeName", e.target.value)} /></div>
-        <div><label className="lbl" htmlFor="settings-support-email">Support email</label><input id="settings-support-email" className="input" type="email" value={form.supportEmail} onChange={(e) => set("supportEmail", e.target.value)} /></div>
+        <div>
+          <label className="lbl" htmlFor="settings-store-name">
+            Store name
+          </label>
+          <input id="settings-store-name" className="input" value={form.storeName} onChange={(e) => set("storeName", e.target.value)} />
+        </div>
+        <div>
+          <label className="lbl" htmlFor="settings-support-email">
+            Support email
+          </label>
+          <input
+            id="settings-support-email"
+            className="input"
+            type="email"
+            value={form.supportEmail}
+            onChange={(e) => set("supportEmail", e.target.value)}
+          />
+        </div>
         <div className="f-full">
-          <label className="lbl" htmlFor="settings-logo">Store logo</label>
+          <label className="lbl" htmlFor="settings-logo">
+            Store logo
+          </label>
           <div className="media-upload-inline">
-            <input id="settings-logo" className="input" placeholder="https://… or upload from device" value={form.logoUrl} onChange={(e) => set("logoUrl", e.target.value)} />
+            <input
+              id="settings-logo"
+              className="input"
+              placeholder="https://… or upload from device"
+              value={form.logoUrl}
+              onChange={(e) => set("logoUrl", e.target.value)}
+            />
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <label className="btn btn-ghost btn-sm" style={{ cursor: "pointer" }}>
                 {logoUploading ? "Uploading…" : "Upload from device"}
-                <input type="file" accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml" hidden disabled={logoUploading} onChange={(e) => { uploadLogo(e.target.files?.[0]); e.target.value = ""; }} />
+                <input
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif,image/svg+xml"
+                  hidden
+                  disabled={logoUploading}
+                  onChange={(e) => {
+                    uploadLogo(e.target.files?.[0]);
+                    e.target.value = "";
+                  }}
+                />
               </label>
               <span className="image-hint">Square image works best · up to {Math.round(MAX_IMAGE_BYTES / (1024 * 1024))} MB</span>
-              {form.logoUrl && <button type="button" className="btn btn-ghost btn-sm" onClick={() => set("logoUrl", "")}>Remove logo</button>}
+              {form.logoUrl && (
+                <button type="button" className="btn btn-ghost btn-sm" onClick={() => set("logoUrl", "")}>
+                  Remove logo
+                </button>
+              )}
             </div>
             {logoUploadError && <p className="f-err">{logoUploadError}</p>}
-            {form.logoUrl && <div className="hero-image-setting-preview" style={{ maxWidth: 80 }}><img src={form.logoUrl} alt="Current logo preview" loading="lazy" /></div>}
+            {form.logoUrl && (
+              <div className="hero-image-setting-preview" style={{ maxWidth: 80 }}>
+                <img src={form.logoUrl} alt="Current logo preview" loading="lazy" />
+              </div>
+            )}
           </div>
         </div>
-        <div className="f-full"><label className="lbl" htmlFor="settings-kicker">Hero kicker</label><input id="settings-kicker" className="input" value={form.heroKicker} onChange={(e) => set("heroKicker", e.target.value)} /></div>
-        <div className="f-full"><label className="lbl" htmlFor="settings-eyebrow">Hero eyebrow</label><input id="settings-eyebrow" className="input" value={form.heroEyebrow} onChange={(e) => set("heroEyebrow", e.target.value)} /></div>
-        <div><label className="lbl" htmlFor="settings-title">Hero title</label><input id="settings-title" className="input" value={form.heroTitle} onChange={(e) => set("heroTitle", e.target.value)} /></div>
-        <div><label className="lbl" htmlFor="settings-highlight">Hero highlight</label><input id="settings-highlight" className="input" value={form.heroHighlight} onChange={(e) => set("heroHighlight", e.target.value)} /></div>
-        <div className="f-full"><label className="lbl" htmlFor="settings-subtitle">Hero subtitle</label><textarea id="settings-subtitle" className="textarea" value={form.heroSubtitle} onChange={(e) => set("heroSubtitle", e.target.value)} /></div>
-        <div><label className="lbl" htmlFor="settings-sticker">Hero sticker</label><input id="settings-sticker" className="input" value={form.heroSticker} onChange={(e) => set("heroSticker", e.target.value)} /></div>
+        <div className="f-full">
+          <label className="lbl" htmlFor="settings-kicker">
+            Hero kicker
+          </label>
+          <input id="settings-kicker" className="input" value={form.heroKicker} onChange={(e) => set("heroKicker", e.target.value)} />
+        </div>
+        <div className="f-full">
+          <label className="lbl" htmlFor="settings-eyebrow">
+            Hero eyebrow
+          </label>
+          <input id="settings-eyebrow" className="input" value={form.heroEyebrow} onChange={(e) => set("heroEyebrow", e.target.value)} />
+        </div>
+        <div>
+          <label className="lbl" htmlFor="settings-title">
+            Hero title
+          </label>
+          <input id="settings-title" className="input" value={form.heroTitle} onChange={(e) => set("heroTitle", e.target.value)} />
+        </div>
+        <div>
+          <label className="lbl" htmlFor="settings-highlight">
+            Hero highlight
+          </label>
+          <input
+            id="settings-highlight"
+            className="input"
+            value={form.heroHighlight}
+            onChange={(e) => set("heroHighlight", e.target.value)}
+          />
+        </div>
+        <div className="f-full">
+          <label className="lbl" htmlFor="settings-subtitle">
+            Hero subtitle
+          </label>
+          <textarea
+            id="settings-subtitle"
+            className="textarea"
+            value={form.heroSubtitle}
+            onChange={(e) => set("heroSubtitle", e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="lbl" htmlFor="settings-sticker">
+            Hero sticker
+          </label>
+          <input id="settings-sticker" className="input" value={form.heroSticker} onChange={(e) => set("heroSticker", e.target.value)} />
+        </div>
         <div className="f-full">
           <HeroVideoField
             id="settings-hero-video"
@@ -2040,14 +2346,29 @@ function SettingsTab() {
           />
         </div>
         <div className="f-full">
-          <label className="lbl" htmlFor="settings-hero-image">Hero slider images</label>
+          <label className="lbl" htmlFor="settings-hero-image">
+            Hero slider images
+          </label>
           <div className="media-upload-inline">
             <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
               <label className="btn btn-ghost btn-sm" style={{ cursor: "pointer" }}>
                 {heroUploading ? "Uploading…" : "Add an image"}
-                <input id="settings-hero-image" type="file" accept="image/jpeg,image/png,image/webp,image/gif" hidden disabled={heroUploading} onChange={(e) => { uploadHeroImage(e.target.files?.[0]); e.target.value = ""; }} />
+                <input
+                  id="settings-hero-image"
+                  type="file"
+                  accept="image/jpeg,image/png,image/webp,image/gif"
+                  hidden
+                  disabled={heroUploading}
+                  onChange={(e) => {
+                    uploadHeroImage(e.target.files?.[0]);
+                    e.target.value = "";
+                  }}
+                />
               </label>
-              <span className="image-hint">Add as many as you like · they play as a slider on the homepage · up to {Math.round(MAX_IMAGE_BYTES / (1024 * 1024))} MB each</span>
+              <span className="image-hint">
+                Add as many as you like · they play as a slider on the homepage · up to {Math.round(MAX_IMAGE_BYTES / (1024 * 1024))} MB
+                each
+              </span>
             </div>
             {heroUploadError && <p className="f-err">{heroUploadError}</p>}
             {heroImages.length > 0 && (
@@ -2055,59 +2376,348 @@ function SettingsTab() {
                 {heroImages.map((src, i) => (
                   <div className="hero-image-setting-preview" key={`${src}-${i}`} style={{ position: "relative", maxWidth: 140 }}>
                     <img src={src} alt={`Hero slide ${i + 1}`} loading="lazy" />
-                    <button type="button" className="btn btn-danger btn-sm" style={{ marginTop: 6, width: "100%" }} onClick={() => removeHeroImage(i)}>Remove</button>
+                    <button
+                      type="button"
+                      className="btn btn-danger btn-sm"
+                      style={{ marginTop: 6, width: "100%" }}
+                      onClick={() => removeHeroImage(i)}
+                    >
+                      Remove
+                    </button>
                   </div>
                 ))}
               </div>
             )}
-            {!heroImages.length && <p style={{ color: "var(--ink2)", fontSize: 13, marginTop: 8 }}>No hero images yet — the homepage will fall back to the default artwork.</p>}
+            {!heroImages.length && (
+              <p style={{ color: "var(--ink2)", fontSize: 13, marginTop: 8 }}>
+                No hero images yet — the homepage will fall back to the default artwork.
+              </p>
+            )}
           </div>
         </div>
-        <div className="f-full"><label className="lbl" htmlFor="settings-announcement">Announcement bar</label><input id="settings-announcement" className="input" value={form.announcement} onChange={(e) => set("announcement", e.target.value)} /><p style={{ color: "var(--ink2)", fontSize: 12, marginTop: 4 }}>Separate multiple messages with a newline, a pipe ( | ) or a middle dot ( · ) to scroll several items.</p></div>
+        <div className="f-full">
+          <label className="lbl" htmlFor="settings-announcement">
+            Announcement bar
+          </label>
+          <input
+            id="settings-announcement"
+            className="input"
+            value={form.announcement}
+            onChange={(e) => set("announcement", e.target.value)}
+          />
+          <p style={{ color: "var(--ink2)", fontSize: 12, marginTop: 4 }}>
+            Separate multiple messages with a newline, a pipe ( | ) or a middle dot ( · ) to scroll several items.
+          </p>
+        </div>
         <div className="f-full">
           <span className="lbl">Extra navigation links</span>
           {navLinks.map((link, i) => (
             <div key={i} style={{ display: "flex", gap: 8, marginBottom: 8, flexWrap: "wrap" }}>
-              <input className="input" placeholder="Label (e.g. Blog)" value={link.label} onChange={(e) => updateNavLink(i, "label", e.target.value)} style={{ flex: "1 1 160px" }} />
-              <input className="input" placeholder="/blog or https://…" value={link.url} onChange={(e) => updateNavLink(i, "url", e.target.value)} style={{ flex: "2 1 220px" }} />
-              <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeNavLink(i)}>Remove</button>
+              <input
+                className="input"
+                placeholder="Label (e.g. Blog)"
+                value={link.label}
+                onChange={(e) => updateNavLink(i, "label", e.target.value)}
+                style={{ flex: "1 1 160px" }}
+              />
+              <input
+                className="input"
+                placeholder="/blog or https://…"
+                value={link.url}
+                onChange={(e) => updateNavLink(i, "url", e.target.value)}
+                style={{ flex: "2 1 220px" }}
+              />
+              <button type="button" className="btn btn-ghost btn-sm" onClick={() => removeNavLink(i)}>
+                Remove
+              </button>
             </div>
           ))}
-          <button type="button" className="btn btn-ghost btn-sm" onClick={addNavLink}>+ Add nav link</button>
-          <p style={{ color: "var(--ink2)", fontSize: 12, marginTop: 6 }}>These appear in the header (after &quot;Shop&quot;) and in the mobile menu.</p>
+          <button type="button" className="btn btn-ghost btn-sm" onClick={addNavLink}>
+            + Add nav link
+          </button>
+          <p style={{ color: "var(--ink2)", fontSize: 12, marginTop: 6 }}>
+            These appear in the header (after &quot;Shop&quot;) and in the mobile menu.
+          </p>
         </div>
-        <div className="f-full"><h4 className="display" style={{ margin: "12px 0 4px" }}>Commerce & checkout</h4></div>
-        <div><label className="lbl" htmlFor="settings-currency">Currency</label><input id="settings-currency" className="input" value={form.currency} onChange={(e) => set("currency", e.target.value.toUpperCase())} maxLength={3} /></div>
-        <div><label className="lbl" htmlFor="settings-locale">Currency locale</label><input id="settings-locale" className="input" value={form.currencyLocale} onChange={(e) => set("currencyLocale", e.target.value)} /></div>
-        <div><label className="lbl" htmlFor="settings-free-shipping">Free shipping threshold</label><input id="settings-free-shipping" className="input" inputMode="decimal" value={form.freeShippingThreshold} onChange={(e) => set("freeShippingThreshold", e.target.value)} /></div>
-        <div><label className="lbl" htmlFor="settings-shipping-rate">Flat shipping rate</label><input id="settings-shipping-rate" className="input" inputMode="decimal" value={form.shippingFlatRate} onChange={(e) => set("shippingFlatRate", e.target.value)} /></div>
-        <div><label className="lbl" htmlFor="settings-tax-rate">Tax / GST rate (%)</label><input id="settings-tax-rate" className="input" inputMode="decimal" value={form.taxRate} onChange={(e) => set("taxRate", e.target.value)} /></div>
-        <div><label className="lbl" htmlFor="settings-tax-label">Tax label</label><input id="settings-tax-label" className="input" value={form.taxLabel} onChange={(e) => set("taxLabel", e.target.value)} /></div>
-        <div><label className="lbl" htmlFor="settings-cod">Cash on delivery</label><select id="settings-cod" className="select" value={form.allowCod} onChange={(e) => set("allowCod", e.target.value)}><option value="1">Enabled</option><option value="0">Disabled</option></select></div>
-        <div><label className="lbl" htmlFor="settings-online">Online payments</label><select id="settings-online" className="select" value={form.allowOnlinePayments} onChange={(e) => set("allowOnlinePayments", e.target.value)}><option value="0">Disabled</option><option value="1">Enabled — requires PayFast configuration</option></select></div>
-        <div><label className="lbl" htmlFor="settings-manual-payments">Manual wallet/bank payments</label><select id="settings-manual-payments" className="select" value={form.allowManualPayments} onChange={(e) => set("allowManualPayments", e.target.value)}><option value="1">Enabled</option><option value="0">Disabled</option></select></div>
-        <div className="f-full"><h4 className="display" style={{ margin: "12px 0 4px" }}>Manual payment details</h4></div>
-        <div><label className="lbl" htmlFor="settings-jazzcash">JazzCash number</label><input id="settings-jazzcash" className="input" placeholder="923001234567" value={form.jazzcashNumber} onChange={(e) => set("jazzcashNumber", e.target.value)} /></div>
-        <div><label className="lbl" htmlFor="settings-easypaisa">Easypaisa number</label><input id="settings-easypaisa" className="input" placeholder="923001234567" value={form.easypaisaNumber} onChange={(e) => set("easypaisaNumber", e.target.value)} /></div>
-        <div><label className="lbl" htmlFor="settings-bank-name">Bank name</label><input id="settings-bank-name" className="input" value={form.bankName} onChange={(e) => set("bankName", e.target.value)} /></div>
-        <div><label className="lbl" htmlFor="settings-bank-title">Account title</label><input id="settings-bank-title" className="input" value={form.bankAccountTitle} onChange={(e) => set("bankAccountTitle", e.target.value)} /></div>
-        <div><label className="lbl" htmlFor="settings-bank-account">Account number</label><input id="settings-bank-account" className="input" value={form.bankAccountNumber} onChange={(e) => set("bankAccountNumber", e.target.value)} /></div>
-        <div><label className="lbl" htmlFor="settings-bank-iban">IBAN</label><input id="settings-bank-iban" className="input" value={form.bankIban} onChange={(e) => set("bankIban", e.target.value)} /></div>
-        <div className="f-full"><label className="lbl" htmlFor="settings-bank-instructions">Payment instructions</label><textarea id="settings-bank-instructions" className="textarea" placeholder="e.g. Use your order ID as the transfer reference." value={form.bankInstructions} onChange={(e) => set("bankInstructions", e.target.value)} /></div>
-        <div className="f-full"><p style={{ color: "var(--ink2)", fontSize: 12, margin: 0 }}>Current default launch currency is PKR. Existing product numeric prices are not automatically converted; review catalogue pricing before enabling live sales.</p></div>
-        <div className="f-full"><h4 className="display" style={{ margin: "12px 0 4px" }}>About page</h4></div>
-        <div className="f-full"><label className="lbl" htmlFor="settings-about-title">About title</label><input id="settings-about-title" className="input" value={form.aboutTitle} onChange={(e) => set("aboutTitle", e.target.value)} /></div>
-        <div className="f-full"><label className="lbl" htmlFor="settings-about-intro">About intro</label><textarea id="settings-about-intro" className="textarea" value={form.aboutIntro} onChange={(e) => set("aboutIntro", e.target.value)} /></div>
-        <div className="f-full"><label className="lbl" htmlFor="settings-about-body">About body</label><textarea id="settings-about-body" className="textarea" value={form.aboutBody} onChange={(e) => set("aboutBody", e.target.value)} /></div>
-        <div className="f-full"><h4 className="display" style={{ margin: "12px 0 4px" }}>Contact, social & SEO</h4></div>
-        <div><label className="lbl" htmlFor="settings-whatsapp">WhatsApp number</label><input id="settings-whatsapp" className="input" placeholder="923001234567" value={form.whatsappNumber} onChange={(e) => set("whatsappNumber", e.target.value)} /></div>
-        <div><label className="lbl" htmlFor="settings-instagram">Instagram URL</label><input id="settings-instagram" className="input" value={form.instagramUrl} onChange={(e) => set("instagramUrl", e.target.value)} /></div>
-        <div><label className="lbl" htmlFor="settings-facebook">Facebook URL</label><input id="settings-facebook" className="input" value={form.facebookUrl} onChange={(e) => set("facebookUrl", e.target.value)} /></div>
-        <div><label className="lbl" htmlFor="settings-meta-title">SEO title</label><input id="settings-meta-title" className="input" value={form.metaTitle} onChange={(e) => set("metaTitle", e.target.value)} /></div>
-        <div className="f-full"><label className="lbl" htmlFor="settings-meta-description">SEO description</label><textarea id="settings-meta-description" className="textarea" value={form.metaDescription} onChange={(e) => set("metaDescription", e.target.value)} /></div>
+        <div className="f-full">
+          <h4 className="display" style={{ margin: "12px 0 4px" }}>
+            Commerce & checkout
+          </h4>
+        </div>
+        <div>
+          <label className="lbl" htmlFor="settings-currency">
+            Currency
+          </label>
+          <input
+            id="settings-currency"
+            className="input"
+            value={form.currency}
+            onChange={(e) => set("currency", e.target.value.toUpperCase())}
+            maxLength={3}
+          />
+        </div>
+        <div>
+          <label className="lbl" htmlFor="settings-locale">
+            Currency locale
+          </label>
+          <input
+            id="settings-locale"
+            className="input"
+            value={form.currencyLocale}
+            onChange={(e) => set("currencyLocale", e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="lbl" htmlFor="settings-free-shipping">
+            Free shipping threshold
+          </label>
+          <input
+            id="settings-free-shipping"
+            className="input"
+            inputMode="decimal"
+            value={form.freeShippingThreshold}
+            onChange={(e) => set("freeShippingThreshold", e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="lbl" htmlFor="settings-shipping-rate">
+            Flat shipping rate
+          </label>
+          <input
+            id="settings-shipping-rate"
+            className="input"
+            inputMode="decimal"
+            value={form.shippingFlatRate}
+            onChange={(e) => set("shippingFlatRate", e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="lbl" htmlFor="settings-tax-rate">
+            Tax / GST rate (%)
+          </label>
+          <input
+            id="settings-tax-rate"
+            className="input"
+            inputMode="decimal"
+            value={form.taxRate}
+            onChange={(e) => set("taxRate", e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="lbl" htmlFor="settings-tax-label">
+            Tax label
+          </label>
+          <input id="settings-tax-label" className="input" value={form.taxLabel} onChange={(e) => set("taxLabel", e.target.value)} />
+        </div>
+        <div>
+          <label className="lbl" htmlFor="settings-cod">
+            Cash on delivery
+          </label>
+          <select id="settings-cod" className="select" value={form.allowCod} onChange={(e) => set("allowCod", e.target.value)}>
+            <option value="1">Enabled</option>
+            <option value="0">Disabled</option>
+          </select>
+        </div>
+        {FEATURES.payfast && (
+          <div>
+            <label className="lbl" htmlFor="settings-online">
+              Online payments
+            </label>
+            <select
+              id="settings-online"
+              className="select"
+              value={form.allowOnlinePayments}
+              onChange={(e) => set("allowOnlinePayments", e.target.value)}
+            >
+              <option value="0">Disabled</option>
+              <option value="1">Enabled — requires PayFast configuration</option>
+            </select>
+          </div>
+        )}
+        <div>
+          <label className="lbl" htmlFor="settings-manual-payments">
+            Manual wallet/bank payments
+          </label>
+          <select
+            id="settings-manual-payments"
+            className="select"
+            value={form.allowManualPayments}
+            onChange={(e) => set("allowManualPayments", e.target.value)}
+          >
+            <option value="1">Enabled</option>
+            <option value="0">Disabled</option>
+          </select>
+        </div>
+        <div className="f-full">
+          <h4 className="display" style={{ margin: "12px 0 4px" }}>
+            Manual payment details
+          </h4>
+        </div>
+        <div>
+          <label className="lbl" htmlFor="settings-jazzcash">
+            JazzCash number
+          </label>
+          <input
+            id="settings-jazzcash"
+            className="input"
+            placeholder="923001234567"
+            value={form.jazzcashNumber}
+            onChange={(e) => set("jazzcashNumber", e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="lbl" htmlFor="settings-easypaisa">
+            Easypaisa number
+          </label>
+          <input
+            id="settings-easypaisa"
+            className="input"
+            placeholder="923001234567"
+            value={form.easypaisaNumber}
+            onChange={(e) => set("easypaisaNumber", e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="lbl" htmlFor="settings-bank-name">
+            Bank name
+          </label>
+          <input id="settings-bank-name" className="input" value={form.bankName} onChange={(e) => set("bankName", e.target.value)} />
+        </div>
+        <div>
+          <label className="lbl" htmlFor="settings-bank-title">
+            Account title
+          </label>
+          <input
+            id="settings-bank-title"
+            className="input"
+            value={form.bankAccountTitle}
+            onChange={(e) => set("bankAccountTitle", e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="lbl" htmlFor="settings-bank-account">
+            Account number
+          </label>
+          <input
+            id="settings-bank-account"
+            className="input"
+            value={form.bankAccountNumber}
+            onChange={(e) => set("bankAccountNumber", e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="lbl" htmlFor="settings-bank-iban">
+            IBAN
+          </label>
+          <input id="settings-bank-iban" className="input" value={form.bankIban} onChange={(e) => set("bankIban", e.target.value)} />
+        </div>
+        <div className="f-full">
+          <label className="lbl" htmlFor="settings-bank-instructions">
+            Payment instructions
+          </label>
+          <textarea
+            id="settings-bank-instructions"
+            className="textarea"
+            placeholder="e.g. Use your order ID as the transfer reference."
+            value={form.bankInstructions}
+            onChange={(e) => set("bankInstructions", e.target.value)}
+          />
+        </div>
+        <div className="f-full">
+          <p style={{ color: "var(--ink2)", fontSize: 12, margin: 0 }}>
+            Current default launch currency is PKR. Existing product numeric prices are not automatically converted; review catalogue
+            pricing before enabling live sales.
+          </p>
+        </div>
+        <div className="f-full">
+          <h4 className="display" style={{ margin: "12px 0 4px" }}>
+            About page
+          </h4>
+        </div>
+        <div className="f-full">
+          <label className="lbl" htmlFor="settings-about-title">
+            About title
+          </label>
+          <input id="settings-about-title" className="input" value={form.aboutTitle} onChange={(e) => set("aboutTitle", e.target.value)} />
+        </div>
+        <div className="f-full">
+          <label className="lbl" htmlFor="settings-about-intro">
+            About intro
+          </label>
+          <textarea
+            id="settings-about-intro"
+            className="textarea"
+            value={form.aboutIntro}
+            onChange={(e) => set("aboutIntro", e.target.value)}
+          />
+        </div>
+        <div className="f-full">
+          <label className="lbl" htmlFor="settings-about-body">
+            About body
+          </label>
+          <textarea
+            id="settings-about-body"
+            className="textarea"
+            value={form.aboutBody}
+            onChange={(e) => set("aboutBody", e.target.value)}
+          />
+        </div>
+        <div className="f-full">
+          <h4 className="display" style={{ margin: "12px 0 4px" }}>
+            Contact, social & SEO
+          </h4>
+        </div>
+        <div>
+          <label className="lbl" htmlFor="settings-whatsapp">
+            WhatsApp number
+          </label>
+          <input
+            id="settings-whatsapp"
+            className="input"
+            placeholder="923001234567"
+            value={form.whatsappNumber}
+            onChange={(e) => set("whatsappNumber", e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="lbl" htmlFor="settings-instagram">
+            Instagram URL
+          </label>
+          <input
+            id="settings-instagram"
+            className="input"
+            value={form.instagramUrl}
+            onChange={(e) => set("instagramUrl", e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="lbl" htmlFor="settings-facebook">
+            Facebook URL
+          </label>
+          <input id="settings-facebook" className="input" value={form.facebookUrl} onChange={(e) => set("facebookUrl", e.target.value)} />
+        </div>
+        <div>
+          <label className="lbl" htmlFor="settings-meta-title">
+            SEO title
+          </label>
+          <input id="settings-meta-title" className="input" value={form.metaTitle} onChange={(e) => set("metaTitle", e.target.value)} />
+        </div>
+        <div className="f-full">
+          <label className="lbl" htmlFor="settings-meta-description">
+            SEO description
+          </label>
+          <textarea
+            id="settings-meta-description"
+            className="textarea"
+            value={form.metaDescription}
+            onChange={(e) => set("metaDescription", e.target.value)}
+          />
+        </div>
       </div>
       <div style={{ display: "flex", justifyContent: "flex-end", marginTop: 18 }}>
-        <button className="btn btn-dark" disabled={saving}>{saving ? "Saving…" : "Save settings"}</button>
+        <button className="btn btn-dark" disabled={saving}>
+          {saving ? "Saving…" : "Save settings"}
+        </button>
       </div>
     </form>
   );
@@ -2161,7 +2771,13 @@ export default function AdminPage({ tab }) {
     // Security is staff-wide (not admin-only): two-factor auth protects the
     // signed-in account itself, and editors have write access worth protecting too.
     { id: "security", path: "/admin/security", label: "Security", icon: "shield" },
-    ...(s.session.role === "admin" ? [{ id: "media", path: "/admin/media", label: "Media", icon: "box" }, { id: "users", path: "/admin/users", label: "Users", icon: "users", n: s.users.length }, { id: "settings", path: "/admin/settings", label: "Settings", icon: "tag" }] : []),
+    ...(s.session.role === "admin"
+      ? [
+          { id: "media", path: "/admin/media", label: "Media", icon: "box" },
+          { id: "users", path: "/admin/users", label: "Users", icon: "users", n: s.users.length },
+          { id: "settings", path: "/admin/settings", label: "Settings", icon: "tag" },
+        ]
+      : []),
   ];
   const activeTab = tabs.find((t) => t.id === tab);
   return (

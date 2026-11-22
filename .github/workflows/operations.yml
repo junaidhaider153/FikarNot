@@ -2,7 +2,7 @@ name: FikarNot Operations
 
 on:
   schedule:
-    - cron: "*/5 * * * *"
+    - cron: "*/30 * * * *"
   workflow_dispatch:
 
 permissions:
@@ -13,9 +13,10 @@ jobs:
     runs-on: ubuntu-latest
     timeout-minutes: 5
     steps:
-      - name: Check API health
+      - name: Check the catalog function is up
         env:
+          # e.g. https://<ref>.supabase.co/functions/v1/catalog?limit=1
           HEALTHCHECK_URL: ${{ secrets.FIKARNOT_HEALTHCHECK_URL }}
         run: |
           test -n "$HEALTHCHECK_URL"
-          curl --fail --silent --show-error --max-time 10 "$HEALTHCHECK_URL"
+          curl --fail --silent --show-error --max-time 15 "$HEALTHCHECK_URL" > /dev/null

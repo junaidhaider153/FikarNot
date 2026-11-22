@@ -13,8 +13,7 @@
   overflow: hidden;
   background:
     radial-gradient(60% 55% at 20% 15%, rgba(255, 157, 107, 0.16), transparent 60%),
-    radial-gradient(55% 50% at 85% 80%, rgba(120, 130, 255, 0.16), transparent 60%),
-    linear-gradient(160deg, #fbf9f4 0%, #f3f2f8 100%);
+    radial-gradient(55% 50% at 85% 80%, rgba(120, 130, 255, 0.16), transparent 60%), linear-gradient(160deg, #fbf9f4 0%, #f3f2f8 100%);
 }
 
 /* Soft drifting glow behind the card. */

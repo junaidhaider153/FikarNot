@@ -8,7 +8,8 @@ export const ALLOWED_VIDEO_TYPES = ["video/mp4", "video/webm"];
 export const uploadsApi = {
   // dataUrl: a "data:image/...;base64,..." string (already compressed client-side).
   // Returns { url } where url is a stable, relative /uploads/... path to store on the product.
-  uploadImage: (dataUrl, originalName = "") => request("/api/uploads/image", { method: "POST", body: JSON.stringify({ dataUrl, originalName }) }),
+  uploadImage: (dataUrl, originalName = "") =>
+    request("/api/uploads/image", { method: "POST", body: JSON.stringify({ dataUrl, originalName }) }),
 
   // Videos are sent as raw binary (no base64) so a large clip is not inflated by ~33%.
   // The file's own MIME type becomes the Content-Type; the server re-validates it

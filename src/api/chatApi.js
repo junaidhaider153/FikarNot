@@ -6,9 +6,5 @@ import { apiRequest } from "./apiClient";
  * @returns {Promise<{reply: string}>}
  */
 export function sendChatMessage(message, history) {
-  return apiRequest(
-    "/api/chat",
-    { method: "POST", body: JSON.stringify({ message, history }) },
-    "Couldn't reach the chat assistant.",
-  );
+  return apiRequest("/api/chat", { method: "POST", body: JSON.stringify({ message, history }) }, "Couldn't reach the chat assistant.");
 }

@@ -1,0 +1,28 @@
+# Supabase CLI configuration for FikarNot.
+#
+# Every Edge Function authenticates the caller itself (supabase.auth.getUser +
+# role lookup in public.profiles — see functions/_shared/auth.ts) because the
+# storefront has public routes (catalog, guest checkout) and the new
+# `sb_publishable_…` API keys are not JWTs, so the platform-level JWT check
+# must be OFF. Do NOT remove these blocks: deploying without them makes the
+# functions reject every browser request.
+#
+# After `supabase link --project-ref <ref>` deploy with:
+#   supabase functions deploy            (deploys all, honouring this file)
+
+project_id = "fikarnot"
+
+[functions.catalog]
+verify_jwt = false
+
+[functions.orders]
+verify_jwt = false
+
+[functions.account]
+verify_jwt = false
+
+[functions.admin]
+verify_jwt = false
+
+[functions.storage]
+verify_jwt = false

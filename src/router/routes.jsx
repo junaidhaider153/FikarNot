@@ -17,6 +17,7 @@ import NotificationsPage from "../pages/NotificationsPage";
 import HelpCenterPage from "../pages/HelpCenterPage";
 import StoreInfoPage from "../pages/StoreInfoPage";
 import PaymentResultPage from "../pages/PaymentResultPage";
+import InvoicePage from "../pages/InvoicePage";
 import NotFoundPage from "../pages/NotFoundPage";
 import { STAFF_ROLES, ADMIN_ROLES } from "../config/appConfig";
 import { ProtectedRoute } from "./ProtectedRoute";
@@ -121,6 +122,14 @@ export function AppRoutes() {
       <Route path="/admin/users" element={<AdminRoute tab="users" roles={ADMIN_ROLES} />} />
       <Route path="/admin/settings" element={<AdminRoute tab="settings" roles={ADMIN_ROLES} />} />
 
+      <Route
+        path="/invoice/:orderId"
+        element={
+          <ProtectedRoute>
+            <InvoicePage />
+          </ProtectedRoute>
+        }
+      />
       <Route path="*" element={<NotFoundPage />} />
     </Routes>
   );

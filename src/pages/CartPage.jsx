@@ -13,7 +13,10 @@ export default function CartPage() {
   const state = useApp();
   useDocumentMeta({ title: "Your cart", noindex: true });
   const rawLines = cartLines(state);
-  const summary = getCartSummary(rawLines);
+  const summary = getCartSummary(rawLines, {
+    freeShippingThreshold: state.siteSettings?.freeShippingThreshold,
+    shippingFlatRate: state.siteSettings?.shippingFlatRate,
+  });
 
   if (summary.lines.length === 0) {
     return (

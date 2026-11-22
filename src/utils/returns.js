@@ -16,7 +16,7 @@ export const RETURN_STATUSES = Object.freeze({
 });
 
 export function canCancelOrder(order) {
-  return ["paid", "processing"].includes(order?.status) && !order?.returnRequest;
+  return ["pending_payment", "paid", "processing"].includes(order?.status) && !order?.returnRequest;
 }
 
 export function canRequestReturn(order, now = Date.now()) {

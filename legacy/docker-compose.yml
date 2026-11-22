@@ -1,0 +1,57 @@
+services:
+  api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      FIKARNOT_API_PORT: 8787
+      FIKARNOT_DATA_DIR: /app/server/data
+      FIKARNOT_SEED_DEMO_DATA: "0"
+      FIKARNOT_ENABLE_MOCK_PAYMENTS: "0"
+      FIKARNOT_EXPOSE_RESET_LINKS: "0"
+    volumes:
+      - fikarnot_data:/app/server/data
+    expose:
+      - "8787"
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8787/api/health').then(r=>process.exit(r.ok?0:1)).catch(()=>process.exit(1))"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 15s
+
+  backup:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: production
+      FIKARNOT_DATA_DIR: /app/server/data
+      FIKARNOT_BACKUP_INTERVAL_HOURS: 24
+    volumes:
+      - fikarnot_data:/app/server/data
+    command: ["node", "scripts/backup-scheduler.mjs"]
+    restart: unless-stopped
+    depends_on:
+      api:
+        condition: service_started
+
+  web:
+    build:
+      context: .
+      dockerfile: Dockerfile.web
+    depends_on:
+      api:
+        condition: service_healthy
+    ports:
+      - "8080:80"
+    restart: unless-stopped
+
+volumes:
+  fikarnot_data:

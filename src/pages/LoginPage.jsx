@@ -66,7 +66,8 @@ export default function LoginPage() {
       }
     }
     setBusy(false);
-    if (result?.role) navigate(redirect || (result.role === "admin" || result.role === "editor" ? "/admin" : "/account"), { replace: true });
+    if (result?.role)
+      navigate(redirect || (result.role === "admin" || result.role === "editor" ? "/admin" : "/account"), { replace: true });
   };
 
   return (
@@ -168,8 +169,19 @@ export default function LoginPage() {
           </div>
           {mode === "login" && twoFactorRequired && (
             <div className="field">
-              <label className="lbl" htmlFor="l-totp">Authenticator code (staff only when 2FA is enabled)</label>
-              <input id="l-totp" className="input" inputMode="numeric" autoComplete="one-time-code" maxLength={6} value={totp} onChange={(e) => setTotp(e.target.value.replace(/\D/g, "").slice(0, 6))} placeholder="123456" />
+              <label className="lbl" htmlFor="l-totp">
+                Authenticator code (staff only when 2FA is enabled)
+              </label>
+              <input
+                id="l-totp"
+                className="input"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                maxLength={6}
+                value={totp}
+                onChange={(e) => setTotp(e.target.value.replace(/\D/g, "").slice(0, 6))}
+                placeholder="123456"
+              />
             </div>
           )}
           {err && (
@@ -181,19 +193,30 @@ export default function LoginPage() {
             <div className="free-note" style={{ marginBottom: 14 }} role="status">
               <strong>Verify your email first.</strong> Check {verificationNotice} for the FikarNot verification link.
               <div style={{ marginTop: 10, display: "flex", gap: 8, flexWrap: "wrap" }}>
-                <button type="button" className="btn btn-ghost btn-sm" disabled={resending} onClick={async () => {
-                  setResending(true);
-                  try {
-                    const response = await (await import("../api/authApi")).authApi.resendVerification(verificationNotice);
-                    setDevVerificationUrl(response.devVerificationUrl || "");
-                    appActions.toast("A new verification link has been prepared");
-                  } catch (error) {
-                    appActions.toast(error.message || "Could not resend verification", "err");
-                  } finally { setResending(false); }
-                }}>
+                <button
+                  type="button"
+                  className="btn btn-ghost btn-sm"
+                  disabled={resending}
+                  onClick={async () => {
+                    setResending(true);
+                    try {
+                      const response = await (await import("../api/authApi")).authApi.resendVerification(verificationNotice);
+                      setDevVerificationUrl(response.devVerificationUrl || "");
+                      appActions.toast("A new verification link has been prepared");
+                    } catch (error) {
+                      appActions.toast(error.message || "Could not resend verification", "err");
+                    } finally {
+                      setResending(false);
+                    }
+                  }}
+                >
                   {resending ? "Sending…" : "Resend verification"}
                 </button>
-                {devVerificationUrl && <a className="btn btn-ghost btn-sm" href={devVerificationUrl}>Open verification link</a>}
+                {devVerificationUrl && (
+                  <a className="btn btn-ghost btn-sm" href={devVerificationUrl}>
+                    Open verification link
+                  </a>
+                )}
               </div>
             </div>
           )}

@@ -21,8 +21,7 @@ export function HeroVideo({ src, webm, poster, alt = "" }) {
   const [ready, setReady] = useState(false);
   const [failed, setFailed] = useState(false);
 
-  const prefersReducedMotion =
-    typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
+  const prefersReducedMotion = typeof window !== "undefined" && window.matchMedia?.("(prefers-reduced-motion: reduce)").matches;
 
   useEffect(() => {
     const node = videoRef.current;

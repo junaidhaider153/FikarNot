@@ -8,28 +8,19 @@
     <meta name="robots" content="index, follow" />
     <!--
       Content-Security-Policy notes:
-      - Delivered via <meta> because the Node API server never serves this HTML file
-        (it's API-only); a CSP response header set there would have no effect on the
-        page. If you later put this behind a server/CDN that serves the HTML, prefer
-        setting this as a real response header instead — it supports frame-ancestors
-        and report-to, which <meta> cannot.
+      - Delivered via <meta>. __SUPABASE_ORIGIN__ is replaced at build/dev time with the
+        origin of VITE_SUPABASE_URL (see vite.config.js), so each environment
+        (production, staging) allows only its own Supabase project.
+      - frame-ancestors (clickjacking protection) is IGNORED in <meta> CSPs, so it is
+        sent as a real response header from vercel.json instead.
       - style-src needs 'unsafe-inline' because the app uses React inline styles
-        (style={{...}}) extensively; removing that requires migrating those to
-        classes, which is a larger refactor.
-      - img-src includes image.qwenlm.ai for the seeded demo catalogue only — remove
-        it once real product photography (served from /uploads via this app) replaces
-        the demo images.
-      - media-src allows the same backend origin as img-src/connect-src, since the
-        hero background video is served from /uploads on the API host, not this
-        frontend's own origin. Without it, media-src falls back to default-src
-        ('self' only) and the browser silently blocks the <video> source — no
-        console-visible network error, it just never plays.
-      - connect-src is 'self' because the API is same-origin by default. If you set
-        VITE_API_URL to a different origin, add that origin here too.
+        (style={{...}}) extensively; removing that is a larger refactor.
+      - img-src includes image.qwenlm.ai for the seeded demo catalogue only — remove it
+        once real product photography is uploaded to Supabase Storage.
     -->
     <meta
       http-equiv="Content-Security-Policy"
-      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net data:; img-src 'self' data: blob: https://image.qwenlm.ai https://fikarnot-production.up.railway.app https://lylctscdktxukukapfgy.supabase.co; media-src 'self' https://fikarnot-production.up.railway.app; connect-src 'self' https://fikarnot-production.up.railway.app https://lylctscdktxukukapfgy.supabase.co; object-src 'none'; base-uri 'self'; form-action 'self'; frame-ancestors 'none'"
+      content="default-src 'self'; script-src 'self'; style-src 'self' 'unsafe-inline' https://cdn.jsdelivr.net; font-src 'self' https://cdn.jsdelivr.net data:; img-src 'self' data: blob: https://image.qwenlm.ai __SUPABASE_ORIGIN__; media-src 'self' __SUPABASE_ORIGIN__; connect-src 'self' __SUPABASE_ORIGIN__; object-src 'none'; base-uri 'self'; form-action 'self'"
     />
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="preconnect" href="https://cdn.jsdelivr.net" />

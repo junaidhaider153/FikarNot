@@ -269,16 +269,66 @@
   animation: confetti-fly 0.9s ease-out forwards;
   animation-delay: 0.15s;
 }
-.confetti-piece.piece-0 { background: var(--lime); transform: rotate(-10deg); --tx: -70px; --ty: -60px; }
-.confetti-piece.piece-1 { background: #ff9f6b; transform: rotate(20deg); --tx: -40px; --ty: -90px; }
-.confetti-piece.piece-2 { background: var(--ink-solid); transform: rotate(5deg); --tx: 0px; --ty: -100px; }
-.confetti-piece.piece-3 { background: #6bb1ff; transform: rotate(-30deg); --tx: 40px; --ty: -90px; }
-.confetti-piece.piece-4 { background: var(--lime); transform: rotate(45deg); --tx: 70px; --ty: -60px; }
-.confetti-piece.piece-5 { background: #ff9f6b; transform: rotate(-15deg); --tx: -55px; --ty: -30px; }
-.confetti-piece.piece-6 { background: #6bb1ff; transform: rotate(25deg); --tx: 55px; --ty: -30px; }
-.confetti-piece.piece-7 { background: var(--ink-solid); transform: rotate(-40deg); --tx: -20px; --ty: -105px; }
-.confetti-piece.piece-8 { background: var(--lime); transform: rotate(35deg); --tx: 20px; --ty: -105px; }
-.confetti-piece.piece-9 { background: #ff9f6b; transform: rotate(10deg); --tx: 0px; --ty: -75px; }
+.confetti-piece.piece-0 {
+  background: var(--lime);
+  transform: rotate(-10deg);
+  --tx: -70px;
+  --ty: -60px;
+}
+.confetti-piece.piece-1 {
+  background: #ff9f6b;
+  transform: rotate(20deg);
+  --tx: -40px;
+  --ty: -90px;
+}
+.confetti-piece.piece-2 {
+  background: var(--ink-solid);
+  transform: rotate(5deg);
+  --tx: 0px;
+  --ty: -100px;
+}
+.confetti-piece.piece-3 {
+  background: #6bb1ff;
+  transform: rotate(-30deg);
+  --tx: 40px;
+  --ty: -90px;
+}
+.confetti-piece.piece-4 {
+  background: var(--lime);
+  transform: rotate(45deg);
+  --tx: 70px;
+  --ty: -60px;
+}
+.confetti-piece.piece-5 {
+  background: #ff9f6b;
+  transform: rotate(-15deg);
+  --tx: -55px;
+  --ty: -30px;
+}
+.confetti-piece.piece-6 {
+  background: #6bb1ff;
+  transform: rotate(25deg);
+  --tx: 55px;
+  --ty: -30px;
+}
+.confetti-piece.piece-7 {
+  background: var(--ink-solid);
+  transform: rotate(-40deg);
+  --tx: -20px;
+  --ty: -105px;
+}
+.confetti-piece.piece-8 {
+  background: var(--lime);
+  transform: rotate(35deg);
+  --tx: 20px;
+  --ty: -105px;
+}
+.confetti-piece.piece-9 {
+  background: #ff9f6b;
+  transform: rotate(10deg);
+  --tx: 0px;
+  --ty: -75px;
+}
 @keyframes confetti-fly {
   0% {
     opacity: 1;

@@ -83,7 +83,10 @@ export default function ProductsPage() {
     limit: 12,
     offset: Math.max(0, (page - 1) * 12),
   };
-  const { data, loading, error, retry } = useAsync(() => catalogApi.list(requestParams), [dq, category, sort, inStock, minRating, priceCap, page]);
+  const { data, loading, error, retry } = useAsync(
+    () => catalogApi.list(requestParams),
+    [dq, category, sort, inStock, minRating, priceCap, page],
+  );
   const products = data?.products || [];
   const maxPrice = Math.max(100, Math.ceil(Number(data?.maxPrice || 100) / 10) * 10);
   useEffect(() => {

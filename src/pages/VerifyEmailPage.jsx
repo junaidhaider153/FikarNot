@@ -44,13 +44,36 @@ export default function VerifyEmailPage() {
     };
   }, []);
 
-  if (state.loading) return <div className="container" style={{ padding: "60px 24px" }}><div className="panel">Checking your verification link…</div></div>;
+  if (state.loading)
+    return (
+      <div className="container" style={{ padding: "60px 24px" }}>
+        <div className="panel">Checking your verification link…</div>
+      </div>
+    );
 
   return (
     <div className="container auth-wrap">
       <div className="panel auth-panel">
-        <div className="auth-intro"><span className="step-n"><Ic n="check" s={14} /></span><div><p className="eyebrow">Email verification</p><h1 className="auth-title display">Verify your email</h1><p className="auth-sub">Confirm your email address to finish setting up your FikarNot account.</p></div></div>
-        <div className="error-card" role="alert"><span className="empty-ic"><Ic n="alert" s={26} /></span><h3 className="display">Verification link unavailable</h3><p style={{ color: "var(--ink2)", margin: "6px 0 18px" }}>{state.error}</p><Link className="btn btn-dark" to="/login">Back to sign in</Link></div>
+        <div className="auth-intro">
+          <span className="step-n">
+            <Ic n="check" s={14} />
+          </span>
+          <div>
+            <p className="eyebrow">Email verification</p>
+            <h1 className="auth-title display">Verify your email</h1>
+            <p className="auth-sub">Confirm your email address to finish setting up your FikarNot account.</p>
+          </div>
+        </div>
+        <div className="error-card" role="alert">
+          <span className="empty-ic">
+            <Ic n="alert" s={26} />
+          </span>
+          <h3 className="display">Verification link unavailable</h3>
+          <p style={{ color: "var(--ink2)", margin: "6px 0 18px" }}>{state.error}</p>
+          <Link className="btn btn-dark" to="/login">
+            Back to sign in
+          </Link>
+        </div>
       </div>
     </div>
   );

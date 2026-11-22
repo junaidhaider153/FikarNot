@@ -1,6 +1,7 @@
 import { useRef, useState } from "react";
 import { Ic } from "./icons";
 import { uploadsApi, MAX_VIDEO_BYTES, ALLOWED_VIDEO_TYPES } from "../api/uploadsApi";
+import { FEATURES } from "../config/appConfig";
 
 /**
  * Hero background video control for Studio → Settings.
@@ -48,34 +49,36 @@ export function HeroVideoField({ id, label, hint, value, onChange, poster = "" }
         {label}
       </label>
 
-      <div
-        className={"hero-video-drop" + (dragging ? " is-dragging" : "") + (busy ? " is-busy" : "")}
-        onDragOver={(e) => {
-          e.preventDefault();
-          setDragging(true);
-        }}
-        onDragLeave={() => setDragging(false)}
-        onDrop={onDrop}
-      >
-        <span className="hero-video-drop-ic">
-          <Ic n="box" s={20} />
-        </span>
-        <div className="hero-video-drop-copy">
-          <strong>{busy ? "Uploading…" : "Drop a video here or upload from your device"}</strong>
-          <span>{hint || `MP4 or WebM · up to ${Math.round(MAX_VIDEO_BYTES / (1024 * 1024))} MB · a 6–12 s silent loop looks best`}</span>
+      {FEATURES.videoUpload && (
+        <div
+          className={"hero-video-drop" + (dragging ? " is-dragging" : "") + (busy ? " is-busy" : "")}
+          onDragOver={(e) => {
+            e.preventDefault();
+            setDragging(true);
+          }}
+          onDragLeave={() => setDragging(false)}
+          onDrop={onDrop}
+        >
+          <span className="hero-video-drop-ic">
+            <Ic n="box" s={20} />
+          </span>
+          <div className="hero-video-drop-copy">
+            <strong>{busy ? "Uploading…" : "Drop a video here or upload from your device"}</strong>
+            <span>{hint || `MP4 or WebM · up to ${Math.round(MAX_VIDEO_BYTES / (1024 * 1024))} MB · a 6–12 s silent loop looks best`}</span>
+          </div>
+          <button type="button" className="btn btn-dark btn-sm" disabled={busy} onClick={() => inputRef.current?.click()}>
+            {busy ? "Uploading…" : "Choose file"}
+          </button>
+          <input
+            ref={inputRef}
+            type="file"
+            accept={ALLOWED_VIDEO_TYPES.join(",")}
+            hidden
+            disabled={busy}
+            onChange={(e) => upload(e.target.files?.[0])}
+          />
         </div>
-        <button type="button" className="btn btn-dark btn-sm" disabled={busy} onClick={() => inputRef.current?.click()}>
-          {busy ? "Uploading…" : "Choose file"}
-        </button>
-        <input
-          ref={inputRef}
-          type="file"
-          accept={ALLOWED_VIDEO_TYPES.join(",")}
-          hidden
-          disabled={busy}
-          onChange={(e) => upload(e.target.files?.[0])}
-        />
-      </div>
+      )}
 
       <div className="hero-video-url-row">
         <input
@@ -97,7 +100,7 @@ export function HeroVideoField({ id, label, hint, value, onChange, poster = "" }
 
       {value && (
         <div className="hero-video-preview">
-          { }
+          {}
           <video src={value} poster={poster || undefined} muted loop playsInline autoPlay preload="metadata" />
           <span className="hero-video-preview-tag">Preview · save settings to publish</span>
         </div>

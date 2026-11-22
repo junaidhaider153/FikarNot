@@ -12,57 +12,46 @@
 // Env var you set yourself (Project Settings -> Edge Functions -> Secrets):
 //   FIKARNOT_FRONTEND_ORIGIN  e.g. "https://fikarnot.shop,http://localhost:5173"
 
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { admin } from "../_shared/supabase.ts";
+import { corsHeaders } from "../_shared/cors.ts";
+import { json, serverError } from "../_shared/http.ts";
+import { getCaller as getCallerProfile, isStaff } from "../_shared/auth.ts";
+import { validateJson, z } from "../_shared/validate.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-  auth: { autoRefreshToken: false, persistSession: false },
+const productInputSchema = z.object({
+  id: z.string().optional(),
+  sku: z.string().trim().min(1, "SKU is required.").max(80),
+  name: z.string().trim().min(2, "Product name must be between 2 and 160 characters.").max(160),
+  categoryId: z.string().trim().min(1, "A valid product category is required."),
+  price: z.coerce.number().min(0, "Product price is invalid.").max(1_000_000),
+  stock: z.coerce.number().int("Product stock is invalid.").min(0),
+  stockThreshold: z.coerce.number().int("Stock threshold is invalid.").min(0).optional().default(10),
+  rating: z.coerce.number().min(0).max(5).optional().default(0),
+  image: z.string().trim().optional().default(""),
+  images: z.array(z.string()).optional(),
+  tags: z.array(z.string()).optional().default([]),
+  featured: z.boolean().optional().default(false),
+  description: z.string().trim().optional().default(""),
 });
+const productPayloadSchema = z
+  .union([z.object({ product: productInputSchema }), productInputSchema])
+  .transform((val) => ("product" in val ? val.product : val));
 
-const ALLOWED_ORIGINS = (Deno.env.get("FIKARNOT_FRONTEND_ORIGIN") || "http://localhost:5173")
-  .split(",")
-  .map((s) => s.trim().replace(/\/$/, ""))
-  .filter(Boolean);
+const categoryInputSchema = z.object({
+  id: z.string().optional(),
+  name: z.string().trim().min(1, "Category name is required.").max(100),
+  description: z.string().trim().optional().default(""),
+  color: z.string().trim().optional().default("#3E8E5A"),
+});
+const categoryPayloadSchema = z
+  .union([z.object({ category: categoryInputSchema }), categoryInputSchema])
+  .transform((val) => ("category" in val ? val.category : val));
 
-function corsHeaders(req: Request): HeadersInit {
-  const origin = req.headers.get("Origin") || "";
-  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowed,
-    "Vary": "Origin",
-    "Access-Control-Allow-Headers": "authorization, content-type, apikey",
-    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-  };
-}
-
-function json(req: Request, body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json", ...corsHeaders(req) },
-  });
-}
-
-type Profile = { id: string; name: string; role: string };
-
-// Resolves the caller from the Authorization header. Returns null for
-// anonymous requests — catalog browsing doesn't require auth.
-async function getCallerProfile(req: Request): Promise<Profile | null> {
-  const authHeader = req.headers.get("Authorization") || "";
-  const token = authHeader.replace(/^Bearer\s+/i, "");
-  if (!token) return null;
-  const { data: userData, error } = await admin.auth.getUser(token);
-  if (error || !userData?.user) return null;
-  const { data: profile } = await admin
-    .from("profiles")
-    .select("id, name, role")
-    .eq("id", userData.user.id)
-    .maybeSingle();
-  return profile ? (profile as Profile) : null;
-}
-
-const isStaff = (profile: Profile | null) => !!profile && ["admin", "editor"].includes(profile.role);
+const inventoryAdjustSchema = z.object({
+  productId: z.string().min(1, "Product ID is required."),
+  nextStock: z.coerce.number().int("Invalid stock value.").min(0),
+  reason: z.string().trim().max(200).optional().default("Manual stock adjustment"),
+});
 
 // deno-lint-ignore no-explicit-any
 const toCatalogRow = (row: any) => ({
@@ -100,32 +89,43 @@ const SORT_MAP: Record<string, { column: string; ascending: boolean }[]> = {
     { column: "created_at", ascending: false },
   ],
   newest: [{ column: "created_at", ascending: false }],
-  rating: [{ column: "rating", ascending: false }, { column: "created_at", ascending: false }],
-  "price-asc": [{ column: "price", ascending: true }, { column: "created_at", ascending: false }],
-  "price-desc": [{ column: "price", ascending: false }, { column: "created_at", ascending: false }],
-  name: [{ column: "name", ascending: true }, { column: "created_at", ascending: false }],
+  rating: [
+    { column: "rating", ascending: false },
+    { column: "created_at", ascending: false },
+  ],
+  "price-asc": [
+    { column: "price", ascending: true },
+    { column: "created_at", ascending: false },
+  ],
+  "price-desc": [
+    { column: "price", ascending: false },
+    { column: "created_at", ascending: false },
+  ],
+  name: [
+    { column: "name", ascending: true },
+    { column: "created_at", ascending: false },
+  ],
 };
 
 function parseCatalogQuery(url: URL) {
-  const hasCatalogQuery = ["q", "category", "stock", "rating", "maxPrice", "sort", "limit", "offset"].some((k) =>
-    url.searchParams.has(k)
-  );
+  const hasCatalogQuery = ["q", "category", "stock", "rating", "maxPrice", "sort", "limit", "offset"].some((k) => url.searchParams.has(k));
   const defaultLimit = hasCatalogQuery ? 24 : 2000;
   const maxLimit = hasCatalogQuery ? 100 : 5000;
   const rawLimit = Number(url.searchParams.get("limit"));
   const rawOffset = Number(url.searchParams.get("offset"));
   const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(maxLimit, Math.floor(rawLimit)) : defaultLimit;
   const offset = Number.isFinite(rawOffset) && rawOffset >= 0 ? Math.floor(rawOffset) : 0;
-  const q = String(url.searchParams.get("q") || "").trim().slice(0, 100);
+  const q = String(url.searchParams.get("q") || "")
+    .trim()
+    .slice(0, 100);
   const category = String(url.searchParams.get("category") || "").trim();
   const inStock = url.searchParams.get("stock") === "1";
   const ratingValue = Number(url.searchParams.get("rating"));
   const minRating = Number.isFinite(ratingValue) ? Math.max(0, Math.min(5, ratingValue)) : 0;
   const maxPriceParam = url.searchParams.get("maxPrice");
   const maxPriceValue = Number(maxPriceParam);
-  const maxPrice = maxPriceParam !== null && Number.isFinite(maxPriceValue) && maxPriceValue >= 0
-    ? Math.min(1_000_000, maxPriceValue)
-    : null;
+  const maxPrice =
+    maxPriceParam !== null && Number.isFinite(maxPriceValue) && maxPriceValue >= 0 ? Math.min(1_000_000, maxPriceValue) : null;
   const sort = SORT_MAP[url.searchParams.get("sort") || ""] ? url.searchParams.get("sort")! : "featured";
   return { limit, offset, q, category, inStock, minRating, maxPrice, sort };
 }
@@ -148,10 +148,9 @@ Deno.serve(async (req) => {
 
       let productsQuery = admin.from("products").select("*", { count: "exact" });
       if (query.q) {
-        const pattern = `%${query.q}%`;
-        productsQuery = productsQuery.or(
-          `name.ilike.${pattern},description.ilike.${pattern},sku.ilike.${pattern}`,
-        );
+        // strip characters that have meaning inside a PostgREST or(...) filter string
+        const pattern = `%${String(query.q).replace(/[,()*\\]/g, " ")}%`;
+        productsQuery = productsQuery.or(`name.ilike.${pattern},description.ilike.${pattern},sku.ilike.${pattern}`);
       }
       if (query.category && query.category !== "all") productsQuery = productsQuery.eq("category_id", query.category);
       if (query.inStock) productsQuery = productsQuery.gt("stock", 0);
@@ -171,11 +170,7 @@ Deno.serve(async (req) => {
       const profile = await getCallerProfile(req);
       let inventoryLog: unknown[] = [];
       if (isStaff(profile)) {
-        const { data: logs } = await admin
-          .from("inventory_logs")
-          .select("*")
-          .order("created_at", { ascending: false })
-          .limit(100);
+        const { data: logs } = await admin.from("inventory_logs").select("*").order("created_at", { ascending: false }).limit(100);
         // deno-lint-ignore no-explicit-any
         inventoryLog = (logs || []).map((r: any) => ({
           id: r.id,
@@ -213,32 +208,20 @@ Deno.serve(async (req) => {
 
       // ---- POST /products ---------------------------------------------
       if (req.method === "POST" && path === "/products") {
-        const body = await req.json().catch(() => ({}));
-        const p = body.product || body;
+        const val = await validateJson(req, productPayloadSchema);
+        if (!val.success) return val.response;
+        const p = val.data;
         try {
-          const sku = String(p.sku || "").trim().toUpperCase();
-          if (!sku) throw Object.assign(new Error("SKU is required"), { code: "INVALID_PRODUCT" });
-          const name = String(p.name || "").trim();
-          if (name.length < 2 || name.length > 160) {
-            throw Object.assign(new Error("Product name must be between 2 and 160 characters."), { code: "INVALID_PRODUCT" });
-          }
-          const categoryId = String(p.categoryId || "").trim();
+          const sku = p.sku.toUpperCase();
+          const name = p.name;
+          const categoryId = p.categoryId;
           const { data: categoryRow } = await admin.from("categories").select("id").eq("id", categoryId).maybeSingle();
           if (!categoryId || !categoryRow) {
-            throw Object.assign(new Error("A valid product category is required."), { code: "INVALID_CATEGORY" });
+            return json(req, { error: "INVALID_CATEGORY", message: "A valid product category is required." }, 400);
           }
-          const price = Number(p.price);
-          if (!Number.isFinite(price) || price < 0 || price > 1_000_000) {
-            throw Object.assign(new Error("Product price is invalid."), { code: "INVALID_PRICE" });
-          }
-          const stock = Number(p.stock);
-          if (!Number.isFinite(stock) || stock < 0 || !Number.isInteger(stock)) {
-            throw Object.assign(new Error("Product stock is invalid."), { code: "INVALID_STOCK" });
-          }
-          const stockThreshold = Number(p.stockThreshold ?? 10);
-          if (!Number.isFinite(stockThreshold) || stockThreshold < 0 || !Number.isInteger(stockThreshold)) {
-            throw Object.assign(new Error("Stock threshold is invalid."), { code: "INVALID_STOCK_THRESHOLD" });
-          }
+          const price = p.price;
+          const stock = p.stock;
+          const stockThreshold = p.stockThreshold;
 
           let dupQuery = admin.from("products").select("id").ilike("sku", sku);
           if (p.id) dupQuery = dupQuery.neq("id", p.id);
@@ -265,11 +248,7 @@ Deno.serve(async (req) => {
           };
           if (!p.id) row.created_at = now;
 
-          const { data: saved, error: upsertError } = await admin
-            .from("products")
-            .upsert(row, { onConflict: "id" })
-            .select()
-            .single();
+          const { data: saved, error: upsertError } = await admin.from("products").upsert(row, { onConflict: "id" }).select().single();
           if (upsertError) throw upsertError;
 
           await admin.from("audit_logs").insert({
@@ -293,10 +272,14 @@ Deno.serve(async (req) => {
         const id = decodeURIComponent(path.split("/").pop() || "");
         const { count } = await admin.from("order_items").select("id", { count: "exact", head: true }).eq("product_id", id);
         if ((count || 0) > 0) {
-          return json(req, {
-            error: "PRODUCT_HAS_ORDER_HISTORY",
-            message: "This product has order history and cannot be deleted. Set its stock to 0 or hide it instead.",
-          }, 409);
+          return json(
+            req,
+            {
+              error: "PRODUCT_HAS_ORDER_HISTORY",
+              message: "This product has order history and cannot be deleted. Set its stock to 0 or hide it instead.",
+            },
+            409,
+          );
         }
         await admin.from("products").delete().eq("id", id);
         return json(req, { ok: true });
@@ -304,8 +287,9 @@ Deno.serve(async (req) => {
 
       // ---- POST /categories -----------------------------------------------
       if (req.method === "POST" && path === "/categories") {
-        const body = await req.json().catch(() => ({}));
-        const c = body.category || body;
+        const val = await validateJson(req, categoryPayloadSchema);
+        if (!val.success) return val.response;
+        const c = val.data;
         const now = new Date().toISOString();
         const id = c.id || `cat-${crypto.randomUUID()}`;
         const { data: saved, error } = await admin
@@ -313,9 +297,9 @@ Deno.serve(async (req) => {
           .upsert(
             {
               id,
-              name: String(c.name || "").trim(),
-              description: String(c.description || ""),
-              color: c.color || "#3E8E5A",
+              name: c.name,
+              description: c.description,
+              color: c.color,
               updated_at: now,
               ...(c.id ? {} : { created_at: now }),
             },
@@ -338,11 +322,12 @@ Deno.serve(async (req) => {
 
       // ---- POST /inventory/adjust -------------------------------------------
       if (req.method === "POST" && path === "/inventory/adjust") {
-        const body = await req.json().catch(() => ({}));
+        const val = await validateJson(req, inventoryAdjustSchema);
+        if (!val.success) return val.response;
+        const body = val.data;
         const { data: product } = await admin.from("products").select("*").eq("id", body.productId).maybeSingle();
         if (!product) return json(req, { error: "PRODUCT_NOT_FOUND", message: "Product not found." }, 404);
-        const next = Math.max(0, Math.floor(Number(body.nextStock)));
-        if (!Number.isFinite(next)) return json(req, { error: "INVALID_STOCK", message: "Invalid stock value." }, 400);
+        const next = body.nextStock;
         const now = new Date().toISOString();
         await admin.from("products").update({ stock: next, updated_at: now }).eq("id", body.productId);
 
@@ -353,7 +338,7 @@ Deno.serve(async (req) => {
           previous_stock: product.stock,
           next_stock: next,
           change: next - product.stock,
-          reason: String(body.reason || "Manual stock adjustment"),
+          reason: body.reason,
           user_id: profile.id,
           created_at: now,
         };
@@ -388,6 +373,6 @@ Deno.serve(async (req) => {
     return json(req, { error: "NOT_FOUND", message: "Route not found." }, 404);
   } catch (error) {
     console.error(error);
-    return json(req, { error: "SERVER_ERROR", message: (error as Error).message || "Internal server error." }, 500);
+    return serverError(req, error);
   }
 });

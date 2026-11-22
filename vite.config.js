@@ -11,30 +11,21 @@ const toOrigin = (value) => {
 
 export default defineConfig(({ mode }) => {
   const env = loadEnv(mode, process.cwd(), "");
-  const apiOrigin = toOrigin(env.VITE_API_URL);
-  const uploadsOrigin = toOrigin(env.VITE_UPLOADS_PUBLIC_BASE_URL);
   const supabaseOrigin = toOrigin(env.VITE_SUPABASE_URL);
-  const extraConnect = [apiOrigin, supabaseOrigin].filter(Boolean).filter((v, i, arr) => arr.indexOf(v) === i).map((v) => ` ${v}`).join("");
-  const extraImages = [apiOrigin, uploadsOrigin, supabaseOrigin].filter(Boolean).filter((value, index, values) => values.indexOf(value) === index).join(" ");
+  if (!supabaseOrigin && mode === "production") {
+    throw new Error("VITE_SUPABASE_URL is required for a production build (it is also used to build the Content-Security-Policy).");
+  }
 
   return {
     plugins: [
       react(),
       {
+        // Fills the CSP placeholders in index.html with this environment's Supabase origin.
         name: "fikarnot-build-csp",
         transformIndexHtml(html) {
-          return html.replace(
-            /connect-src 'self'([^;]*); img-src 'self'([^;]*);/,
-            (_, connectRest, imageRest) => `connect-src 'self'${extraConnect}${connectRest}; img-src 'self'${extraImages ? ` ${extraImages}` : ""}${imageRest};`,
-          );
+          return html.replaceAll("__SUPABASE_ORIGIN__", supabaseOrigin || "");
         },
       },
     ],
-    server: {
-      proxy: {
-        "/api": "http://localhost:8787",
-        "/uploads": "http://localhost:8787",
-      },
-    },
   };
 });

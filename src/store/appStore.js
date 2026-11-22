@@ -97,15 +97,15 @@ const makeNotification = ({ type, title, message, link = "/account", orderId = n
 
 const persistCustomerState = () => {
   if (!state.session?.id) return;
-  accountApi.saveState({
-    cart: state.cart,
-    wishlist: state.wishlist,
-    recentlyViewed: state.recentlyViewed,
-    comparison: state.comparison,
-  }).catch((error) => console.warn("[FikarNot] Customer state could not be synchronized.", error));
+  accountApi
+    .saveState({
+      cart: state.cart,
+      wishlist: state.wishlist,
+      recentlyViewed: state.recentlyViewed,
+      comparison: state.comparison,
+    })
+    .catch((error) => console.warn("[FikarNot] Customer state could not be synchronized.", error));
 };
-
-
 
 const mergeCart = (base, incoming, products) => {
   const merged = [...base.map((line) => ({ ...line }))];
@@ -126,7 +126,6 @@ const makeFallbackSku = (productId) =>
   `FKN-${String(productId || "PROD")
     .replace(/[^a-z0-9]/gi, "")
     .toUpperCase()}`;
-
 
 const migrateOrderData = (orders, users, emailMigrations) => {
   let sequence = 0;
@@ -419,7 +418,7 @@ export const appActions = {
           try {
             remoteAccountState = await accountApi.getState();
             if (Array.isArray(remoteAccountState.addresses)) {
-              data.users = data.users.map((user) => user.id === session.id ? { ...user, addresses: remoteAccountState.addresses } : user);
+              data.users = data.users.map((user) => (user.id === session.id ? { ...user, addresses: remoteAccountState.addresses } : user));
             }
           } catch (accountError) {
             console.warn("[FikarNot] Account state API unavailable; using local account cache for this session.", accountError);
@@ -443,17 +442,27 @@ export const appActions = {
           const remoteWishlist = Array.isArray(remoteAccountState?.wishlist) ? remoteAccountState.wishlist : null;
           const remoteRecent = Array.isArray(remoteAccountState?.recentlyViewed) ? remoteAccountState.recentlyViewed : null;
           const remoteComparison = Array.isArray(remoteAccountState?.comparison) ? remoteAccountState.comparison : null;
-          cart = remoteCart ? mergeCart([], remoteCart, data.products) : (savedCart.length ? savedCart : mergeCart([], legacyCart, data.products));
+          cart = remoteCart
+            ? mergeCart([], remoteCart, data.products)
+            : savedCart.length
+              ? savedCart
+              : mergeCart([], legacyCart, data.products);
           wishlist = remoteWishlist
             ? remoteWishlist.filter((id) => data.products.some((product) => product.id === id))
-            : (savedWishlist.length ? savedWishlist : legacyWishlist.filter((id) => data.products.some((product) => product.id === id)));
+            : savedWishlist.length
+              ? savedWishlist
+              : legacyWishlist.filter((id) => data.products.some((product) => product.id === id));
           if (cart.length && !savedCart.length) writeAccountBucket(STORAGE_KEYS.customerCarts, session.id, cart);
           if (wishlist.length && !savedWishlist.length) writeAccountBucket(STORAGE_KEYS.customerWishlists, session.id, wishlist);
           if (remoteRecent) {
             const validRecent = remoteRecent.filter((id) => data.products.some((product) => product.id === id)).slice(0, 8);
             writeAccountBucket(STORAGE_KEYS.recentlyViewed, session.id, validRecent);
           }
-          if (remoteComparison) saveLS(STORAGE_KEYS.comparison, remoteComparison.filter((id) => data.products.some((product) => product.id === id)).slice(0, 3));
+          if (remoteComparison)
+            saveLS(
+              STORAGE_KEYS.comparison,
+              remoteComparison.filter((id) => data.products.some((product) => product.id === id)).slice(0, 3),
+            );
         }
         localStorage.removeItem(STORAGE_KEYS.cart);
         localStorage.removeItem(STORAGE_KEYS.wishlist);
@@ -503,11 +512,14 @@ export const appActions = {
     const tickets = [ticket, ...(state.supportTickets || [])];
     setState({ supportTickets: tickets });
     saveLS(STORAGE_KEYS.supportTickets, tickets);
-    engagementApi.createSupport({ ...ticket }).then(({ ticket: remoteTicket }) => {
-      const nextTickets = [remoteTicket, ...state.supportTickets.filter((item) => item.id !== ticket.id && item.id !== remoteTicket.id)];
-      setState({ supportTickets: nextTickets });
-      saveLS(STORAGE_KEYS.supportTickets, nextTickets);
-    }).catch((error) => toast(error.message || "Support request could not be saved to the server", "err"));
+    engagementApi
+      .createSupport({ ...ticket })
+      .then(({ ticket: remoteTicket }) => {
+        const nextTickets = [remoteTicket, ...state.supportTickets.filter((item) => item.id !== ticket.id && item.id !== remoteTicket.id)];
+        setState({ supportTickets: nextTickets });
+        saveLS(STORAGE_KEYS.supportTickets, nextTickets);
+      })
+      .catch((error) => toast(error.message || "Support request could not be saved to the server", "err"));
 
     toast("Support request sent");
     return ticket;
@@ -523,11 +535,14 @@ export const appActions = {
     );
     setState({ supportTickets: tickets });
     saveLS(STORAGE_KEYS.supportTickets, tickets);
-    engagementApi.setSupportStatus(id, status).then(({ ticket: remoteTicket }) => {
-      const nextTickets = state.supportTickets.map((item) => item.id === id ? remoteTicket : item);
-      setState({ supportTickets: nextTickets });
-      saveLS(STORAGE_KEYS.supportTickets, nextTickets);
-    }).catch((error) => toast(error.message || "Support status could not be saved to the server", "err"));
+    engagementApi
+      .setSupportStatus(id, status)
+      .then(({ ticket: remoteTicket }) => {
+        const nextTickets = state.supportTickets.map((item) => (item.id === id ? remoteTicket : item));
+        setState({ supportTickets: nextTickets });
+        saveLS(STORAGE_KEYS.supportTickets, nextTickets);
+      })
+      .catch((error) => toast(error.message || "Support status could not be saved to the server", "err"));
 
     toast("Support status updated");
     return true;
@@ -555,18 +570,28 @@ export const appActions = {
       );
       const accountNotifications = readNotifications(user.id);
       let remoteState = null;
-      try { remoteState = await accountApi.getState(); } catch {
+      try {
+        remoteState = await accountApi.getState();
+      } catch {
         // Remote account sync is best-effort during sign-in.
       }
-      const accountRecentlyViewed = (Array.isArray(remoteState?.recentlyViewed) ? remoteState.recentlyViewed : readAccountBucket(STORAGE_KEYS.recentlyViewed, user.id)).filter((id) =>
-        state.products.some((product) => product.id === id),
-      ).slice(0, 8);
+      const accountRecentlyViewed = (
+        Array.isArray(remoteState?.recentlyViewed) ? remoteState.recentlyViewed : readAccountBucket(STORAGE_KEYS.recentlyViewed, user.id)
+      )
+        .filter((id) => state.products.some((product) => product.id === id))
+        .slice(0, 8);
       const remoteCart = Array.isArray(remoteState?.cart) ? remoteState.cart : accountCart;
-      const remoteWishlist = Array.isArray(remoteState?.wishlist) ? remoteState.wishlist.filter((id) => state.products.some((product) => product.id === id)) : accountWishlist;
-      const remoteAddresses = Array.isArray(remoteState?.addresses) ? remoteState.addresses : (state.users.find((item) => item.id === user.id)?.addresses || []);
+      const remoteWishlist = Array.isArray(remoteState?.wishlist)
+        ? remoteState.wishlist.filter((id) => state.products.some((product) => product.id === id))
+        : accountWishlist;
+      const remoteAddresses = Array.isArray(remoteState?.addresses)
+        ? remoteState.addresses
+        : state.users.find((item) => item.id === user.id)?.addresses || [];
       const cart = mergeCart(remoteCart, guestCart, state.products);
-      const comparison = Array.isArray(remoteState?.comparison) ? remoteState.comparison.filter((id) => state.products.some((product) => product.id === id)).slice(0, 3) : state.comparison;
-      const usersWithState = users.map((item) => item.id === user.id ? { ...item, addresses: remoteAddresses } : item);
+      const comparison = Array.isArray(remoteState?.comparison)
+        ? remoteState.comparison.filter((id) => state.products.some((product) => product.id === id)).slice(0, 3)
+        : state.comparison;
+      const usersWithState = users.map((item) => (item.id === user.id ? { ...item, addresses: remoteAddresses } : item));
       setState({
         users: usersWithState,
         session: { ...localUser, addresses: remoteAddresses },
@@ -628,9 +653,11 @@ export const appActions = {
       writeAccountBucket(STORAGE_KEYS.customerWishlists, state.session.id, state.wishlist);
       writeAccountBucket(STORAGE_KEYS.recentlyViewed, state.session.id, state.recentlyViewed);
       writeNotifications(state.session.id, state.notifications);
-      await accountApi.saveState({ cart: state.cart, wishlist: state.wishlist, recentlyViewed: state.recentlyViewed, comparison: state.comparison }).catch(() => {
-        // Notification refresh failure should not interrupt the current action.
-      });
+      await accountApi
+        .saveState({ cart: state.cart, wishlist: state.wishlist, recentlyViewed: state.recentlyViewed, comparison: state.comparison })
+        .catch(() => {
+          // Notification refresh failure should not interrupt the current action.
+        });
     }
     setState({ session: null, cart: [], wishlist: [], recentlyViewed: [], notifications: [] });
     saveLS(STORAGE_KEYS.session, null);
@@ -739,13 +766,21 @@ export const appActions = {
     setState({ reviews, products });
     saveLS(STORAGE_KEYS.reviews, reviews);
     saveLS(STORAGE_KEYS.products, products);
-    engagementApi.saveReview({ productId, rating: cleanRating, title: cleanTitle, body: cleanBody }).then(({ review: remoteReview, product: remoteProduct }) => {
-      const nextReviews = [remoteReview, ...state.reviews.filter((item) => item.id !== remoteReview.id && !(item.productId === productId && item.userId === state.session?.id))];
-      const nextProducts = state.products.map((item) => item.id === remoteProduct.id ? remoteProduct : item);
-      setState({ reviews: nextReviews, products: nextProducts });
-      saveLS(STORAGE_KEYS.reviews, nextReviews);
-      saveLS(STORAGE_KEYS.products, nextProducts);
-    }).catch((error) => toast(error.message || "Review could not be saved to the server", "err"));
+    engagementApi
+      .saveReview({ productId, rating: cleanRating, title: cleanTitle, body: cleanBody })
+      .then(({ review: remoteReview, product: remoteProduct }) => {
+        const nextReviews = [
+          remoteReview,
+          ...state.reviews.filter(
+            (item) => item.id !== remoteReview.id && !(item.productId === productId && item.userId === state.session?.id),
+          ),
+        ];
+        const nextProducts = state.products.map((item) => (item.id === remoteProduct.id ? remoteProduct : item));
+        setState({ reviews: nextReviews, products: nextProducts });
+        saveLS(STORAGE_KEYS.reviews, nextReviews);
+        saveLS(STORAGE_KEYS.products, nextProducts);
+      })
+      .catch((error) => toast(error.message || "Review could not be saved to the server", "err"));
     return true;
   },
 
@@ -769,13 +804,18 @@ export const appActions = {
     setState({ reviews, products });
     saveLS(STORAGE_KEYS.reviews, reviews);
     saveLS(STORAGE_KEYS.products, products);
-    engagementApi.setReviewStatus(reviewId, status).then(({ review: remoteReview, product: remoteProduct }) => {
-      const nextReviews = state.reviews.map((item) => (item.id === remoteReview.id ? remoteReview : item));
-      const nextProducts = remoteProduct ? state.products.map((item) => (item.id === remoteProduct.id ? remoteProduct : item)) : state.products;
-      setState({ reviews: nextReviews, products: nextProducts });
-      saveLS(STORAGE_KEYS.reviews, nextReviews);
-      saveLS(STORAGE_KEYS.products, nextProducts);
-    }).catch((error) => toast(error.message || "Review status could not be updated on the server", "err"));
+    engagementApi
+      .setReviewStatus(reviewId, status)
+      .then(({ review: remoteReview, product: remoteProduct }) => {
+        const nextReviews = state.reviews.map((item) => (item.id === remoteReview.id ? remoteReview : item));
+        const nextProducts = remoteProduct
+          ? state.products.map((item) => (item.id === remoteProduct.id ? remoteProduct : item))
+          : state.products;
+        setState({ reviews: nextReviews, products: nextProducts });
+        saveLS(STORAGE_KEYS.reviews, nextReviews);
+        saveLS(STORAGE_KEYS.products, nextProducts);
+      })
+      .catch((error) => toast(error.message || "Review status could not be updated on the server", "err"));
     toast(status === "hidden" ? "Review hidden" : "Review restored");
     return true;
   },
@@ -800,13 +840,16 @@ export const appActions = {
     setState({ reviews, products });
     saveLS(STORAGE_KEYS.reviews, reviews);
     saveLS(STORAGE_KEYS.products, products);
-    engagementApi.deleteReview(reviewId).then(({ product: remoteProduct }) => {
-      if (remoteProduct) {
-        const nextProducts = state.products.map((item) => item.id === remoteProduct.id ? remoteProduct : item);
-        setState({ products: nextProducts });
-        saveLS(STORAGE_KEYS.products, nextProducts);
-      }
-    }).catch((error) => toast(error.message || "Review could not be removed from the server", "err"));
+    engagementApi
+      .deleteReview(reviewId)
+      .then(({ product: remoteProduct }) => {
+        if (remoteProduct) {
+          const nextProducts = state.products.map((item) => (item.id === remoteProduct.id ? remoteProduct : item));
+          setState({ products: nextProducts });
+          saveLS(STORAGE_KEYS.products, nextProducts);
+        }
+      })
+      .catch((error) => toast(error.message || "Review could not be removed from the server", "err"));
     toast("Review removed");
     return true;
   },
@@ -887,7 +930,7 @@ export const appActions = {
     }
     try {
       const { addresses } = await accountApi.saveAddress(clean);
-      const users = state.users.map((item) => item.id === state.session.id ? { ...item, addresses } : item);
+      const users = state.users.map((item) => (item.id === state.session.id ? { ...item, addresses } : item));
       const session = users.find((item) => item.id === state.session.id) || state.session;
       setState({ users, session });
       saveLS(STORAGE_KEYS.users, users);
@@ -903,7 +946,7 @@ export const appActions = {
     if (!state.session) return false;
     try {
       const { addresses } = await accountApi.deleteAddress(addressId);
-      const users = state.users.map((user) => user.id === state.session.id ? { ...user, addresses } : user);
+      const users = state.users.map((user) => (user.id === state.session.id ? { ...user, addresses } : user));
       const session = users.find((user) => user.id === state.session.id) || state.session;
       setState({ users, session });
       saveLS(STORAGE_KEYS.users, users);
@@ -931,7 +974,10 @@ export const appActions = {
       : [...state.cart, { productId, qty: nextQty }];
 
     setState({ cart });
-    if (state.session?.id) { writeAccountBucket(STORAGE_KEYS.customerCarts, state.session.id, cart); persistCustomerState(); }
+    if (state.session?.id) {
+      writeAccountBucket(STORAGE_KEYS.customerCarts, state.session.id, cart);
+      persistCustomerState();
+    }
     toast(`${product.name} added to cart`);
   },
 
@@ -945,7 +991,10 @@ export const appActions = {
         : state.cart.map((line) => (line.productId === productId ? { ...line, qty: Math.min(qty, product.stock) } : line));
 
     setState({ cart });
-    if (state.session?.id) { writeAccountBucket(STORAGE_KEYS.customerCarts, state.session.id, cart); persistCustomerState(); }
+    if (state.session?.id) {
+      writeAccountBucket(STORAGE_KEYS.customerCarts, state.session.id, cart);
+      persistCustomerState();
+    }
   },
 
   removeFromCart(productId) {
@@ -1174,9 +1223,7 @@ export const appActions = {
         role: user.role,
         ...(user.password ? { password: user.password } : {}),
       });
-      const list = existed
-        ? state.users.map((item) => (item.id === saved.id ? { ...item, ...saved } : item))
-        : [saved, ...state.users];
+      const list = existed ? state.users.map((item) => (item.id === saved.id ? { ...item, ...saved } : item)) : [saved, ...state.users];
       const session = state.session?.id === saved.id ? { ...state.session, ...saved } : state.session;
       setState({ users: list, session });
       saveLS(STORAGE_KEYS.users, list);
@@ -1244,7 +1291,7 @@ export const appActions = {
     }
     try {
       const { user: saved } = await usersApi.setRole(id, role);
-      const users = state.users.map((user) => user.id === id ? { ...user, ...saved } : user);
+      const users = state.users.map((user) => (user.id === id ? { ...user, ...saved } : user));
       setState({ users });
       saveLS(STORAGE_KEYS.users, users);
       toast("Role updated");
@@ -1319,11 +1366,14 @@ export const appActions = {
     else coupons.unshift(normalized);
     setState({ coupons });
     saveLS(STORAGE_KEYS.coupons, coupons);
-    engagementApi.saveCoupon(normalized).then(({ coupon: remoteCoupon }) => {
-      const nextCoupons = state.coupons.map((item) => item.id === remoteCoupon.id ? remoteCoupon : item);
-      setState({ coupons: nextCoupons });
-      saveLS(STORAGE_KEYS.coupons, nextCoupons);
-    }).catch((error) => toast(error.message || "Coupon could not be saved to the server", "err"));
+    engagementApi
+      .saveCoupon(normalized)
+      .then(({ coupon: remoteCoupon }) => {
+        const nextCoupons = state.coupons.map((item) => (item.id === remoteCoupon.id ? remoteCoupon : item));
+        setState({ coupons: nextCoupons });
+        saveLS(STORAGE_KEYS.coupons, nextCoupons);
+      })
+      .catch((error) => toast(error.message || "Coupon could not be saved to the server", "err"));
     toast(index >= 0 ? "Coupon updated" : "Coupon created");
     return true;
   },
@@ -1340,11 +1390,14 @@ export const appActions = {
     const coupons = state.coupons.map((coupon) => (coupon.id === id ? { ...coupon, active: !coupon.active } : coupon));
     setState({ coupons });
     saveLS(STORAGE_KEYS.coupons, coupons);
-    engagementApi.toggleCoupon(id).then(({ coupon: remoteCoupon }) => {
-      const nextCoupons = state.coupons.map((item) => item.id === remoteCoupon.id ? remoteCoupon : item);
-      setState({ coupons: nextCoupons });
-      saveLS(STORAGE_KEYS.coupons, nextCoupons);
-    }).catch((error) => toast(error.message || "Coupon status could not be saved to the server", "err"));
+    engagementApi
+      .toggleCoupon(id)
+      .then(({ coupon: remoteCoupon }) => {
+        const nextCoupons = state.coupons.map((item) => (item.id === remoteCoupon.id ? remoteCoupon : item));
+        setState({ coupons: nextCoupons });
+        saveLS(STORAGE_KEYS.coupons, nextCoupons);
+      })
+      .catch((error) => toast(error.message || "Coupon status could not be saved to the server", "err"));
     toast("Coupon status updated");
   },
 
@@ -1362,7 +1415,11 @@ export const appActions = {
         items,
         couponCode: couponCode || "",
       });
-      const order = { ...(response.order || {}), paymentProofToken: response.paymentProofToken || null, manualPaymentDetails: response.manualPaymentDetails || null };
+      const order = {
+        ...(response.order || {}),
+        paymentProofToken: response.paymentProofToken || null,
+        manualPaymentDetails: response.manualPaymentDetails || null,
+      };
       const products = state.products.map((product) => {
         const purchased = order.items?.find((item) => item.productId === product.id);
         return purchased ? { ...product, stock: Math.max(0, Number(product.stock) - Number(purchased.qty)) } : product;
@@ -1384,11 +1441,14 @@ export const appActions = {
       saveLS(STORAGE_KEYS.inventoryLog, inventoryLog);
       if (state.session?.id) {
         writeAccountBucket(STORAGE_KEYS.customerCarts, state.session.id, []);
-        engagementApi.listNotifications().then(({ notifications }) => {
-          if (Array.isArray(notifications)) setState({ notifications });
-        }).catch(() => {
-        // Notification refresh failure should not interrupt the current action.
-      });
+        engagementApi
+          .listNotifications()
+          .then(({ notifications }) => {
+            if (Array.isArray(notifications)) setState({ notifications });
+          })
+          .catch(() => {
+            // Notification refresh failure should not interrupt the current action.
+          });
       }
       toast("Order placed successfully");
       return order;
@@ -1408,14 +1468,18 @@ export const appActions = {
       const orders = state.orders.map((item) => (item.id === id ? order : item));
       setState({ orders });
       saveLS(STORAGE_KEYS.orders, orders);
-      engagementApi.listNotifications().then(({ notifications }) => {
-        if (Array.isArray(notifications)) setState({ notifications });
-      }).catch(() => {
-        // Notification refresh failure should not interrupt the current action.
-      });
+      engagementApi
+        .listNotifications()
+        .then(({ notifications }) => {
+          if (Array.isArray(notifications)) setState({ notifications });
+        })
+        .catch(() => {
+          // Notification refresh failure should not interrupt the current action.
+        });
       try {
         const remoteCatalog = await catalogApi.list();
-        if (Array.isArray(remoteCatalog.products)) setState({ products: remoteCatalog.products, inventoryLog: remoteCatalog.inventoryLog || [] });
+        if (Array.isArray(remoteCatalog.products))
+          setState({ products: remoteCatalog.products, inventoryLog: remoteCatalog.inventoryLog || [] });
       } catch {
         // Remote catalog refresh is best-effort after cancellation.
       }
@@ -1450,16 +1514,25 @@ export const appActions = {
     setState({ returnRequests, orders });
     saveLS(STORAGE_KEYS.returnRequests, returnRequests);
     saveLS(STORAGE_KEYS.orders, orders);
-    engagementApi.createReturn({ orderId, reason, note }).then(({ request: remoteRequest }) => {
-      const nextRequests = [remoteRequest, ...state.returnRequests.filter((item) => item.id !== request.id && item.id !== remoteRequest.id)];
-      const nextOrders = state.orders.map((item) => item.id === orderId ? { ...item, returnRequest: remoteRequest.id } : item);
-      setState({ returnRequests: nextRequests, orders: nextOrders });
-      saveLS(STORAGE_KEYS.returnRequests, nextRequests);
-      saveLS(STORAGE_KEYS.orders, nextOrders);
-    }).catch((error) => toast(error.message || "Return request could not be saved to the server", "err"));
-    engagementApi.listNotifications().then(({ notifications }) => {
-      if (Array.isArray(notifications)) setState({ notifications });
-    }).catch(() => {
+    engagementApi
+      .createReturn({ orderId, reason, note })
+      .then(({ request: remoteRequest }) => {
+        const nextRequests = [
+          remoteRequest,
+          ...state.returnRequests.filter((item) => item.id !== request.id && item.id !== remoteRequest.id),
+        ];
+        const nextOrders = state.orders.map((item) => (item.id === orderId ? { ...item, returnRequest: remoteRequest.id } : item));
+        setState({ returnRequests: nextRequests, orders: nextOrders });
+        saveLS(STORAGE_KEYS.returnRequests, nextRequests);
+        saveLS(STORAGE_KEYS.orders, nextOrders);
+      })
+      .catch((error) => toast(error.message || "Return request could not be saved to the server", "err"));
+    engagementApi
+      .listNotifications()
+      .then(({ notifications }) => {
+        if (Array.isArray(notifications)) setState({ notifications });
+      })
+      .catch(() => {
         // Notification refresh failure should not interrupt the current action.
       });
     toast("Return request submitted");
@@ -1520,17 +1593,23 @@ export const appActions = {
     saveLS(STORAGE_KEYS.orders, orders);
     saveLS(STORAGE_KEYS.products, products);
     saveLS(STORAGE_KEYS.inventoryLog, inventoryLog);
-    engagementApi.setReturnStatus(returnId, status).then(({ request: remoteRequest }) => {
-      const nextRequests = state.returnRequests.map((item) => item.id === returnId ? remoteRequest : item);
-      setState({ returnRequests: nextRequests });
-      saveLS(STORAGE_KEYS.returnRequests, nextRequests);
-    }).catch((error) => toast(error.message || "Return status could not be saved to the server", "err"));
+    engagementApi
+      .setReturnStatus(returnId, status)
+      .then(({ request: remoteRequest }) => {
+        const nextRequests = state.returnRequests.map((item) => (item.id === returnId ? remoteRequest : item));
+        setState({ returnRequests: nextRequests });
+        saveLS(STORAGE_KEYS.returnRequests, nextRequests);
+      })
+      .catch((error) => toast(error.message || "Return status could not be saved to the server", "err"));
     if (request.userId) {
-      engagementApi.listNotifications().then(({ notifications }) => {
-        if (Array.isArray(notifications)) setState({ notifications });
-      }).catch(() => {
-        // Notification refresh failure should not interrupt the current action.
-      });
+      engagementApi
+        .listNotifications()
+        .then(({ notifications }) => {
+          if (Array.isArray(notifications)) setState({ notifications });
+        })
+        .catch(() => {
+          // Notification refresh failure should not interrupt the current action.
+        });
     }
     toast("Return status updated");
     return true;
@@ -1557,13 +1636,29 @@ export const appActions = {
   async confirmPayment(id, payload = {}) {
     try {
       const { order } = await ordersApi.confirmPayment(id, payload);
-      const orders = state.orders.map((item) => (item.id === id ? order : item));
+      const orders = state.orders.map((item) =>
+        item.id === id ? order || { ...item, status: "processing", paymentStatus: "paid" } : item,
+      );
       setState({ orders });
       saveLS(STORAGE_KEYS.orders, orders);
       toast("Payment confirmed");
       return true;
     } catch (error) {
       toast(error.message || "Payment could not be confirmed", "err");
+      return false;
+    }
+  },
+
+  async collectCod(id) {
+    try {
+      const res = await ordersApi.collectCod(id);
+      const orders = state.orders.map((item) => (item.id === id ? res.order || { ...item, paymentStatus: "paid" } : item));
+      setState({ orders });
+      saveLS(STORAGE_KEYS.orders, orders);
+      toast("Cash collected");
+      return true;
+    } catch (error) {
+      toast(error.message || "Could not mark cash collected", "err");
       return false;
     }
   },
@@ -1588,15 +1683,20 @@ export const appActions = {
     if (previous.status === status) return true;
     try {
       await ordersApi.setStatus(id, status);
-      const orders = state.orders.map((order) => (order.id === id ? { ...order, status, cancelledAt: status === "cancelled" ? Date.now() : undefined } : order));
+      const orders = state.orders.map((order) =>
+        order.id === id ? { ...order, status, cancelledAt: status === "cancelled" ? Date.now() : undefined } : order,
+      );
       setState({ orders });
       saveLS(STORAGE_KEYS.orders, orders);
       if (previous.customer?.userId) {
-        engagementApi.listNotifications().then(({ notifications }) => {
-          if (Array.isArray(notifications)) setState({ notifications });
-        }).catch(() => {
-        // Notification refresh failure should not interrupt the current action.
-      });
+        engagementApi
+          .listNotifications()
+          .then(({ notifications }) => {
+            if (Array.isArray(notifications)) setState({ notifications });
+          })
+          .catch(() => {
+            // Notification refresh failure should not interrupt the current action.
+          });
       }
       toast("Order status updated");
       return true;

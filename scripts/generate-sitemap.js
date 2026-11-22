@@ -1,9 +1,10 @@
 import { writeFileSync, mkdirSync } from "node:fs";
 import { seedData } from "../src/data/seedData.js";
+import { catalogEndpoint, loadLiveCatalog } from "./catalog-source.js";
 
 const SITE_URL = (process.env.SITE_URL || "https://fikarnot.shop").replace(/\/$/, "");
-const SITEMAP_API_URL = String(process.env.SITEMAP_API_URL || "").trim().replace(/\/$/, "");
-const xmlEscape = (value) => String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
+const xmlEscape = (value) =>
+  String(value).replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;").replace(/'/g, "&apos;");
 
 const buildUrls = ({ products, categories }) => {
   const today = new Date().toISOString().slice(0, 10);
@@ -20,7 +21,7 @@ const buildUrls = ({ products, categories }) => {
 };
 
 const toXml = (urls) => `<?xml version="1.0" encoding="UTF-8"?>
-<urlset xmlns="http://sitemaps.org">
+<urlset xmlns="http://www.sitemaps.org/schemas/sitemap/0.9">
 ${urls
   .map(
     (u) => `  <url>
@@ -34,28 +35,14 @@ ${urls
 `;
 
 const loadCatalog = async () => {
-  if (!SITEMAP_API_URL) {
-    if (process.env.NODE_ENV === "production") {
-      throw new Error("SITEMAP_API_URL is required in production builds — refusing to write a demo/seed sitemap.");
-    }
-    return seedData();
+  const live = await loadLiveCatalog();
+  if (live) return live;
+  if (process.env.NODE_ENV === "production") {
+    throw new Error(
+      "VITE_SUPABASE_URL (or SITEMAP_API_URL) is required in production builds — refusing to write demo/seed sitemap output.",
+    );
   }
-  
-  const first = await fetch(`${SITEMAP_API_URL}/api/catalog?limit=100&offset=0`);
-  if (!first.ok || first.headers.get("content-type")?.includes("text/html")) {
-    throw new Error(`Sitemap API returned invalid response (${first.status})`);
-  }
-  
-  const payload = await first.json();
-  const products = [...(payload.products || [])];
-  const total = Number(payload.total || products.length);
-  for (let offset = products.length; offset < total; offset += 100) {
-    const response = await fetch(`${SITEMAP_API_URL}/api/catalog?limit=100&offset=${offset}`);
-    if (!response.ok) throw new Error(`Sitemap API returned ${response.status}`);
-    const page = await response.json();
-    products.push(...(page.products || []));
-  }
-  return { products, categories: payload.categories || [] };
+  return seedData();
 };
 
 const outPath = new URL("../dist/sitemap.xml", import.meta.url);
@@ -65,7 +52,7 @@ try {
   const catalog = await loadCatalog();
   const urls = buildUrls(catalog);
   writeFileSync(outPath, toXml(urls));
-  console.log(`sitemap.xml written from ${SITEMAP_API_URL ? "live API" : "seed data"} with ${urls.length} URLs`);
+  console.log(`sitemap.xml written from ${catalogEndpoint() ? "live API" : "seed data"} with ${urls.length} URLs`);
 } catch (error) {
   if (process.env.NODE_ENV === "production") {
     console.error(`Sitemap generation failed in production: ${error.message}`);

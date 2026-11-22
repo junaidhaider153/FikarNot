@@ -8,3 +8,18 @@ server/data/*.sqlite-wal
 server/data/uploads/*
 !server/data/uploads/.gitkeep
 .env
+
+# --- added 2026-11 review ---------------------------------------------------
+.env
+.env.*
+!.env.example
+supabase/functions/.env
+supabase/.temp/
+supabase/.branches/
+*.sqlite
+*.sqlite-wal
+*.sqlite-shm
+*.db
+legacy/server/data/
+legacy/server/config/data/
+coverage/

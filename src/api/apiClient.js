@@ -49,6 +49,7 @@ const ROUTES = [
   [/^\/api\/coupons\/(.+)$/, "orders", (m) => `/coupons/${m[1]}`],
   [/^\/api\/coupons$/, "orders", () => "/coupons"],
   [/^\/api\/admin\/orders\/(.+)\/fulfilment$/, "orders", (m) => `/${m[1]}/fulfilment`],
+  [/^\/api\/admin\/orders\/(.+)\/collect-cod$/, "orders", (m) => `/${m[1]}/collect-cod`],
   [/^\/api\/orders\/(.+)\/cancel$/, "orders", (m) => `/${m[1]}/cancel`],
   [/^\/api\/orders\/(.+)\/status$/, "orders", (m) => `/${m[1]}/status`],
   [/^\/api\/orders\/(.+)$/, "orders", (m) => `/${m[1]}`],

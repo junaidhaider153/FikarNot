@@ -15,17 +15,11 @@ function formatDate(value) {
 }
 
 function StatusPill({ status }) {
-  return <span className={`account-status ${status}`}>{status}</span>;
+  const label = status === "pending_payment" ? "Pending payment" : status;
+  return <span className={`account-status ${status}`}>{label}</span>;
 }
 
-const ORDER_STEPS = [
-  { key: "paid", label: "Order placed", note: "Your order has been received." },
-  { key: "processing", label: "Processing", note: "FikarNot is preparing your order." },
-  { key: "shipped", label: "Shipped", note: "Your order is on the way." },
-  { key: "delivered", label: "Delivered", note: "Your order has been delivered." },
-];
-
-function OrderProgress({ status }) {
+function OrderProgress({ status, order }) {
   if (status === "cancelled") {
     return (
       <div className="order-progress cancelled-progress">
@@ -39,13 +33,26 @@ function OrderProgress({ status }) {
       </div>
     );
   }
-  const currentIndex = Math.max(
-    0,
-    ORDER_STEPS.findIndex((step) => step.key === status),
-  );
+  const isManual = ["jazzcash", "easypaisa", "bank_transfer"].includes(order?.paymentMethod || order?.customer?.paymentMethod);
+  const steps = isManual
+    ? [
+        { key: "pending_payment", label: "Awaiting payment", note: "Please upload your payment slip." },
+        { key: "processing", label: "Processing", note: "Payment verified. Preparing your order." },
+        { key: "shipped", label: "Shipped", note: "Your order is on the way." },
+        { key: "delivered", label: "Delivered", note: "Your order has been delivered." },
+      ]
+    : [
+        { key: "processing", label: "Processing", note: "Preparing your order." },
+        { key: "shipped", label: "Shipped", note: "Your order is on the way." },
+        { key: "delivered", label: "Delivered", note: "Your order has been delivered." },
+      ];
+
+  const foundIndex = steps.findIndex((step) => step.key === status);
+  const currentIndex = foundIndex >= 0 ? foundIndex : status === "paid" ? 0 : 0;
+
   return (
     <div className="order-progress" aria-label={`Order status: ${status}`}>
-      {ORDER_STEPS.map((step, index) => (
+      {steps.map((step, index) => (
         <div className={`order-progress-step ${index <= currentIndex ? "active" : ""}`} key={step.key}>
           <span className="step-n">{index < currentIndex ? "✓" : index + 1}</span>
           <div>
@@ -280,8 +287,14 @@ export default function AccountPage() {
                     {orders[0].trackingNumber && (
                       <div className="confirmation-address u-mt">
                         <span>Shipment</span>
-                        <strong>{orders[0].courier || "Courier"} · {orders[0].trackingNumber}</strong>
-                        {orders[0].trackingUrl && <a href={orders[0].trackingUrl} target="_blank" rel="noreferrer">Track shipment</a>}
+                        <strong>
+                          {orders[0].courier || "Courier"} · {orders[0].trackingNumber}
+                        </strong>
+                        {orders[0].trackingUrl && (
+                          <a href={orders[0].trackingUrl} target="_blank" rel="noreferrer">
+                            Track shipment
+                          </a>
+                        )}
                       </div>
                     )}
                     <button className="btn btn-ghost btn-sm" onClick={() => setTab("orders")}>
@@ -403,7 +416,7 @@ export default function AccountPage() {
                       </div>
                     </summary>
                     <div className="order-body">
-                      <OrderProgress status={order.status} />
+                      <OrderProgress status={order.status} order={order} />
                       <div className="order-items">
                         {order.items.map((item) => (
                           <div key={item.productId} className="order-item">
@@ -572,11 +585,7 @@ export default function AccountPage() {
                       />
                     </div>
                   </div>
-                  {addressError && (
-                    <p className="f-err u-mt">
-                      {addressError}
-                    </p>
-                  )}
+                  {addressError && <p className="f-err u-mt">{addressError}</p>}
                   <label className="chk u-mt">
                     <input
                       type="checkbox"

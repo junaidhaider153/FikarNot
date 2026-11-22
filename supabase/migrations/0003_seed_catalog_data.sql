@@ -1,3 +1,6 @@
+-- NOTE (2026-11 review): the two boolean literals at the bottom were cast to
+-- jsonb. The original `true` literals fail on a clean database, which broke
+-- `supabase db reset` and any fresh environment.
 INSERT INTO categories (id, name, description, color, created_at, updated_at) VALUES
 ('c1', 'Audio', 'Headphones, speakers and everything between.', '#E4572E', to_timestamp(1787818400007/1000.0), to_timestamp(1788718402588/1000.0)),
 ('c2', 'Wearables', 'Watches and cameras that earn their place on you.', '#5B6DFA', to_timestamp(1787818400007/1000.0), to_timestamp(1788718402588/1000.0)),
@@ -65,7 +68,7 @@ INSERT INTO site_settings (key, value) VALUES
 ('whatsappNumber', '"923709072688"'::jsonb);
 
 INSERT INTO catalog_meta (key, value) VALUES
-('seeded', true);
+('seeded', 'true'::jsonb);
 
 INSERT INTO engagement_meta (key, value) VALUES
-('email_verification_v1', true);
+('email_verification_v1', 'true'::jsonb);

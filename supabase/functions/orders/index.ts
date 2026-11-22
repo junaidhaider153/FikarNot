@@ -1,62 +1,122 @@
 // FikarNot orders Edge Function.
-// Ported from server/index.js:
-//   GET  /api/orders                    -> GET  /            (own orders, or all if staff)
-//   POST /api/orders                    -> POST /            (checkout)
-//   POST /api/orders/:id/cancel          -> POST /:id/cancel
-//   POST /api/orders/:id/status (staff)   -> POST /:id/status
-//   DELETE /api/orders/:id (staff)         -> DELETE /:id
-//   GET  /api/coupons                     -> GET  /coupons
-//   POST /api/coupons/validate             -> POST /coupons/validate
-//   POST /api/coupons (staff)               -> POST /coupons
-//   DELETE /api/coupons/:id (staff)          -> DELETE /coupons/:id
+//   GET    /                      own orders (all, for MFA-verified staff)
+//   POST   /                      checkout  (guests: Cash on Delivery only)
+//   GET    /:id/invoice           invoice data (order owner or staff)
+//   POST   /:id/cancel            owner or staff — atomic cancel + restock
+//   POST   /:id/status            staff — forward-only for editors, admin may correct
+//   POST   /:id/fulfilment        staff — courier + tracking (emails the customer)
+//   DELETE /:id                   admin only (audit-logged)
+//   GET    /commerce-settings     public
+//   GET    /coupons               public list of active coupons
+//   POST   /coupons/validate      public (rate limited)
+//   POST   /coupons               staff
+//   POST   /coupons/:id/toggle    staff
+//   DELETE /coupons/:id           staff
 //
-// NOT included yet (later stages): the invoice HTML page, payment-proof
-// upload (needs Supabase Storage first), and online/card payments (no
-// payment gateway wired up yet — only cod + manual methods work for now).
+// Checkout runs inside the Postgres function public.create_order() so stock,
+// coupon usage, numbering and order rows commit (or roll back) together.
+// NOT included: online/card payments (PayFast) — returns INVALID_PAYMENT_METHOD.
 
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { admin } from "../_shared/supabase.ts";
+import { corsHeaders, preflight } from "../_shared/cors.ts";
+import { json, serverError, text } from "../_shared/http.ts";
+import { getCaller, isAdmin, isStaff } from "../_shared/auth.ts";
+import { limit } from "../_shared/rateLimit.ts";
+import { queueEmail } from "../_shared/email.ts";
+import { orderConfirmation, trackingAdded } from "../_shared/emailTemplates.ts";
+import { validateJson, z } from "../_shared/validate.ts";
+import { parseRpcError } from "../_shared/rpc.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
+void corsHeaders; // re-exported for symmetry with other functions
 
-const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-  auth: { autoRefreshToken: false, persistSession: false },
+const couponValidateSchema = z.object({
+  code: z.string().trim().min(1, "Coupon code is required.").max(40),
+  subtotal: z.coerce.number().min(0).default(0),
 });
 
-const ALLOWED_ORIGINS = (Deno.env.get("FIKARNOT_FRONTEND_ORIGIN") || "http://localhost:5173")
-  .split(",").map((s) => s.trim().replace(/\/$/, "")).filter(Boolean);
+const couponInputSchema = z.object({
+  id: z.string().optional(),
+  code: z.string().trim().min(1, "Coupon code is required.").max(40),
+  type: z.enum(["percent", "fixed", "free_shipping"]).optional().default("percent"),
+  value: z.coerce.number().min(0).optional().default(0),
+  minSubtotal: z.coerce.number().min(0).optional().default(0),
+  maxUses: z.coerce.number().int().min(0).optional().default(0),
+  usedCount: z.coerce.number().int().min(0).optional().default(0),
+  active: z.boolean().optional().default(true),
+  expiresAt: z.string().nullable().optional(),
+  description: z.string().trim().max(300).optional().default(""),
+});
+const couponPayloadSchema = z
+  .union([z.object({ coupon: couponInputSchema }), couponInputSchema])
+  .transform((val) => ("coupon" in val ? val.coupon : val));
 
-function corsHeaders(req: Request): HeadersInit {
-  const origin = req.headers.get("Origin") || "";
-  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowed,
-    "Vary": "Origin",
-    "Access-Control-Allow-Headers": "authorization, content-type, apikey",
-    "Access-Control-Allow-Methods": "GET, POST, DELETE, OPTIONS",
-  };
-}
-function json(req: Request, body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), { status, headers: { "Content-Type": "application/json", ...corsHeaders(req) } });
-}
+const checkoutSchema = z.object({
+  customer: z.object({
+    name: z.string().trim().max(120).default("Guest"),
+    email: z.string().trim().email("A valid customer email is required.").max(254),
+    address: z.string().trim().max(500).default(""),
+    paymentMethod: z
+      .enum(["cod", "jazzcash", "easypaisa", "bank_transfer"], {
+        errorMap: () => ({ message: "Unsupported payment method (card/online payments aren't available yet)." }),
+      })
+      .default("cod"),
+  }),
+  items: z
+    .array(
+      z.object({
+        productId: z.string().trim().min(1, "Product ID is required.").max(80),
+        qty: z.coerce.number().int().min(1, "Item quantity must be at least 1.").max(100),
+      }),
+    )
+    .min(1, "Your order has no items.")
+    .max(50, "An order can contain at most 50 different products."),
+  couponCode: z.string().trim().max(40).optional().nullable(),
+});
 
-type Caller = { id: string; role: string } | null;
+const orderStatusSchema = z.object({
+  status: z.enum(["pending_payment", "paid", "processing", "shipped", "delivered", "cancelled"], {
+    errorMap: () => ({ message: "Invalid order status." }),
+  }),
+});
 
-async function getCaller(req: Request): Promise<Caller> {
-  const token = (req.headers.get("Authorization") || "").replace(/^Bearer\s+/i, "");
-  if (!token) return null;
-  const { data: userData, error } = await admin.auth.getUser(token);
-  if (error || !userData?.user) return null;
-  const { data: profile } = await admin.from("profiles").select("role").eq("id", userData.user.id).maybeSingle();
-  if (!profile) return null;
-  return { id: userData.user.id, role: profile.role };
+const fulfilmentSchema = z.object({
+  courier: z.string().trim().max(80).optional(),
+  trackingNumber: z.string().trim().max(80).optional(),
+  trackingUrl: z.string().trim().max(500).optional(),
+  shipmentStatus: z.string().trim().max(40).optional(),
+});
+
+const STATUS_RANK: Record<string, number> = { pending_payment: 0, paid: 1, processing: 1, shipped: 2, delivered: 3 };
+const RPC_STATUS: Record<string, number> = {
+  LOGIN_REQUIRED: 401,
+  INVALID_PAYMENT_METHOD: 400,
+  EMPTY_ORDER: 400,
+  PRODUCT_NOT_FOUND: 409,
+  INSUFFICIENT_STOCK: 409,
+  INVALID_COUPON: 409,
+  COUPON_MIN_SUBTOTAL: 409,
+  ORDER_NOT_FOUND: 404,
+  ORDER_NOT_CANCELLABLE: 409,
+};
+
+type ItemOut = { productId: string; name: string; price: number; qty: number };
+// deno-lint-ignore no-explicit-any
+const itemRow = (i: any): ItemOut => ({ productId: i.product_id, name: i.product_name, price: Number(i.price), qty: Number(i.qty) });
+async function itemsOf(orderId: string): Promise<ItemOut[]> {
+  const { data } = await admin.from("order_items").select("*").eq("order_id", orderId);
+  return (data || []).map(itemRow);
 }
-const isStaff = (c: Caller) => !!c && ["admin", "editor"].includes(c.role);
 
 // deno-lint-ignore no-explicit-any
 const orderRow = (row: any, items: any[]) => ({
   id: row.id,
-  customer: { ...(row.user_id ? { userId: row.user_id } : {}), name: row.customer_name, email: row.customer_email, address: row.customer_address, paymentMethod: row.payment_method },
+  customer: {
+    ...(row.user_id ? { userId: row.user_id } : {}),
+    name: row.customer_name,
+    email: row.customer_email,
+    address: row.customer_address,
+    paymentMethod: row.payment_method,
+  },
   items,
   subtotal: Number(row.subtotal),
   discount: Number(row.discount),
@@ -79,9 +139,16 @@ const orderRow = (row: any, items: any[]) => ({
 
 // deno-lint-ignore no-explicit-any
 const couponRow = (row: any) => ({
-  id: row.id, code: row.code, type: row.type, value: Number(row.value), minSubtotal: Number(row.min_subtotal),
-  maxUses: Number(row.max_uses), usedCount: Number(row.used_count), active: Boolean(row.active),
-  expiresAt: row.expires_at, description: row.description,
+  id: row.id,
+  code: row.code,
+  type: row.type,
+  value: Number(row.value),
+  minSubtotal: Number(row.min_subtotal),
+  maxUses: Number(row.max_uses),
+  usedCount: Number(row.used_count),
+  active: Boolean(row.active),
+  expiresAt: row.expires_at,
+  description: row.description,
 });
 
 async function getSiteSettings() {
@@ -101,24 +168,35 @@ async function getCommerceConfig() {
     allowCod: String(s.allowCod) !== "0",
     allowManualPayments: String(s.allowManualPayments) !== "0",
     manualPaymentDetails: {
-      jazzcashNumber: String(s.jazzcashNumber || ""), easypaisaNumber: String(s.easypaisaNumber || ""),
-      bankName: String(s.bankName || ""), bankAccountTitle: String(s.bankAccountTitle || ""),
-      bankAccountNumber: String(s.bankAccountNumber || ""), bankIban: String(s.bankIban || ""), bankInstructions: String(s.bankInstructions || ""),
+      jazzcashNumber: String(s.jazzcashNumber || ""),
+      easypaisaNumber: String(s.easypaisaNumber || ""),
+      bankName: String(s.bankName || ""),
+      bankAccountTitle: String(s.bankAccountTitle || ""),
+      bankAccountNumber: String(s.bankAccountNumber || ""),
+      bankIban: String(s.bankIban || ""),
+      bankInstructions: String(s.bankInstructions || ""),
     },
   };
 }
 
+/** Read-only preview used by the cart. Checkout re-validates inside create_order(). */
 async function validateCoupon(code: string, subtotal: number) {
-  const normalized = String(code || "").trim().toUpperCase();
+  const normalized = String(code || "")
+    .trim()
+    .toUpperCase()
+    .slice(0, 40);
   if (!normalized) return { coupon: null as any, discount: 0, shippingFree: false };
-  const { data: coupon } = await admin.from("coupons").select("*").ilike("code", normalized).maybeSingle();
+  // .eq (NOT .ilike): the column is citext, and ilike would treat % and _ in user input as wildcards.
+  const { data: coupon } = await admin.from("coupons").select("*").eq("code", normalized).maybeSingle();
   if (!coupon) throw Object.assign(new Error("That coupon code is not valid"), { code: "INVALID_COUPON" });
   const expired = coupon.expires_at && new Date(coupon.expires_at).getTime() <= Date.now();
   if (!coupon.active || expired || (coupon.max_uses > 0 && coupon.used_count >= coupon.max_uses)) {
     throw Object.assign(new Error("That coupon is expired, inactive, or has reached its usage limit"), { code: "INVALID_COUPON" });
   }
   if (subtotal < Number(coupon.min_subtotal || 0)) {
-    throw Object.assign(new Error(`Spend at least ${Number(coupon.min_subtotal).toFixed(2)} to use ${normalized}`), { code: "COUPON_MIN_SUBTOTAL" });
+    throw Object.assign(new Error(`Spend at least ${Number(coupon.min_subtotal).toFixed(2)} to use ${normalized}`), {
+      code: "COUPON_MIN_SUBTOTAL",
+    });
   }
   const shippingFree = coupon.type === "free_shipping";
   let discount = 0;
@@ -127,26 +205,37 @@ async function validateCoupon(code: string, subtotal: number) {
   return { coupon, discount: Number(discount.toFixed(2)), shippingFree };
 }
 
-async function nextOrderNumber() {
-  const { data } = await admin.from("orders").select("id").ilike("id", "FN-%");
-  let max = 0;
-  for (const row of data || []) {
-    const n = Number(String(row.id).replace(/^FN-/, ""));
-    if (Number.isFinite(n) && n > max) max = n;
-  }
-  return `FN-${String(max + 1).padStart(4, "0")}`;
-}
-
-async function createNotification(userId: string | null, opts: { type: string; title: string; message: string; link?: string; orderId?: string | null }) {
+async function createNotification(
+  userId: string | null,
+  opts: { type: string; title: string; message: string; link?: string; orderId?: string | null },
+) {
   if (!userId) return;
   await admin.from("notifications").insert({
-    id: `n-${crypto.randomUUID()}`, user_id: userId, type: opts.type, title: opts.title, message: opts.message,
-    link: opts.link || "/account", order_id: opts.orderId || null, read: false,
+    id: `n-${crypto.randomUUID()}`,
+    user_id: userId,
+    type: opts.type,
+    title: opts.title,
+    message: opts.message,
+    link: opts.link || "/account",
+    order_id: opts.orderId || null,
+    read: false,
+  });
+}
+
+async function audit(actorId: string, action: string, entityId: string, details: Record<string, unknown>) {
+  await admin.from("audit_logs").insert({
+    id: `audit-${crypto.randomUUID()}`,
+    actor_user_id: actorId,
+    action,
+    entity_type: "order",
+    entity_id: entityId,
+    details_json: details,
   });
 }
 
 Deno.serve(async (req) => {
-  if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(req) });
+  const pre = preflight(req);
+  if (pre) return pre;
   const url = new URL(req.url);
   const path = url.pathname.replace(/^\/(functions\/v1\/)?orders/, "") || "/";
 
@@ -165,39 +254,72 @@ Deno.serve(async (req) => {
         return json(req, { coupons: active.map(couponRow) });
       }
       if (req.method === "POST" && path === "/coupons/validate") {
-        const body = await req.json().catch(() => ({}));
+        const limited = await limit(req, "coupon-validate", 40, 60);
+        if (limited) return limited;
+        const val = await validateJson(req, couponValidateSchema);
+        if (!val.success) return val.response;
         try {
-          const result = await validateCoupon(body.code || "", Number(body.subtotal || 0));
-          return json(req, { coupon: result.coupon ? couponRow(result.coupon) : null, discount: result.discount, shippingFree: result.shippingFree });
+          const result = await validateCoupon(val.data.code, val.data.subtotal);
+          return json(req, {
+            coupon: result.coupon ? couponRow(result.coupon) : null,
+            discount: result.discount,
+            shippingFree: result.shippingFree,
+          });
         } catch (e) {
           const err = e as { code?: string; message?: string };
           return json(req, { error: err.code || "INVALID_COUPON", message: err.message }, 400);
         }
       }
       // Everything else under /coupons is staff-only.
-      const caller = await getCaller(req);
-      if (!isStaff(caller)) return json(req, { error: "FORBIDDEN", message: "Staff permission required." }, caller ? 403 : 401);
+      const staffCaller = await getCaller(req);
+      if (!isStaff(staffCaller)) return json(req, { error: "FORBIDDEN", message: "Staff permission required." }, staffCaller ? 403 : 401);
 
       if (req.method === "POST" && path === "/coupons") {
-        const body = await req.json().catch(() => ({}));
-        const c = body.coupon || body;
+        const val = await validateJson(req, couponPayloadSchema);
+        if (!val.success) return val.response;
+        const c = val.data;
         const id = c.id || `cp-${crypto.randomUUID()}`;
-        const { data: saved, error } = await admin.from("coupons").upsert({
-          id, code: String(c.code || "").trim().toUpperCase(), type: c.type || "percent", value: Number(c.value) || 0,
-          min_subtotal: Number(c.minSubtotal) || 0, max_uses: Number(c.maxUses) || 0, used_count: Number(c.usedCount) || 0,
-          active: c.active !== false, expires_at: c.expiresAt ? new Date(c.expiresAt).toISOString() : null, description: String(c.description || ""),
-        }, { onConflict: "id" }).select().single();
+        const { data: saved, error } = await admin
+          .from("coupons")
+          .upsert(
+            {
+              id,
+              code: c.code.toUpperCase(),
+              type: c.type,
+              value: c.value,
+              min_subtotal: c.minSubtotal,
+              max_uses: c.maxUses,
+              used_count: c.usedCount,
+              active: c.active,
+              expires_at: c.expiresAt ? new Date(c.expiresAt).toISOString() : null,
+              description: c.description,
+            },
+            { onConflict: "id" },
+          )
+          .select()
+          .single();
         if (error) throw error;
+        await audit(staffCaller!.id, "coupon.save", saved.id, { code: saved.code });
+        return json(req, { coupon: couponRow(saved) });
+      }
+      if (req.method === "POST" && /^\/coupons\/[^/]+\/toggle$/.test(path)) {
+        const id = decodeURIComponent(path.split("/")[2]);
+        const { data: existing } = await admin.from("coupons").select("*").eq("id", id).maybeSingle();
+        if (!existing) return json(req, { error: "NOT_FOUND", message: "Coupon not found." }, 404);
+        const { data: saved, error } = await admin.from("coupons").update({ active: !existing.active }).eq("id", id).select().single();
+        if (error) throw error;
+        await audit(staffCaller!.id, "coupon.toggle", id, { active: saved.active });
         return json(req, { coupon: couponRow(saved) });
       }
       if (req.method === "DELETE" && path.startsWith("/coupons/")) {
         const id = decodeURIComponent(path.split("/").pop() || "");
         await admin.from("coupons").delete().eq("id", id);
+        await audit(staffCaller!.id, "coupon.delete", id, {});
         return json(req, { ok: true });
       }
     }
 
-    // Everything below requires auth.
+    // Everything below may use auth (checkout also allows guests).
     const caller = await getCaller(req);
 
     // ---- GET /  (own orders, or all if staff) ------------------------------
@@ -208,7 +330,11 @@ Deno.serve(async (req) => {
       const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(500, Math.floor(rawLimit)) : 200;
       const offset = Number.isFinite(rawOffset) && rawOffset >= 0 ? Math.floor(rawOffset) : 0;
 
-      let ordersQuery = admin.from("orders").select("*", { count: "exact" }).order("created_at", { ascending: false }).range(offset, offset + limit - 1);
+      let ordersQuery = admin
+        .from("orders")
+        .select("*", { count: "exact" })
+        .order("created_at", { ascending: false })
+        .range(offset, offset + limit - 1);
       if (!isStaff(caller)) ordersQuery = ordersQuery.eq("user_id", caller.id);
       const { data: orders, count, error } = await ordersQuery;
       if (error) throw error;
@@ -228,190 +354,295 @@ Deno.serve(async (req) => {
 
     // ---- POST /  (checkout) -------------------------------------------------
     if (req.method === "POST" && path === "/") {
-      const body = await req.json().catch(() => ({}));
-      const customer = body.customer || {};
-      const paymentMethod = String(customer.paymentMethod || "cod").trim().toLowerCase();
+      const limited = await limit(req, "checkout", 15, 600);
+      if (limited) return limited;
+      const val = await validateJson(req, checkoutSchema);
+      if (!val.success) return val.response;
+      const body = val.data;
+      const customer = body.customer;
+      const paymentMethod = customer.paymentMethod;
       const commerce = await getCommerceConfig();
       const isManual = ["jazzcash", "easypaisa", "bank_transfer"].includes(paymentMethod);
-      if (!["cod", "jazzcash", "easypaisa", "bank_transfer"].includes(paymentMethod)) {
-        return json(req, { error: "INVALID_PAYMENT_METHOD", message: "Unsupported payment method (card/online payments aren't wired up yet)." }, 400);
+
+      // POLICY: guests may only use Cash on Delivery.
+      if (isManual && !caller) {
+        return json(
+          req,
+          {
+            error: "LOGIN_REQUIRED",
+            message: "Please sign in to pay by bank transfer or mobile wallet. Guests can choose Cash on Delivery.",
+          },
+          401,
+        );
       }
-      if (paymentMethod === "cod" && !commerce.allowCod) return json(req, { error: "PAYMENT_METHOD_DISABLED", message: "Cash on delivery is currently unavailable." }, 409);
-      if (isManual && !commerce.allowManualPayments) return json(req, { error: "PAYMENT_METHOD_DISABLED", message: "Manual payment methods are currently unavailable." }, 503);
+      if (paymentMethod === "cod" && !commerce.allowCod)
+        return json(req, { error: "PAYMENT_METHOD_DISABLED", message: "Cash on delivery is currently unavailable." }, 409);
+      if (isManual && !commerce.allowManualPayments)
+        return json(req, { error: "PAYMENT_METHOD_DISABLED", message: "Manual payment methods are currently unavailable." }, 503);
 
-      const email = String(customer.email || "").trim().toLowerCase();
-      if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json(req, { error: "INVALID_EMAIL", message: "A valid customer email is required." }, 400);
-      const requestedItems = Array.isArray(body.items) ? body.items : [];
-      if (!requestedItems.length) return json(req, { error: "EMPTY_ORDER", message: "Your order has no items." }, 400);
+      const email = customer.email.toLowerCase();
+      const items = body.items.map((r) => ({
+        productId: r.productId,
+        qty: r.qty,
+      }));
 
-      try {
-        const items: { productId: string; name: string; price: number; qty: number }[] = [];
-        for (const requested of requestedItems) {
-          const { data: product } = await admin.from("products").select("*").eq("id", requested.productId).maybeSingle();
-          const qty = Math.max(0, Math.floor(Number(requested.qty || 0)));
-          if (!product) throw Object.assign(new Error(`Product ${requested.productId} was not found.`), { code: "PRODUCT_NOT_FOUND" });
-          if (!qty) continue;
-          if (product.stock < qty) throw Object.assign(new Error(`${product.name} only has ${product.stock} item(s) left.`), { code: "INSUFFICIENT_STOCK" });
-          items.push({ productId: product.id, name: product.name, price: Number(product.price), qty });
-        }
-        if (!items.length) throw Object.assign(new Error("Your cart is empty or unavailable."), { code: "EMPTY_ORDER" });
+      const { data: created, error: rpcError } = await admin.rpc("create_order", {
+        p_user_id: caller?.id || null,
+        p_customer: { name: customer.name || "Guest", email, address: customer.address || "", paymentMethod },
+        p_items: items,
+        p_coupon_code: body.couponCode ? text(body.couponCode, 40) : null,
+        p_config: {
+          currency: commerce.currency,
+          freeShippingThreshold: commerce.freeShippingThreshold,
+          shippingFlatRate: commerce.shippingFlatRate,
+          taxRate: commerce.taxRate,
+        },
+      });
+      if (rpcError) {
+        const parsed = parseRpcError(rpcError.message);
+        if (parsed) return json(req, { error: parsed.code, message: parsed.message }, RPC_STATUS[parsed.code] || 400);
+        throw rpcError;
+      }
 
-        const subtotal = Number(items.reduce((sum, i) => sum + i.price * i.qty, 0).toFixed(2));
-        const baseShipping = subtotal === 0 ? 0 : subtotal >= commerce.freeShippingThreshold ? 0 : commerce.shippingFlatRate;
-        const couponResult = await validateCoupon(body.couponCode || "", subtotal);
-        const shipping = couponResult.shippingFree ? 0 : baseShipping;
-        const discount = couponResult.discount;
-        const taxable = Math.max(0, subtotal - discount);
-        const tax = Number(((taxable * commerce.taxRate) / 100).toFixed(2));
-        const total = Number((taxable + shipping + tax).toFixed(2));
-        const id = await nextOrderNumber();
-        const now = new Date().toISOString();
-        const paymentStatus = isManual ? "pending" : "unpaid";
-
-        const { error: insertError } = await admin.from("orders").insert({
-          id, user_id: caller?.id || null, customer_name: String(customer.name || "Guest").trim(), customer_email: email,
-          customer_address: String(customer.address || ""), payment_method: paymentMethod, subtotal, discount, shipping, tax, total,
-          coupon_json: couponResult.coupon ? { code: couponResult.coupon.code, type: couponResult.coupon.type, value: couponResult.coupon.value, discount, shippingFree: couponResult.shippingFree } : null,
-          status: paymentMethod === "cod" ? "processing" : "paid", payment_status: paymentStatus, currency: commerce.currency,
-          invoice_number: `INV-${id.replace(/^FN-/, "")}`, created_at: now, updated_at: now,
+      const id = (created as { orderId: string }).orderId;
+      const { data: savedOrder } = await admin.from("orders").select("*").eq("id", id).single();
+      const orderItems = await itemsOf(id);
+      if (caller?.id)
+        await createNotification(caller.id, {
+          type: "order",
+          title: `Order ${id} received`,
+          message: "Thanks for your order. We are preparing it for dispatch.",
+          orderId: id,
         });
-        if (insertError) throw insertError;
-
-        for (const item of items) {
-          await admin.from("order_items").insert({ id: `${id}-${item.productId}`, order_id: id, product_id: item.productId, product_name: item.name, price: item.price, qty: item.qty });
-          const { data: product } = await admin.from("products").select("stock").eq("id", item.productId).single();
-          const nextStock = Number(product.stock) - item.qty;
-          if (nextStock < 0) throw Object.assign(new Error(`${item.name} is no longer available in that quantity.`), { code: "INSUFFICIENT_STOCK" });
-          await admin.from("products").update({ stock: nextStock, updated_at: now }).eq("id", item.productId);
-          await admin.from("inventory_logs").insert({
-            id: `inv-${crypto.randomUUID()}`, product_id: item.productId, product_name: item.name, previous_stock: Number(product.stock),
-            next_stock: nextStock, change: -item.qty, reason: `Order ${id}`, user_id: caller?.id || null, created_at: now,
-          });
-        }
-
-        if (couponResult.coupon) {
-          await admin.from("coupons").update({ used_count: couponResult.coupon.used_count + 1 }).eq("id", couponResult.coupon.id);
-        }
-
-        const { data: savedOrder } = await admin.from("orders").select("*").eq("id", id).single();
-        if (caller?.id) await createNotification(caller.id, { type: "order", title: `Order ${id} received`, message: "Thanks for your order. We are preparing it for dispatch.", orderId: id });
-
-        return json(req, { order: orderRow(savedOrder, items), manualPaymentDetails: isManual ? commerce.manualPaymentDetails : null }, 201);
-      } catch (e) {
-        const err = e as { code?: string; message?: string };
-        const status = ["INVALID_COUPON", "COUPON_MIN_SUBTOTAL", "PRODUCT_NOT_FOUND", "INSUFFICIENT_STOCK", "EMPTY_ORDER", "PAYMENT_METHOD_DISABLED"].includes(err.code || "") ? 409 : 400;
-        return json(req, { error: err.code || "ORDER_CREATE_FAILED", message: err.message || "Order could not be created." }, status);
-      }
+      queueEmail({
+        to: email,
+        ...orderConfirmation(
+          {
+            id,
+            total: Number(savedOrder.total),
+            subtotal: Number(savedOrder.subtotal),
+            shipping: Number(savedOrder.shipping),
+            discount: Number(savedOrder.discount),
+            currency: savedOrder.currency || "PKR",
+            paymentMethod,
+            customerName: savedOrder.customer_name,
+          },
+          orderItems,
+        ),
+      });
+      return json(
+        req,
+        { order: orderRow(savedOrder, orderItems), manualPaymentDetails: isManual ? commerce.manualPaymentDetails : null },
+        201,
+      );
     }
 
     if (!caller) return json(req, { error: "AUTH_REQUIRED", message: "Authentication required." }, 401);
+
+    // ---- GET /:id/invoice (owner or staff) ----------------------------------
+    if (req.method === "GET" && /^\/[^/]+\/invoice$/.test(path)) {
+      const id = decodeURIComponent(path.split("/")[1]);
+      const { data: order } = await admin.from("orders").select("*").eq("id", id).maybeSingle();
+      if (!order) return json(req, { error: "ORDER_NOT_FOUND", message: "Order not found." }, 404);
+      if (!(isStaff(caller) || order.user_id === caller.id))
+        return json(req, { error: "FORBIDDEN", message: "You cannot view this invoice." }, 403);
+      const s = await getSiteSettings();
+      const store = {
+        name: String(s.storeName || s.siteName || "FikarNot"),
+        email: String(s.supportEmail || s.contactEmail || ""),
+        address: String(s.storeAddress || s.contactAddress || ""),
+        phone: String(s.contactPhone || ""),
+      };
+      return json(req, { invoice: { store, order: orderRow(order, await itemsOf(id)) } });
+    }
 
     // ---- POST /:id/cancel ---------------------------------------------------
     if (req.method === "POST" && /^\/[^/]+\/cancel$/.test(path)) {
       const id = decodeURIComponent(path.split("/")[1]);
       const { data: order } = await admin.from("orders").select("*").eq("id", id).maybeSingle();
       if (!order) return json(req, { error: "ORDER_NOT_FOUND", message: "Order not found." }, 404);
-      if (!(isStaff(caller) || order.user_id === caller.id)) return json(req, { error: "FORBIDDEN", message: "You cannot cancel this order." }, 403);
-      if (!["paid", "processing"].includes(order.status)) return json(req, { error: "ORDER_NOT_CANCELLABLE", message: "This order can no longer be cancelled." }, 409);
-
-      const { data: items } = await admin.from("order_items").select("*").eq("order_id", id);
-      const now = new Date().toISOString();
-      for (const item of items || []) {
-        const { data: product } = await admin.from("products").select("stock").eq("id", item.product_id).maybeSingle();
-        if (product) {
-          await admin.from("products").update({ stock: Number(product.stock) + Number(item.qty), updated_at: now }).eq("id", item.product_id);
-          await admin.from("inventory_logs").insert({
-            id: `inv-${crypto.randomUUID()}`, product_id: item.product_id, product_name: item.product_name, previous_stock: Number(product.stock),
-            next_stock: Number(product.stock) + Number(item.qty), change: Number(item.qty), reason: `Order ${id} cancelled`, user_id: caller.id, created_at: now,
-          });
-        }
+      if (!(isStaff(caller) || order.user_id === caller.id))
+        return json(req, { error: "FORBIDDEN", message: "You cannot cancel this order." }, 403);
+      const { error: cancelError } = await admin.rpc("cancel_order", {
+        p_order_id: id,
+        p_actor: caller.id,
+        p_reason: `Order ${id} cancelled`,
+      });
+      if (cancelError) {
+        const parsed = parseRpcError(cancelError.message);
+        if (parsed) return json(req, { error: parsed.code, message: parsed.message }, RPC_STATUS[parsed.code] || 400);
+        throw cancelError;
       }
-      await admin.from("orders").update({ status: "cancelled", cancelled_at: now, updated_at: now }).eq("id", id);
-      if (order.user_id) await createNotification(order.user_id, { type: "order", title: `Order ${id} cancelled`, message: "Your cancellation was completed and the items were returned to stock.", orderId: id });
+      if (order.user_id)
+        await createNotification(order.user_id, {
+          type: "order",
+          title: `Order ${id} cancelled`,
+          message: "Your cancellation was completed and the items were returned to stock.",
+          orderId: id,
+        });
+      if (isStaff(caller)) await audit(caller.id, "order.cancel", id, {});
       const { data: updated } = await admin.from("orders").select("*").eq("id", id).single();
-      return json(req, { order: orderRow(updated, (items || []).map((i) => ({ productId: i.product_id, name: i.product_name, price: Number(i.price), qty: Number(i.qty) }))) });
+      return json(req, { order: orderRow(updated, await itemsOf(id)) });
     }
 
     // ---- POST /:id/status (staff) -------------------------------------------
     if (req.method === "POST" && /^\/[^/]+\/status$/.test(path)) {
       if (!isStaff(caller)) return json(req, { error: "FORBIDDEN", message: "Staff permission required." }, 403);
       const id = decodeURIComponent(path.split("/")[1]);
-      const body = await req.json().catch(() => ({}));
-      const allowed = new Set(["paid", "processing", "shipped", "delivered", "cancelled"]);
-      if (!allowed.has(body.status)) return json(req, { error: "INVALID_STATUS", message: "Invalid order status." }, 400);
+      const val = await validateJson(req, orderStatusSchema);
+      if (!val.success) return val.response;
+      const status = val.data.status;
       const { data: previous } = await admin.from("orders").select("*").eq("id", id).maybeSingle();
       if (!previous) return json(req, { error: "ORDER_NOT_FOUND", message: "Order not found." }, 404);
-      if (previous.status === body.status) return json(req, { ok: true, orderId: id, status: body.status });
-      if (previous.status === "cancelled") return json(req, { error: "INVALID_STATUS_TRANSITION", message: "A cancelled order cannot be moved back into fulfilment." }, 409);
+      if (previous.status === status) return json(req, { ok: true, orderId: id, status });
+      if (previous.status === "cancelled")
+        return json(req, { error: "INVALID_STATUS_TRANSITION", message: "A cancelled order cannot be moved back into fulfilment." }, 409);
 
-      const now = new Date().toISOString();
-      if (body.status === "cancelled") {
-        if (!["paid", "processing"].includes(previous.status)) return json(req, { error: "ORDER_NOT_CANCELLABLE", message: "Only paid or processing orders can be cancelled." }, 409);
-        const { data: items } = await admin.from("order_items").select("*").eq("order_id", id);
-        for (const item of items || []) {
-          const { data: product } = await admin.from("products").select("stock").eq("id", item.product_id).maybeSingle();
-          if (product) {
-            await admin.from("products").update({ stock: Number(product.stock) + Number(item.qty), updated_at: now }).eq("id", item.product_id);
-            await admin.from("inventory_logs").insert({
-              id: `inv-${crypto.randomUUID()}`, product_id: item.product_id, product_name: item.product_name, previous_stock: Number(product.stock),
-              next_stock: Number(product.stock) + Number(item.qty), change: Number(item.qty), reason: `Order ${id} cancelled by staff`, user_id: caller.id, created_at: now,
-            });
-          }
+      if (status === "cancelled") {
+        const { error: cancelError } = await admin.rpc("cancel_order", {
+          p_order_id: id,
+          p_actor: caller.id,
+          p_reason: `Order ${id} cancelled by staff`,
+        });
+        if (cancelError) {
+          const parsed = parseRpcError(cancelError.message);
+          if (parsed) return json(req, { error: parsed.code, message: parsed.message }, RPC_STATUS[parsed.code] || 400);
+          throw cancelError;
         }
-        await admin.from("orders").update({ status: "cancelled", cancelled_at: now, updated_at: now }).eq("id", id);
       } else {
-        const patch: Record<string, unknown> = { status: body.status, updated_at: now, cancelled_at: null };
-        if (body.status === "shipped" && !previous.shipped_at) patch.shipped_at = now;
-        if (body.status === "delivered" && !previous.delivered_at) patch.delivered_at = now;
+        // Editors may only move an order forward; admins may correct mistakes.
+        if (!isAdmin(caller) && STATUS_RANK[status] < STATUS_RANK[previous.status]) {
+          return json(
+            req,
+            { error: "INVALID_STATUS_TRANSITION", message: "Only an admin can move an order back to an earlier status." },
+            403,
+          );
+        }
+        const now = new Date().toISOString();
+        const patch: Record<string, unknown> = { status, updated_at: now };
+        if (status === "shipped" && !previous.shipped_at) patch.shipped_at = now;
+        if (status === "delivered" && !previous.delivered_at) patch.delivered_at = now;
         await admin.from("orders").update(patch).eq("id", id);
       }
+      await audit(caller.id, "order.status", id, { from: previous.status, to: status });
       if (previous.user_id) {
-        await createNotification(previous.user_id, { type: "order", title: `Order ${id} is ${body.status === "paid" ? "confirmed" : body.status}`, message: `Your order status has been updated to ${body.status}.`, orderId: id });
+        await createNotification(previous.user_id, {
+          type: "order",
+          title: `Order ${id} is ${status === "paid" ? "confirmed" : status}`,
+          message: `Your order status has been updated to ${status}.`,
+          orderId: id,
+        });
       }
       const { data: updatedOrder } = await admin.from("orders").select("*").eq("id", id).single();
-      const { data: items } = await admin.from("order_items").select("*").eq("order_id", id);
-      return json(req, { ok: true, orderId: id, status: body.status, order: orderRow(updatedOrder, (items || []).map((i) => ({ productId: i.product_id, name: i.product_name, price: Number(i.price), qty: Number(i.qty) }))) });
+      return json(req, { ok: true, orderId: id, status, order: orderRow(updatedOrder, await itemsOf(id)) });
+    }
+
+    // ---- POST /:id/collect-cod (staff) ---------------------------------------
+    if (req.method === "POST" && /^\/[^/]+\/collect-cod$/.test(path)) {
+      if (!isStaff(caller)) return json(req, { error: "FORBIDDEN", message: "Staff permission required." }, 403);
+      const id = decodeURIComponent(path.split("/")[1]);
+      const { data: order } = await admin.from("orders").select("*").eq("id", id).maybeSingle();
+      if (!order) return json(req, { error: "ORDER_NOT_FOUND", message: "Order not found." }, 404);
+      if (order.payment_method !== "cod")
+        return json(req, { error: "INVALID_COD_ORDER", message: "Only Cash on Delivery orders can be marked collected here." }, 400);
+      if (order.status === "cancelled")
+        return json(req, { error: "ORDER_CANCELLED", message: "Cannot collect payment for a cancelled order." }, 409);
+
+      const items = await itemsOf(id);
+      if (order.payment_status === "paid") {
+        return json(req, { ok: true, alreadyCollected: true, order: orderRow(order, items) });
+      }
+
+      const now = new Date().toISOString();
+      const { data: existingPayment } = await admin.from("payments").select("id").eq("order_id", id).eq("status", "paid").maybeSingle();
+
+      if (!existingPayment) {
+        await admin.from("payments").insert({
+          id: `pay-${crypto.randomUUID()}`,
+          order_id: id,
+          provider: "cod",
+          provider_payment_id: `cod-${id}`,
+          amount: Number(order.total),
+          currency: order.currency || "PKR",
+          status: "paid",
+          raw_status: "Collected by staff / courier",
+          created_at: now,
+          updated_at: now,
+        });
+      }
+
+      await admin
+        .from("orders")
+        .update({
+          payment_status: "paid",
+          updated_at: now,
+        })
+        .eq("id", id);
+
+      await audit(caller.id, "payment.cod_collected", id, {
+        total: Number(order.total),
+        currency: order.currency || "PKR",
+      });
+
+      const { data: updatedOrder } = await admin.from("orders").select("*").eq("id", id).single();
+      return json(req, { ok: true, order: orderRow(updatedOrder, items) });
     }
 
     // ---- POST /:id/fulfilment (staff) ----------------------------------------
     if (req.method === "POST" && /^\/[^/]+\/fulfilment$/.test(path)) {
       if (!isStaff(caller)) return json(req, { error: "FORBIDDEN", message: "Staff permission required." }, 403);
       const id = decodeURIComponent(path.split("/")[1]);
-      const body = await req.json().catch(() => ({}));
+      const val = await validateJson(req, fulfilmentSchema);
+      if (!val.success) return val.response;
+      const body = val.data;
       const { data: order } = await admin.from("orders").select("*").eq("id", id).maybeSingle();
       if (!order) return json(req, { error: "ORDER_NOT_FOUND", message: "Order not found." }, 404);
       const now = new Date().toISOString();
       const patch: Record<string, unknown> = {
-        courier: String(body.courier ?? order.courier ?? ""),
-        tracking_number: String(body.trackingNumber ?? order.tracking_number ?? ""),
-        tracking_url: String(body.trackingUrl ?? order.tracking_url ?? ""),
-        shipment_status: String(body.shipmentStatus ?? order.shipment_status ?? "not_created"),
+        courier: text(body.courier ?? order.courier ?? "", 80),
+        tracking_number: text(body.trackingNumber ?? order.tracking_number ?? "", 80),
+        tracking_url: text(body.trackingUrl ?? order.tracking_url ?? "", 500),
+        shipment_status: text(body.shipmentStatus ?? order.shipment_status ?? "not_created", 40),
         updated_at: now,
       };
       if (patch.shipment_status === "shipped" && !order.shipment_created_at) patch.shipment_created_at = now;
       await admin.from("orders").update(patch).eq("id", id);
-      await admin.from("audit_logs").insert({ id: `audit-${crypto.randomUUID()}`, actor_user_id: caller.id, action: "order.fulfilment_update", entity_type: "order", entity_id: id, details_json: { courier: patch.courier, trackingNumber: patch.tracking_number, trackingUrl: patch.tracking_url, shipmentStatus: patch.shipment_status } });
+      await audit(caller.id, "order.fulfilment_update", id, {
+        courier: patch.courier,
+        trackingNumber: patch.tracking_number,
+        shipmentStatus: patch.shipment_status,
+      });
       if (order.user_id && patch.tracking_number) {
-        await createNotification(order.user_id, { type: "order", title: `Tracking added for ${id}`, message: `Courier: ${patch.courier || "N/A"}, Tracking #: ${patch.tracking_number}`, orderId: id });
+        await createNotification(order.user_id, {
+          type: "order",
+          title: `Tracking added for ${id}`,
+          message: `Courier: ${patch.courier || "N/A"}, Tracking #: ${patch.tracking_number}`,
+          orderId: id,
+        });
+      }
+      if (patch.tracking_number && patch.tracking_number !== order.tracking_number) {
+        queueEmail({
+          to: order.customer_email,
+          ...trackingAdded(id, String(patch.courier), String(patch.tracking_number), String(patch.tracking_url)),
+        });
       }
       const { data: updatedOrder } = await admin.from("orders").select("*").eq("id", id).single();
-      const { data: items } = await admin.from("order_items").select("*").eq("order_id", id);
-      return json(req, { order: orderRow(updatedOrder, (items || []).map((i) => ({ productId: i.product_id, name: i.product_name, price: Number(i.price), qty: Number(i.qty) }))) });
+      return json(req, { order: orderRow(updatedOrder, await itemsOf(id)) });
     }
 
-    // ---- DELETE /:id (staff) -------------------------------------------------
+    // ---- DELETE /:id (admin only) --------------------------------------------
     if (req.method === "DELETE" && /^\/[^/]+$/.test(path)) {
-      if (!isStaff(caller)) return json(req, { error: "FORBIDDEN", message: "Staff permission required." }, 403);
+      if (!isAdmin(caller)) return json(req, { error: "FORBIDDEN", message: "Admin permission required to delete orders." }, 403);
       const id = decodeURIComponent(path.slice(1));
-      const { data: order } = await admin.from("orders").select("id").eq("id", id).maybeSingle();
+      const { data: order } = await admin.from("orders").select("id, status, total, customer_email").eq("id", id).maybeSingle();
       if (!order) return json(req, { error: "ORDER_NOT_FOUND", message: "Order not found." }, 404);
+      await audit(caller.id, "order.delete", id, { status: order.status, total: order.total, customerEmail: order.customer_email });
       await admin.from("orders").delete().eq("id", id);
       return json(req, { ok: true });
     }
 
     return json(req, { error: "NOT_FOUND", message: "Route not found." }, 404);
   } catch (error) {
-    console.error(error);
-    return json(req, { error: "SERVER_ERROR", message: (error as Error).message || "Internal server error." }, 500);
+    return serverError(req, error);
   }
 });

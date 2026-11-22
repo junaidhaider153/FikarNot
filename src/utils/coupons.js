@@ -4,7 +4,8 @@ export function normalizeCouponCode(value = "") {
 
 export function isCouponUsable(coupon, now = Date.now()) {
   if (!coupon || coupon.active === false) return false;
-  if (coupon.expiresAt && now > coupon.expiresAt) return false;
+  // expiresAt arrives from the API as an ISO string; comparing it to a number was always false.
+  if (coupon.expiresAt && now > new Date(coupon.expiresAt).getTime()) return false;
   if (coupon.maxUses && coupon.usedCount >= coupon.maxUses) return false;
   return true;
 }

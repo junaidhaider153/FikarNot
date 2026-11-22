@@ -19,60 +19,58 @@
 // we check it manually (via getCaller()) so we control the error shape,
 // same as the old requireUser() helper.
 
-import { createClient } from "jsr:@supabase/supabase-js@2";
+import { admin } from "../_shared/supabase.ts";
+import { corsHeaders } from "../_shared/cors.ts";
+import { json, serverError, text } from "../_shared/http.ts";
+import { getCaller, isAdmin, type Caller } from "../_shared/auth.ts";
+import { validateJson, z } from "../_shared/validate.ts";
 
-const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
-const SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
-
-const admin = createClient(SUPABASE_URL, SERVICE_ROLE_KEY, {
-  auth: { autoRefreshToken: false, persistSession: false },
+const profileSchema = z.object({
+  name: z.string().trim().min(2, "Name must be at least 2 characters.").max(100),
 });
 
-const ALLOWED_ORIGINS = (Deno.env.get("FIKARNOT_FRONTEND_ORIGIN") || "http://localhost:5173")
-  .split(",")
-  .map((s) => s.trim().replace(/\/$/, ""))
-  .filter(Boolean);
+const stateSchema = z.object({
+  cart: z.array(z.unknown()).optional(),
+  wishlist: z.array(z.unknown()).optional(),
+  recentlyViewed: z.array(z.unknown()).optional(),
+  comparison: z.array(z.unknown()).optional(),
+});
 
-function corsHeaders(req: Request): HeadersInit {
-  const origin = req.headers.get("Origin") || "";
-  const allowed = ALLOWED_ORIGINS.includes(origin) ? origin : ALLOWED_ORIGINS[0];
-  return {
-    "Access-Control-Allow-Origin": allowed,
-    "Vary": "Origin",
-    "Access-Control-Allow-Headers": "authorization, content-type, apikey",
-    "Access-Control-Allow-Methods": "GET, PUT, POST, DELETE, OPTIONS",
-  };
-}
+const addressSchema = z.object({
+  address: z.object({
+    id: z.string().optional(),
+    label: z.string().trim().optional(),
+    name: z.string().trim().min(1, "Name, address, city and country are required."),
+    line1: z.string().trim().min(1, "Name, address, city and country are required."),
+    city: z.string().trim().min(1, "Name, address, city and country are required."),
+    region: z.string().trim().optional().default(""),
+    postalCode: z.string().trim().optional().default(""),
+    country: z.string().trim().min(1, "Name, address, city and country are required."),
+    isDefault: z.boolean().optional().default(false),
+  }),
+});
 
-function json(req: Request, body: unknown, status = 200) {
-  return new Response(JSON.stringify(body), {
-    status,
-    headers: { "Content-Type": "application/json", ...corsHeaders(req) },
-  });
-}
+const deleteAccountSchema = z.object({
+  confirmationText: z.literal("DELETE", {
+    errorMap: () => ({ message: "Type DELETE to confirm." }),
+  }),
+});
 
-type Caller = { id: string; email: string; createdAt: string; name: string; role: string };
+const userAdminSchema = z.object({
+  user: z.object({
+    id: z.string().optional(),
+    name: z.string().trim().min(2, "Name must be at least 2 characters."),
+    email: z.string().trim().email("Enter a valid email address.").toLowerCase(),
+    role: z.enum(["customer", "editor", "admin"]).optional().default("customer"),
+    password: z.string().optional(),
+  }),
+});
 
-// Resolves + requires the caller. Every route in this function needs auth
-// (unlike catalog's GET /, there's no anonymous path here).
-async function getCaller(req: Request): Promise<Caller | null> {
-  const authHeader = req.headers.get("Authorization") || "";
-  const token = authHeader.replace(/^Bearer\s+/i, "");
-  if (!token) return null;
-  const { data: userData, error } = await admin.auth.getUser(token);
-  if (error || !userData?.user) return null;
-  const { data: profile } = await admin.from("profiles").select("name, role").eq("id", userData.user.id).maybeSingle();
-  if (!profile) return null;
-  return {
-    id: userData.user.id,
-    email: userData.user.email || "",
-    createdAt: userData.user.created_at,
-    name: profile.name,
-    role: profile.role,
-  };
-}
-
-const isAdmin = (caller: Caller) => caller.role === "admin";
+const roleSchema = z.object({
+  role: z.enum(["customer", "editor", "admin"], {
+    errorMap: () => ({ message: "Invalid user role." }),
+  }),
+});
 
 // deno-lint-ignore no-explicit-any
 const addressRow = (row: any) => ({
@@ -140,26 +138,36 @@ Deno.serve(async (req) => {
 
     // ---- PATCH /profile (update own name / email) --------------------------
     if (req.method === "PATCH" && path === "/profile") {
-      const body = await req.json().catch(() => ({}));
-      const name = String(body.name || "").trim();
-      if (name.length < 2) return json(req, { error: "INVALID_NAME", message: "Name must be at least 2 characters." }, 400);
+      const val = await validateJson(req, profileSchema);
+      if (!val.success) return val.response;
+      const name = val.data.name;
       await admin.from("profiles").update({ name, updated_at: new Date().toISOString() }).eq("id", caller.id);
       const { data: authUser } = await admin.auth.admin.getUserById(caller.id);
-      return json(req, { user: { id: caller.id, name, email: authUser?.user?.email || caller.email, role: caller.role, createdAt: caller.createdAt } });
+      return json(req, {
+        user: { id: caller.id, name, email: authUser?.user?.email || caller.email, role: caller.role, createdAt: caller.createdAt },
+      });
     }
 
     // ---- PUT /state --------------------------------------------------------
     if (req.method === "PUT" && path === "/state") {
-      const body = await req.json().catch(() => ({}));
-      const cart = Array.isArray(body.cart) ? body.cart : [];
-      const wishlist = Array.isArray(body.wishlist) ? body.wishlist : [];
-      const recentlyViewed = Array.isArray(body.recentlyViewed) ? body.recentlyViewed.slice(0, 8) : [];
-      const comparison = Array.isArray(body.comparison) ? body.comparison.slice(0, 3) : [];
+      const val = await validateJson(req, stateSchema, 128 * 1024);
+      if (!val.success) return val.response;
+      const cart = (val.data.cart || []).slice(0, 100);
+      const wishlist = (val.data.wishlist || []).slice(0, 200);
+      const recentlyViewed = (val.data.recentlyViewed || []).slice(0, 8);
+      const comparison = (val.data.comparison || []).slice(0, 3);
       const now = new Date().toISOString();
       const { data: saved, error } = await admin
         .from("customer_state")
         .upsert(
-          { user_id: caller.id, cart_json: cart, wishlist_json: wishlist, recently_viewed_json: recentlyViewed, comparison_json: comparison, updated_at: now },
+          {
+            user_id: caller.id,
+            cart_json: cart,
+            wishlist_json: wishlist,
+            recently_viewed_json: recentlyViewed,
+            comparison_json: comparison,
+            updated_at: now,
+          },
           { onConflict: "user_id" },
         )
         .select()
@@ -177,11 +185,9 @@ Deno.serve(async (req) => {
 
     // ---- PUT /addresses (create or update one address) ---------------------
     if (req.method === "PUT" && path === "/addresses") {
-      const body = await req.json().catch(() => ({}));
-      const address = body.address || {};
-      if (!String(address.name || "").trim() || !String(address.line1 || "").trim() || !String(address.city || "").trim() || !String(address.country || "").trim()) {
-        return json(req, { error: "INVALID_ADDRESS", message: "Name, address, city and country are required." }, 400);
-      }
+      const val = await validateJson(req, addressSchema);
+      if (!val.success) return val.response;
+      const address = val.data.address;
       const id = String(address.id || `addr-${crypto.randomUUID()}`);
       const now = new Date().toISOString();
 
@@ -221,9 +227,20 @@ Deno.serve(async (req) => {
       await admin.from("customer_addresses").delete().eq("id", id).eq("user_id", caller.id);
 
       const { count } = await admin.from("customer_addresses").select("id", { count: "exact", head: true }).eq("user_id", caller.id);
-      const { data: hasDefault } = await admin.from("customer_addresses").select("id").eq("user_id", caller.id).eq("is_default", true).maybeSingle();
+      const { data: hasDefault } = await admin
+        .from("customer_addresses")
+        .select("id")
+        .eq("user_id", caller.id)
+        .eq("is_default", true)
+        .maybeSingle();
       if ((count || 0) > 0 && !hasDefault) {
-        const { data: next } = await admin.from("customer_addresses").select("id").eq("user_id", caller.id).order("updated_at", { ascending: false }).limit(1).maybeSingle();
+        const { data: next } = await admin
+          .from("customer_addresses")
+          .select("id")
+          .eq("user_id", caller.id)
+          .order("updated_at", { ascending: false })
+          .limit(1)
+          .maybeSingle();
         if (next) await admin.from("customer_addresses").update({ is_default: true }).eq("id", next.id).eq("user_id", caller.id);
       }
       return json(req, { addresses: await getAddresses(caller.id) });
@@ -234,12 +251,8 @@ Deno.serve(async (req) => {
       if (["admin", "editor"].includes(caller.role)) {
         return json(req, { error: "STAFF_DELETE_BLOCKED", message: "Staff accounts cannot be deleted here." }, 403);
       }
-      const body = await req.json().catch(() => ({}));
-      // No password check here (Supabase Auth owns passwords, not us) — the
-      // caller's valid JWT already proves they're signed in as this account.
-      if (String(body.confirmationText || "") !== "DELETE") {
-        return json(req, { error: "CONFIRMATION_REQUIRED", message: "Type DELETE to confirm." }, 400);
-      }
+      const val = await validateJson(req, deleteAccountSchema);
+      if (!val.success) return val.response;
       const { error } = await admin.auth.admin.deleteUser(caller.id);
       if (error) throw error;
       return json(req, { ok: true });
@@ -256,7 +269,11 @@ Deno.serve(async (req) => {
         const limit = Number.isFinite(rawLimit) && rawLimit > 0 ? Math.min(500, Math.floor(rawLimit)) : 200;
         const offset = Number.isFinite(rawOffset) && rawOffset >= 0 ? Math.floor(rawOffset) : 0;
 
-        const { data: profiles, count, error } = await admin
+        const {
+          data: profiles,
+          count,
+          error,
+        } = await admin
           .from("profiles")
           .select("*", { count: "exact" })
           .order("created_at", { ascending: false })
@@ -274,21 +291,20 @@ Deno.serve(async (req) => {
 
       // ---- POST /users (create or update) ------------------------------------
       if (req.method === "POST" && path === "/users") {
-        const body = await req.json().catch(() => ({}));
-        const payload = body.user || {};
-        const name = String(payload.name || "").trim();
-        const email = String(payload.email || "").trim().toLowerCase();
-        const role = ["customer", "editor", "admin"].includes(payload.role) ? payload.role : "customer";
+        const val = await validateJson(req, userAdminSchema);
+        if (!val.success) return val.response;
+        const payload = val.data.user;
+        const name = payload.name;
+        const email = payload.email;
+        const role = payload.role;
         const password = payload.password == null ? "" : String(payload.password);
         const existingId = payload.id ? String(payload.id) : null;
-
-        if (name.length < 2) return json(req, { error: "INVALID_NAME", message: "Name must be at least 2 characters." }, 400);
-        if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email)) return json(req, { error: "INVALID_EMAIL", message: "Enter a valid email address." }, 400);
 
         if (existingId) {
           const { data: existingProfile } = await admin.from("profiles").select("*").eq("id", existingId).maybeSingle();
           if (!existingProfile) return json(req, { error: "USER_NOT_FOUND", message: "User not found." }, 404);
-          if (password && password.length < 8) return json(req, { error: "WEAK_PASSWORD", message: "Password must be at least 8 characters." }, 400);
+          if (password && password.length < 8)
+            return json(req, { error: "WEAK_PASSWORD", message: "Password must be at least 8 characters." }, 400);
           if (caller.id === existingId && role !== existingProfile.role) {
             return json(req, { error: "SELF_ROLE_CHANGE", message: "You cannot change your own role." }, 400);
           }
@@ -342,12 +358,16 @@ Deno.serve(async (req) => {
       // ---- POST /users/:id/role ------------------------------------------------
       if (req.method === "POST" && /^\/users\/[^/]+\/role$/.test(path)) {
         const id = decodeURIComponent(path.split("/")[2]);
-        const body = await req.json().catch(() => ({}));
-        if (!["customer", "editor", "admin"].includes(body.role)) {
-          return json(req, { error: "INVALID_ROLE", message: "Invalid user role." }, 400);
-        }
+        const val = await validateJson(req, roleSchema);
+        if (!val.success) return val.response;
+        const role = val.data.role;
         if (id === caller.id) return json(req, { error: "SELF_ROLE_CHANGE", message: "You cannot change your own role." }, 400);
-        const { data: updated, error } = await admin.from("profiles").update({ role: body.role, updated_at: new Date().toISOString() }).eq("id", id).select().maybeSingle();
+        const { data: updated, error } = await admin
+          .from("profiles")
+          .update({ role, updated_at: new Date().toISOString() })
+          .eq("id", id)
+          .select()
+          .maybeSingle();
         if (error) throw error;
         if (!updated) return json(req, { error: "USER_NOT_FOUND", message: "User not found." }, 404);
 
@@ -357,7 +377,7 @@ Deno.serve(async (req) => {
           action: "user.role_change",
           entity_type: "user",
           entity_id: id,
-          details_json: { role: body.role },
+          details_json: { role },
         });
 
         const { data: authUser } = await admin.auth.admin.getUserById(id);
@@ -370,7 +390,8 @@ Deno.serve(async (req) => {
         if (id === caller.id) return json(req, { error: "SELF_DELETE_BLOCKED", message: "You cannot delete yourself." }, 400);
         const { data: target } = await admin.from("profiles").select("id, role").eq("id", id).maybeSingle();
         if (!target) return json(req, { error: "USER_NOT_FOUND", message: "User not found." }, 404);
-        if (target.role === "admin") return json(req, { error: "ADMIN_DELETE_BLOCKED", message: "Admin accounts cannot be deleted from this screen." }, 403);
+        if (target.role === "admin")
+          return json(req, { error: "ADMIN_DELETE_BLOCKED", message: "Admin accounts cannot be deleted from this screen." }, 403);
 
         const { error } = await admin.auth.admin.deleteUser(id);
         if (error) throw error;
@@ -389,6 +410,6 @@ Deno.serve(async (req) => {
     return json(req, { error: "NOT_FOUND", message: "Route not found." }, 404);
   } catch (error) {
     console.error(error);
-    return json(req, { error: "SERVER_ERROR", message: (error as Error).message || "Internal server error." }, 500);
+    return serverError(req, error);
   }
 });

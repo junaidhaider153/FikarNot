@@ -75,12 +75,7 @@ export default function HomePage() {
     <>
       {/* Full-bleed cinematic hero: video fills the whole band, copy sits on top of it. */}
       <section className="hero-cinema" aria-label="FikarNot introduction">
-        <HeroVideo
-          src={heroVideoSrc}
-          webm={heroVideoWebm}
-          poster={heroPoster}
-          alt="FikarNot products arranged on a warm cream surface"
-        />
+        <HeroVideo src={heroVideoSrc} webm={heroVideoWebm} poster={heroPoster} alt="FikarNot products arranged on a warm cream surface" />
 
         <div className="container hero-cinema-inner">
           <div className="hero-cinema-copy">
@@ -93,7 +88,8 @@ export default function HomePage() {
               </span>
             </h1>
             <p className="hero-sub hero-cinema-sub">
-              {site.heroSubtitle || "Discover a refined mix of tech, desk and everyday carry — selected for utility, character and the way they fit into real life."}
+              {site.heroSubtitle ||
+                "Discover a refined mix of tech, desk and everyday carry — selected for utility, character and the way they fit into real life."}
             </p>
             <div className="hero-cta">
               <Link className="btn btn-dark" to="/products">
@@ -136,7 +132,6 @@ export default function HomePage() {
           </div>
         </div>
       </section>
-
 
       <section className="container section home-section section-categories" style={{ paddingTop: 8 }}>
         <div className="sec-hd">

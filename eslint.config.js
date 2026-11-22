@@ -5,7 +5,7 @@ import jsxA11y from "eslint-plugin-jsx-a11y";
 import globals from "globals";
 
 export default [
-  { ignores: ["dist/**", "node_modules/**"] },
+  { ignores: ["dist/**", "node_modules/**", "legacy/**", "supabase/functions/**"] },
   js.configs.recommended,
   {
     // FIX 1: Added .mjs extension so your backup and check scripts are parsed correctly
@@ -26,13 +26,13 @@ export default [
       ...react.configs.recommended.rules,
       ...reactHooks.configs.recommended.rules,
       ...jsxA11y.configs.recommended.rules,
-      "react/react-in-jsx-scope": "off", 
-      "react/prop-types": "off", 
+      "react/react-in-jsx-scope": "off",
+      "react/prop-types": "off",
       "no-unused-vars": ["warn", { argsIgnorePattern: "^_", varsIgnorePattern: "^_" }],
-      
+
       // FIX 2: Changes empty blocks from crashing errors to warnings
-      "no-empty": ["warn", { "allowEmptyCatch": true }],
-      
+      "no-empty": ["warn", { allowEmptyCatch: true }],
+
       "react-hooks/set-state-in-effect": "off",
     },
   },

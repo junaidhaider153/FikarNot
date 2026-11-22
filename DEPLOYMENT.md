@@ -1,81 +1,51 @@
-# FikarNot Production Deployment Notes
+# Deployment — Vercel + Supabase
 
-## Required environment
+> Your Supabase project is **live**. Follow the order below and take a backup first.
 
-Set these on the server, never in the frontend bundle:
+## 0. Before you start
 
-- `NODE_ENV=production`
-- `FIKARNOT_API_PORT`
-- `FIKARNOT_FRONTEND_ORIGIN`
-- `FIKARNOT_APP_URL`
-- `SITE_URL`
-- `GMAIL_OAUTH_CLIENT_ID`
-- `GMAIL_OAUTH_CLIENT_SECRET`
-- `GMAIL_OAUTH_REFRESH_TOKEN`
-- `GMAIL_SENDER_EMAIL`
-- `FIKARNOT_DATA_DIR`
-- `FIKARNOT_SEED_DEMO_DATA=0`
-- `FIKARNOT_ENABLE_MOCK_PAYMENTS=0`
-- `FIKARNOT_EXPOSE_RESET_LINKS=0`
+- Supabase Dashboard → Database → **Backups** (or `pg_dump`) — take a manual backup.
+- Install the Supabase CLI and run `supabase login` and `supabase link --project-ref <ref>`.
 
-Run `npm run check:production` before starting a production deployment.
+## 1. Database (one time, in this order)
 
-## Email
+1. Confirm which migrations the live project already has: `supabase migration list`. `0001`–`0003` should be applied (the project was seeded). If the CLI shows them as not applied, mark them applied with `supabase migration repair --status applied 0001 0002 0003` instead of re-running them.
+2. `supabase db push` → applies **0004** (RLS lockdown) and **0005** (checkout hardening). Both are idempotent and add constraints as `NOT VALID`, so existing rows can never block them.
+3. Prove the lockdown:
+   ```bash
+   VITE_SUPABASE_URL=https://<ref>.supabase.co VITE_SUPABASE_ANON_KEY=<publishable key> npm run verify:rls
+   ```
+   Every line must say `PASS`. Dashboard → Advisors → Security should show no "RLS disabled" warnings.
+4. Admin account: follow the steps at the top of `supabase/maintenance/promote_admin.sql`, then run `remove_seeded_demo_users.sql`.
 
-Transactional email (verification, password reset, order confirmation/status, return status) is sent via the **Gmail REST API over HTTPS (port 443)**, not SMTP — this avoids relying on outbound SMTP ports, which some hosts (including Railway) restrict or don't guarantee. See `.env.example` for the one-time Google Cloud setup, and run `node scripts/get-gmail-refresh-token.mjs` once to obtain `GMAIL_OAUTH_REFRESH_TOKEN`. If the four `GMAIL_OAUTH_*`/`GMAIL_SENDER_EMAIL` variables are not set, the API logs email content instead of sending (non-production only) — sending is required in production.
-
-## Database
-
-Persist `server/data` on a durable volume. Before migrations or risky maintenance, run:
-
-```powershell
-npm run db:backup
-```
-
-A backup is written to `FIKARNOT_BACKUP_DIR` when set, otherwise to `server/data/backups`.
-
-## Images
-
-Uploaded product images are stored under the configured data directory. The uploads directory must be on persistent storage in production.
-
-## Reverse proxy
-
-Terminate TLS at the reverse proxy/load balancer and forward API traffic to the Node process. Configure the frontend origin explicitly and preserve `X-Forwarded-For` only when the proxy is trusted; set `FIKARNOT_TRUST_PROXY=1` only when the deployment is behind a trusted proxy.
-
-## Health check
-
-Use `GET /api/health` for service health checks. A non-200 response should be treated as unhealthy.
-
-## Docker Compose
-
-For a single-host deployment, copy `deploy/.env.production.example` to `.env`, replace the placeholder secrets, and run:
+## 2. Edge Functions
 
 ```bash
-docker compose up -d --build
+cp supabase/functions/.env.example supabase/functions/.env   # fill in, never commit
+supabase secrets set --env-file supabase/functions/.env
+supabase functions deploy          # uses supabase/config.toml (verify_jwt = false)
 ```
 
-The web container is exposed on port `8080` and proxies `/api` and `/uploads` to the API container. The SPA history fallback is handled by Nginx, so direct routes such as `/product/p6` continue to work after refresh.
+Set `ALLOWED_ORIGINS` to every origin that serves the site. Email: see `docs/EMAIL_SETUP.md`.
 
-The SQLite database and uploads are stored in the named `fikarnot_data` volume. Back up that volume/database before upgrades or risky maintenance.
+## 3. Storage buckets
 
+Dashboard → Storage: `payment-proofs` must be **private** (migration 0004 enforces this if it exists). Product/site images use the public bucket(s) already configured.
 
-## Operations hardening
+## 4. Vercel
 
-Before launch, enable TOTP 2FA for every admin/editor account from **Admin -> Settings -> Staff security**.
+Environment variables (Production + Preview): `VITE_SUPABASE_URL`, `VITE_SUPABASE_ANON_KEY`, `SITE_URL`. Leave the `VITE_ENABLE_*` flags unset.
+`vercel.json` no longer proxies to Railway; it sends security headers and an SPA fallback.
+The production build generates `sitemap.xml` and prerendered product pages from the live `catalog` function and **fails** (instead of publishing demo SEO data) if `VITE_SUPABASE_URL` is missing.
 
-Configure `FIKARNOT_ERROR_WEBHOOK_URL` to an internal/approved error intake endpoint if centralized error alerts are required. The API sends only operational error metadata and omits stack traces in production.
+## 5. Smoke test (do it on the live site)
 
-Run `npm run db:backup` on the persistent API host and upload the generated SQLite file to durable off-box storage. `FIKARNOT_BACKUP_UPLOAD_URL` can be used with a private authenticated storage gateway that accepts a PUT upload; do not expose that endpoint publicly.
+1. Guest: add a product → checkout → only **Cash on Delivery** is offered → order placed, confirmation email arrives.
+2. Signed-in customer: bank transfer → upload payment slip → admin sees it (5-minute signed link) → confirm → "payment confirmed" email.
+3. Admin: change order status, add tracking (email), cancel an order (stock returns), open `/invoice/<id>`.
+4. Enrol TOTP on the admin account, sign out/in, confirm the admin area works. Only then set `STAFF_MFA_REQUIRED=1`.
+5. `supabase functions logs orders` — no unexpected errors.
 
-Run `npm run db:restore /path/to/backup.sqlite` as a documented restore drill on a maintenance instance before launch.
+## Rollback
 
-Run `npm run ops:healthcheck https://api.example.com/healthz` from an external scheduler/monitor every 5 minutes.
-
-
-## Monitoring and scheduled backups
-
-The Docker Compose stack now includes a persistent `backup` service that runs `npm run db:backup:schedule` every 24 hours. Configure `FIKARNOT_BACKUP_UPLOAD_URL` and its token to copy each backup to private off-box storage. Keep the upload endpoint private and rotate its token.
-
-GitHub Actions can also check `/healthz` every five minutes. Add the public API health URL as the repository secret `FIKARNOT_HEALTHCHECK_URL`.
-
-Before launch, perform one restore drill with `npm run db:restore /path/to/backup.sqlite` on a maintenance instance. Do not restore over a live production database without a maintenance plan.
+Edge Functions: redeploy the previous commit. Migrations 0004/0005 are additive; to undo 0004 grant privileges back **only** if you intend to expose the tables (you should not).
