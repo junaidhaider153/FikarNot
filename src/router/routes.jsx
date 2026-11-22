@@ -19,6 +19,7 @@ import StoreInfoPage from "../pages/StoreInfoPage";
 import PaymentResultPage from "../pages/PaymentResultPage";
 import InvoicePage from "../pages/InvoicePage";
 import OrderTrackingPage from "../pages/OrderTrackingPage";
+import PackingSlipPage from "../pages/PackingSlipPage";
 import NotFoundPage from "../pages/NotFoundPage";
 import { STAFF_ROLES, ADMIN_ROLES } from "../config/appConfig";
 import { ProtectedRoute } from "./ProtectedRoute";
@@ -123,6 +124,14 @@ export function AppRoutes() {
       <Route path="/admin/media" element={<AdminRoute tab="media" roles={ADMIN_ROLES} />} />
       <Route path="/admin/users" element={<AdminRoute tab="users" roles={ADMIN_ROLES} />} />
       <Route path="/admin/settings" element={<AdminRoute tab="settings" roles={ADMIN_ROLES} />} />
+      <Route
+        path="/admin/orders/:orderId/packing-slip"
+        element={
+          <ProtectedRoute roles={STAFF_ROLES}>
+            <PackingSlipPage />
+          </ProtectedRoute>
+        }
+      />
 
       <Route
         path="/invoice/:orderId"

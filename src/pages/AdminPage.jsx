@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { FEATURES } from "../config/appConfig";
-import { NavLink, useNavigate, useSearchParams } from "react-router-dom";
+import { Link, NavLink, useNavigate, useSearchParams } from "react-router-dom";
 import {
   ResponsiveContainer,
   BarChart,
@@ -1325,6 +1325,14 @@ function ShipmentManager({ order }) {
             WhatsApp
           </a>
         )}
+        <Link
+          className="btn btn-ghost btn-sm"
+          to={`/admin/orders/${encodeURIComponent(order.id)}/packing-slip`}
+          target="_blank"
+          rel="noreferrer"
+        >
+          Packing slip ↗
+        </Link>
         <button className="btn btn-dark btn-sm" type="button" onClick={() => setOpen((current) => !current)} aria-expanded={open}>
           {open ? "Close" : order.trackingNumber ? "Update shipment" : "Create shipment"}
         </button>
@@ -1564,16 +1572,27 @@ export function OrdersTab() {
                   <ShipmentManager order={o} />
                 </td>
                 <td className="u-right">
-                  <button
-                    className="icon-btn"
-                    aria-label={`Delete order ${o.id}`}
-                    title="Delete order"
-                    onClick={() => {
-                      if (window.confirm(`Permanently delete order ${o.id}? This cannot be undone.`)) appActions.deleteOrder(o.id);
-                    }}
-                  >
-                    <Ic n="trash" s={14} />
-                  </button>
+                  <div style={{ display: "flex", gap: 6, justifyContent: "flex-end", alignItems: "center" }}>
+                    <Link
+                      className="btn btn-ghost btn-sm"
+                      to={`/admin/orders/${encodeURIComponent(o.id)}/packing-slip`}
+                      target="_blank"
+                      rel="noreferrer"
+                      title="Print packing slip & shipping label"
+                    >
+                      Slip ↗
+                    </Link>
+                    <button
+                      className="icon-btn"
+                      aria-label={`Delete order ${o.id}`}
+                      title="Delete order"
+                      onClick={() => {
+                        if (window.confirm(`Permanently delete order ${o.id}? This cannot be undone.`)) appActions.deleteOrder(o.id);
+                      }}
+                    >
+                      <Ic n="trash" s={14} />
+                    </button>
+                  </div>
                 </td>
               </tr>
             ))}
