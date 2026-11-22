@@ -33,7 +33,7 @@ export const authApi = {
   },
 
   async login(email, password, totp = "") {
-    const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+    const { data: _data, error } = await supabase.auth.signInWithPassword({ email, password });
     if (error) {
       // Supabase returns a generic AMR/factor error when the account has a
       // TOTP factor enrolled and no `totp` code was supplied yet.
@@ -153,19 +153,29 @@ export const authApi = {
   async twoFactorStatus() {
     const { data, error } = await supabase.auth.mfa.listFactors();
     if (error) throw mapAuthError(error);
-    return { enabled: (data?.totp || []).length > 0, required: false };
+    const verified = (data?.totp || []).filter((f) => f.status === "verified" || !f.status);
+    return { enabled: verified.length > 0, factors: verified, required: false };
   },
 
   async twoFactorSetup() {
+    const { data: list } = await supabase.auth.mfa.listFactors();
+    for (const factor of list?.totp || []) {
+      if (factor.status === "unverified") {
+        await supabase.auth.mfa.unenroll({ factorId: factor.id }).catch(() => {});
+      }
+    }
     const { data, error } = await supabase.auth.mfa.enroll({ factorType: "totp" });
     if (error) throw mapAuthError(error);
     return { secret: data.totp.secret, otpauthUrl: data.totp.uri, factorId: data.id };
   },
 
-  async twoFactorEnable(_currentPassword, factorIdOrSecret, code) {
-    // AdminPage passes the value returned as `secret` from twoFactorSetup —
-    // that call now also returns `factorId`, which is what MFA verify needs.
-    const factorId = factorIdOrSecret;
+  async twoFactorEnable(factorIdOrPassword, factorIdOrCode, maybeCode) {
+    let factorId = factorIdOrPassword;
+    let code = factorIdOrCode;
+    if (maybeCode !== undefined) {
+      factorId = factorIdOrCode;
+      code = maybeCode;
+    }
     const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId });
     if (challengeError) throw mapAuthError(challengeError);
     const { error } = await supabase.auth.mfa.verify({ factorId, challengeId: challenge.id, code });
@@ -175,11 +185,26 @@ export const authApi = {
 
   async twoFactorDisable() {
     const { data } = await supabase.auth.mfa.listFactors();
-    const factor = data?.totp?.[0];
-    if (factor) {
+    for (const factor of data?.totp || []) {
       const { error } = await supabase.auth.mfa.unenroll({ factorId: factor.id });
       if (error) throw mapAuthError(error);
     }
     return { enabled: false };
+  },
+
+  mfaStatus() {
+    return authApi.twoFactorStatus();
+  },
+
+  mfaEnroll() {
+    return authApi.twoFactorSetup();
+  },
+
+  mfaVerify(factorId, code) {
+    return authApi.twoFactorEnable(factorId, code);
+  },
+
+  mfaUnenroll() {
+    return authApi.twoFactorDisable();
   },
 };

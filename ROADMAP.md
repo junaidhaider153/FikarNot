@@ -39,7 +39,7 @@ Legend: ✅ done in this package · 🔧 you must do it (needs your accounts/das
 - ✅ Port AI chat (Gemini) to a new `chat` function (reference: `legacy/server/lib/gemini.js`), connected ChatWidget, enabled `VITE_ENABLE_AI_CHAT=true`
 - ✅ Hero video upload via Supabase Storage signed upload URLs
 - ⬜ PayFast (only if you actually need card payments in Pakistan)
-- ⬜ Customer-side 2FA enrollment screen (admin has one)
+- ✅ Customer-side 2FA enrollment screen (shared TwoFactorSection in Account & Admin)
 
 ## Phase 3 — Tests & cleanup
 

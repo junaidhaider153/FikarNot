@@ -25,9 +25,9 @@ import { prepareImageFile, MAX_IMAGE_BYTES } from "../utils/imageUpload";
 import { uploadsApi } from "../api/uploadsApi";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
 import { siteApi } from "../api/siteApi";
-import { authApi } from "../api/authApi";
 import { mediaApi } from "../api/mediaApi";
 import { usePagination } from "../hooks/usePagination";
+import { TwoFactorSection } from "../components/TwoFactorSection";
 import { RETURN_STATUSES } from "../utils/returns";
 import { AnalyticsTab } from "../components/admin/AnalyticsTab";
 
@@ -1949,130 +1949,6 @@ function MediaTab() {
   );
 }
 
-function TwoFactorSection() {
-  const [status, setStatus] = useState(null);
-  const [password, setPassword] = useState("");
-  const [code, setCode] = useState("");
-  const [secret, setSecret] = useState("");
-  const [factorId, setFactorId] = useState("");
-  const [otpauthUrl, setOtpauthUrl] = useState("");
-  const [busy, setBusy] = useState(false);
-  useEffect(() => {
-    authApi
-      .twoFactorStatus()
-      .then(setStatus)
-      .catch(() => {});
-  }, []);
-  const setup = async () => {
-    setBusy(true);
-    try {
-      const result = await authApi.twoFactorSetup(password);
-      setSecret(result.secret);
-      setFactorId(result.factorId);
-      setOtpauthUrl(result.otpauthUrl);
-      appActions.toast("Authenticator secret generated. Add it to your authenticator app.");
-    } catch (e) {
-      appActions.toast(e.message || "Could not start 2FA setup", "err");
-    } finally {
-      setBusy(false);
-    }
-  };
-  const enable = async () => {
-    setBusy(true);
-    try {
-      await authApi.twoFactorEnable(password, factorId, code);
-      setStatus({ enabled: true, required: true });
-      setPassword("");
-      setCode("");
-      setSecret("");
-      setFactorId("");
-      setOtpauthUrl("");
-      appActions.toast("Two-factor authentication enabled");
-    } catch (e) {
-      appActions.toast(e.message || "Could not enable 2FA", "err");
-    } finally {
-      setBusy(false);
-    }
-  };
-  const disable = async () => {
-    setBusy(true);
-    try {
-      await authApi.twoFactorDisable(password, code);
-      setStatus({ enabled: false, required: true });
-      setPassword("");
-      setCode("");
-      appActions.toast("Two-factor authentication disabled");
-    } catch (e) {
-      appActions.toast(e.message || "Could not disable 2FA", "err");
-    } finally {
-      setBusy(false);
-    }
-  };
-  if (!status) return <SkelForm rows={2} />;
-  return (
-    <div className="twofactor-section">
-      <h4 className="display twofactor-title">Two-factor authentication</h4>
-      <p className="field-hint">
-        Protect this staff account with a 6-digit code from Google Authenticator, Microsoft Authenticator, 1Password, or another TOTP app.
-      </p>
-      <div className={`free-note twofactor-status${status.enabled ? " is-on" : ""}`}>
-        {status.enabled ? "2FA is enabled for this staff account." : "2FA is not enabled. Enabling it is strongly recommended."}
-      </div>
-      <div className="f-grid">
-        <div>
-          <label className="lbl" htmlFor="twofactor-password">
-            Current password
-          </label>
-          <input
-            id="twofactor-password"
-            className="input"
-            type="password"
-            autoComplete="current-password"
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-          />
-        </div>
-        <div>
-          <label className="lbl" htmlFor="twofactor-code">
-            Authenticator code
-          </label>
-          <input
-            id="twofactor-code"
-            className="input"
-            inputMode="numeric"
-            maxLength={6}
-            value={code}
-            onChange={(e) => setCode(e.target.value.replace(/\D/g, "").slice(0, 6))}
-            placeholder="123456"
-          />
-        </div>
-      </div>
-      {!status.enabled && !secret && (
-        <button type="button" className="btn btn-ghost btn-sm" disabled={busy || !password} onClick={setup}>
-          Generate setup secret
-        </button>
-      )}
-      {secret && (
-        <div className="panel twofactor-secret">
-          <strong>Setup secret</strong>
-          <p className="twofactor-code-text">{secret}</p>
-          <p className="field-hint">
-            Manual setup URI: <code className="twofactor-code-text">{otpauthUrl}</code>
-          </p>
-          <button type="button" className="btn btn-dark btn-sm" disabled={busy || code.length !== 6} onClick={enable}>
-            Verify and enable 2FA
-          </button>
-        </div>
-      )}
-      {status.enabled && (
-        <button type="button" className="btn btn-danger btn-sm" disabled={busy || !password || code.length !== 6} onClick={disable}>
-          Disable 2FA
-        </button>
-      )}
-    </div>
-  );
-}
-
 function SettingsTab() {
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
@@ -2807,7 +2683,7 @@ export default function AdminPage({ tab }) {
         {tab === "returns" && <ReturnsTab />}
         {tab === "security" && (
           <div className="panel">
-            <TwoFactorSection />
+            <TwoFactorSection isStaff={true} />
           </div>
         )}
         {tab === "media" && s.session.role === "admin" && <MediaTab />}

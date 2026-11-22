@@ -7,6 +7,7 @@ import { RETURN_REASONS, canCancelOrder, canRequestReturn } from "../utils/retur
 import { ProductCard } from "../components/ProductCard";
 import { Ic } from "../components/icons";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
+import { TwoFactorSection } from "../components/TwoFactorSection";
 
 const emptyAddress = { id: "", label: "Home", name: "", line1: "", city: "", region: "", postalCode: "", country: "", isDefault: false };
 
@@ -764,6 +765,9 @@ export default function AccountPage() {
                   </button>
                 </div>
               </form>
+            </section>
+            <section className="account-card">
+              <TwoFactorSection />
             </section>
             {user.role === "customer" && (
               <section className="account-card account-danger-zone">
