@@ -71,6 +71,9 @@ const ROUTES = [
   [/^\/api\/site-settings$/, "admin", () => "/site-settings"],
   [/^\/api\/audit-logs(\?.*)?$/, "admin", (m) => `/audit-logs${m[1] || ""}`],
   [/^\/api\/engagement$/, "admin", () => "/engagement"],
+
+  // ---- chat assistant (Gemini) --------------------------------------------
+  [/^\/api\/chat$/, "chat", () => "/"],
 ];
 
 // Old routes that were either one-time migration tools (not needed — we
@@ -82,7 +85,6 @@ const KNOWN_UNSUPPORTED = {
   "/api/engagement/migrate": "One-time data migration tool — no longer needed, your data is already in Supabase.",
   "/api/media/cleanup": "Bulk media cleanup hasn't been ported yet.",
   "/api/uploads/video": "Video upload hasn't been ported yet (only images are supported so far).",
-  "/api/chat": "The AI chat assistant hasn't been ported yet.",
   "/api/payments/payfast/session": "Online/card payments (PayFast) aren't wired up yet — only COD and manual transfer work right now.",
 };
 

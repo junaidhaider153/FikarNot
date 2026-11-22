@@ -36,7 +36,7 @@ Legend: ✅ done in this package · 🔧 you must do it (needs your accounts/das
 ## Phase 2 — Features hidden behind flags
 
 - ✅ PayFast, AI chat, hero-video upload hidden by `FEATURES`
-- ⬜ Port AI chat (Gemini) to a new `chat` function (reference: `legacy/server/lib/gemini.js`), then set `VITE_ENABLE_AI_CHAT=true`
+- ✅ Port AI chat (Gemini) to a new `chat` function (reference: `legacy/server/lib/gemini.js`), connected ChatWidget, enabled `VITE_ENABLE_AI_CHAT=true`
 - ⬜ Hero video upload via Supabase Storage signed upload URLs
 - ⬜ PayFast (only if you actually need card payments in Pakistan)
 - ⬜ Customer-side 2FA enrollment screen (admin has one)

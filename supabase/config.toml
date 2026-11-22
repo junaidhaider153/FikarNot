@@ -26,3 +26,6 @@ verify_jwt = false
 
 [functions.storage]
 verify_jwt = false
+
+[functions.chat]
+verify_jwt = false

@@ -35,8 +35,13 @@ describe("apiRequest routing", () => {
     expect(fetchMock.mock.calls[0][1].headers.Authorization).toBe("Bearer tok");
   });
 
+  it("routes /api/chat to the chat function", async () => {
+    await apiRequest("/api/chat", { method: "POST", body: JSON.stringify({ message: "Hello" }) });
+    expect(urlOf()).toMatch(/\/functions\/v1\/chat\/?$/);
+  });
+
   it("fails fast with 501 for features that are not ported", async () => {
-    await expect(apiRequest("/api/chat")).rejects.toMatchObject({ status: 501, code: "NOT_YET_MIGRATED" });
+    await expect(apiRequest("/api/uploads/video")).rejects.toMatchObject({ status: 501, code: "NOT_YET_MIGRATED" });
     await expect(apiRequest("/api/payments/payfast/session")).rejects.toMatchObject({ status: 501 });
   });
 
