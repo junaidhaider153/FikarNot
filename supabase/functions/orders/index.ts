@@ -26,6 +26,7 @@ import { queueEmail } from "../_shared/email.ts";
 import { orderConfirmation, trackingAdded } from "../_shared/emailTemplates.ts";
 import { validateJson, z } from "../_shared/validate.ts";
 import { parseRpcError } from "../_shared/rpc.ts";
+import { validateStatusTransition } from "../_shared/orderLifecycle.ts";
 
 void corsHeaders; // re-exported for symmetry with other functions
 
@@ -86,7 +87,7 @@ const fulfilmentSchema = z.object({
   shipmentStatus: z.string().trim().max(40).optional(),
 });
 
-const STATUS_RANK: Record<string, number> = { pending_payment: 0, paid: 1, processing: 1, shipped: 2, delivered: 3 };
+const STATUS_RANK: Record<string, number> = { pending_payment: 0, paid: 1, processing: 2, shipped: 3, delivered: 4 };
 const RPC_STATUS: Record<string, number> = {
   LOGIN_REQUIRED: 401,
   INVALID_PAYMENT_METHOD: 400,
@@ -494,9 +495,11 @@ Deno.serve(async (req) => {
       const status = val.data.status;
       const { data: previous } = await admin.from("orders").select("*").eq("id", id).maybeSingle();
       if (!previous) return json(req, { error: "ORDER_NOT_FOUND", message: "Order not found." }, 404);
+      const transitionCheck = validateStatusTransition(previous.status, status, isAdmin(caller));
+      if (!transitionCheck.allowed) {
+        return json(req, { error: transitionCheck.code!, message: transitionCheck.message! }, transitionCheck.status!);
+      }
       if (previous.status === status) return json(req, { ok: true, orderId: id, status });
-      if (previous.status === "cancelled")
-        return json(req, { error: "INVALID_STATUS_TRANSITION", message: "A cancelled order cannot be moved back into fulfilment." }, 409);
 
       if (status === "cancelled") {
         const { error: cancelError } = await admin.rpc("cancel_order", {
@@ -510,14 +513,6 @@ Deno.serve(async (req) => {
           throw cancelError;
         }
       } else {
-        // Editors may only move an order forward; admins may correct mistakes.
-        if (!isAdmin(caller) && STATUS_RANK[status] < STATUS_RANK[previous.status]) {
-          return json(
-            req,
-            { error: "INVALID_STATUS_TRANSITION", message: "Only an admin can move an order back to an earlier status." },
-            403,
-          );
-        }
         const now = new Date().toISOString();
         const patch: Record<string, unknown> = { status, updated_at: now };
         if (status === "shipped" && !previous.shipped_at) patch.shipped_at = now;

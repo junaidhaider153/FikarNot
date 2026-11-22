@@ -6,7 +6,13 @@ import { clientIp, json } from "./http.ts";
 
 /** Returns a 429 Response when the limit is exceeded, otherwise null. */
 // deno-lint-ignore no-explicit-any
-export async function limit(req: Request, bucket: string, max: number, windowSeconds: number, client: any = admin): Promise<Response | null> {
+export async function limit(
+  req: Request,
+  bucket: string,
+  max: number,
+  windowSeconds: number,
+  client: any = admin,
+): Promise<Response | null> {
   try {
     const { data, error } = await client.rpc("rate_limit_hit", {
       p_key: `${bucket}:${clientIp(req)}`,

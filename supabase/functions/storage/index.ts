@@ -17,6 +17,7 @@ import { getCaller, isStaff } from "../_shared/auth.ts";
 import { queueEmail } from "../_shared/email.ts";
 import { paymentConfirmed } from "../_shared/emailTemplates.ts";
 import { validateJson, z } from "../_shared/validate.ts";
+import { validateConfirmPayment, validatePaymentProofUpload } from "../_shared/orderLifecycle.ts";
 
 const uploadImageSchema = z.object({
   dataUrl: z.string().min(1, "Image data URL is required."),
@@ -209,12 +210,9 @@ Deno.serve(async (req) => {
       const caller = await getCaller(req);
       const { data: order } = await admin.from("orders").select("*").eq("id", orderId).maybeSingle();
       if (!order) return json(req, { error: "ORDER_NOT_FOUND", message: "Order not found." }, 404);
-      if (!["jazzcash", "easypaisa", "bank_transfer"].includes(order.payment_method) || order.payment_status !== "pending") {
-        return json(
-          req,
-          { error: "PAYMENT_PROOF_NOT_ALLOWED", message: "A payment slip is only accepted for a pending manual payment." },
-          409,
-        );
+      const proofCheck = validatePaymentProofUpload(order);
+      if (!proofCheck.allowed) {
+        return json(req, { error: proofCheck.code!, message: proofCheck.message! }, proofCheck.status!);
       }
       if (!caller || caller.id !== order.user_id)
         return json(req, { error: "FORBIDDEN", message: "This order cannot accept a payment slip from this account." }, 403);
@@ -306,9 +304,10 @@ Deno.serve(async (req) => {
       const body = val.data;
       const { data: order } = await admin.from("orders").select("*").eq("id", orderId).maybeSingle();
       if (!order) return json(req, { error: "ORDER_NOT_FOUND", message: "Order not found." }, 404);
-      if (!["jazzcash", "easypaisa", "bank_transfer"].includes(order.payment_method))
-        return json(req, { error: "INVALID_MANUAL_PAYMENT", message: "Only manual payment orders can be confirmed here." }, 400);
-      if (order.payment_status === "paid") return json(req, { ok: true, alreadyConfirmed: true });
+      const confirmCheck = validateConfirmPayment(order);
+      if (!confirmCheck.allowed) {
+        return json(req, { error: confirmCheck.code!, message: confirmCheck.message! }, confirmCheck.status!);
+      }
       const { data: proof } = await admin.from("payment_proofs").select("id").eq("order_id", orderId).maybeSingle();
       if (!proof && body.requireProof !== false)
         return json(req, { error: "PAYMENT_PROOF_REQUIRED", message: "Review the payment slip before confirming this payment." }, 409);

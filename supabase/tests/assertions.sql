@@ -82,6 +82,33 @@ begin
     raise exception 'FAIL: cancel_order did not set status to cancelled';
   end if;
 
+  -- 9b. Cannot cancel an already cancelled order (ORDER_NOT_CANCELLABLE)
+  begin
+    perform public.cancel_order(r->>'orderId', u, 'Double cancel');
+    raise exception 'FAIL: cancel_order allowed double cancel';
+  exception when others then
+    get stacked diagnostics msg = message_text;
+    if msg not like 'ORDER_NOT_CANCELLABLE|%' then
+      raise exception 'FAIL: wrong error on double cancel %', msg;
+    end if;
+  end;
+  if (select status from public.orders where id = r->>'orderId') <> 'cancelled' then
+    raise exception 'FAIL: cancelled order status was altered';
+  end if;
+
+  -- 9c. Cannot cancel a delivered order (ORDER_NOT_CANCELLABLE)
+  r := public.create_order(u, cust, '[{"productId":"p3","qty":1}]', null, cfg);
+  update public.orders set status = 'delivered', payment_status = 'paid' where id = r->>'orderId';
+  begin
+    perform public.cancel_order(r->>'orderId', u, 'Cancel delivered');
+    raise exception 'FAIL: cancel_order allowed cancelling delivered order';
+  exception when others then
+    get stacked diagnostics msg = message_text;
+    if msg not like 'ORDER_NOT_CANCELLABLE|%' then
+      raise exception 'FAIL: wrong error on cancelling delivered order %', msg;
+    end if;
+  end;
+
   -- 10. COD order collection: payments row and status
   r := public.create_order(u, cust, '[{"productId":"p3","qty":1}]', null, cfg);
   if (select status || '/' || payment_status from public.orders where id = r->>'orderId') <> 'processing/unpaid' then

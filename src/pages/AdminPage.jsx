@@ -1476,10 +1476,10 @@ export function OrdersTab() {
                     onChange={(e) => appActions.setOrderStatus(o.id, e.target.value)}
                   >
                     <option>pending_payment</option>
-                    <option>paid</option>
-                    <option>processing</option>
-                    <option>shipped</option>
-                    <option>delivered</option>
+                    <option disabled={o.status === "pending_payment"}>paid</option>
+                    <option disabled={o.status === "pending_payment"}>processing</option>
+                    <option disabled={o.status === "pending_payment"}>shipped</option>
+                    <option disabled={o.status === "pending_payment"}>delivered</option>
                     <option>cancelled</option>
                   </select>
                 </td>
