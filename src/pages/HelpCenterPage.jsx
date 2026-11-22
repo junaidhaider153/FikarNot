@@ -14,7 +14,10 @@ const FAQS = [
     "Can I cancel my order?",
     "For this personal project, order status is managed from the Studio. The customer-facing cancellation flow is intentionally simple for now.",
   ],
-  ["How do I track my order?", "Open My Account → Orders and select an order to see its current status timeline."],
+  [
+    "How do I track my order?",
+    "Visit our Track Order page (/track) and enter your Order ID with your mobile phone number or email, or sign in and open My Account → Orders to view live dispatch and courier tracking.",
+  ],
   [
     "Can I save products for later?",
     "Yes. Sign in and use the heart button on product cards or product detail pages to add products to your wishlist.",

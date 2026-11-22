@@ -21,7 +21,7 @@ function StatusPill({ status }) {
   return <span className={`account-status ${status}`}>{label}</span>;
 }
 
-function OrderProgress({ status, order }) {
+export function OrderProgress({ status, order }) {
   if (status === "cancelled") {
     return (
       <div className="order-progress cancelled-progress">

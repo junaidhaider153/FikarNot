@@ -88,6 +88,11 @@ const orderStatusSchema = z.object({
   }),
 });
 
+export const orderLookupSchema = z.object({
+  orderId: z.string().trim().min(3, "Order ID is required.").max(40),
+  contact: z.string().trim().min(3, "Phone number or email is required.").max(254),
+});
+
 const fulfilmentSchema = z.object({
   courier: z.string().trim().max(80).optional(),
   trackingNumber: z.string().trim().max(80).optional(),
@@ -258,6 +263,75 @@ export async function handleOrdersRequest(req: Request): Promise<Response> {
     // ---- GET /commerce-settings (public) ------------------------------------
     if (req.method === "GET" && path === "/commerce-settings") {
       return json(req, await getCommerceConfig());
+    }
+
+    // ---- POST /lookup (public, rate limited) --------------------------------
+    if (req.method === "POST" && path === "/lookup") {
+      const limited = await limit(req, "order_lookup", 10, 60);
+      if (limited) return limited;
+      const val = await validateJson(req, orderLookupSchema);
+      if (!val.success) return val.response;
+      const { orderId, contact } = val.data;
+
+      const normalizedId = orderId.toUpperCase();
+      const rawContact = contact.toLowerCase().trim();
+      const cleanContact = rawContact.replace(/[\s\-()]/g, "");
+
+      const { data: order } = await admin.from("orders").select("*").eq("id", normalizedId).maybeSingle();
+      if (!order) {
+        return json(
+          req,
+          { error: "NOT_FOUND", message: "No order found matching those details. Please check your Order ID and phone/email." },
+          404,
+        );
+      }
+
+      const orderEmail = (order.customer_email || "").toLowerCase().trim();
+      const orderPhone = (order.customer_phone || "").replace(/[\s\-()]/g, "");
+
+      const matchesEmail = orderEmail === rawContact;
+      const matchesPhone = Boolean(
+        orderPhone &&
+        cleanContact &&
+        (orderPhone.endsWith(cleanContact) ||
+          cleanContact.endsWith(orderPhone) ||
+          (orderPhone.length >= 7 && cleanContact.includes(orderPhone.slice(-7)))),
+      );
+
+      if (!matchesEmail && !matchesPhone) {
+        return json(
+          req,
+          { error: "NOT_FOUND", message: "No order found matching those details. Please check your Order ID and phone/email." },
+          404,
+        );
+      }
+
+      const items = await itemsOf(order.id);
+      return json(req, {
+        order: {
+          id: order.id,
+          status: order.status,
+          paymentStatus: order.payment_status || (order.status === "paid" ? "paid" : "pending"),
+          paymentMethod: order.payment_method,
+          total: Number(order.total),
+          subtotal: Number(order.subtotal),
+          shipping: Number(order.shipping),
+          discount: Number(order.discount),
+          currency: order.currency || "PKR",
+          createdAt: order.created_at,
+          courier: order.courier || "",
+          trackingNumber: order.tracking_number || "",
+          trackingUrl: order.tracking_url || "",
+          shipmentStatus: order.shipment_status || (order.tracking_number ? "shipped" : "not_created"),
+          customer: {
+            name: order.customer_name,
+            email: order.customer_email,
+            phone: order.customer_phone || "",
+            address: order.customer_address,
+          },
+          items,
+        },
+      });
     }
 
     // ---- Coupons (partly public) -------------------------------------------

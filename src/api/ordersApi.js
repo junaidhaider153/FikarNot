@@ -14,6 +14,11 @@ export const ordersApi = {
       method: "POST",
       body: JSON.stringify(payload),
     }),
+  lookup: (orderId, contact) =>
+    request("/api/orders/lookup", {
+      method: "POST",
+      body: JSON.stringify({ orderId, contact }),
+    }),
   invoice: (id) => request(`/api/orders/${encodeURIComponent(id)}/invoice`),
   cancel: (id) => request(`/api/orders/${encodeURIComponent(id)}/cancel`, { method: "POST" }),
   remove: (id) => request(`/api/orders/${encodeURIComponent(id)}`, { method: "DELETE" }),

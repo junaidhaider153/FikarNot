@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { checkoutSchema } from "../orders/index.ts";
+import { checkoutSchema, orderLookupSchema } from "../orders/index.ts";
 
 Deno.test("orders: checkoutSchema validates Pakistani mobile numbers", () => {
   const baseOrder = {
@@ -55,4 +55,30 @@ Deno.test("orders: checkoutSchema validates Pakistani mobile numbers", () => {
     });
     assertEquals(res.success, false, `Expected phone ${phone} to be rejected`);
   }
+});
+
+Deno.test("orders: orderLookupSchema validates orderId and contact", () => {
+  const valid = orderLookupSchema.safeParse({
+    orderId: "FN-1002",
+    contact: "0300 1234567",
+  });
+  assertEquals(valid.success, true);
+
+  const validEmail = orderLookupSchema.safeParse({
+    orderId: "FN-1002",
+    contact: "customer@example.com",
+  });
+  assertEquals(validEmail.success, true);
+
+  const missingId = orderLookupSchema.safeParse({
+    orderId: "",
+    contact: "0300 1234567",
+  });
+  assertEquals(missingId.success, false);
+
+  const missingContact = orderLookupSchema.safeParse({
+    orderId: "FN-1002",
+    contact: "",
+  });
+  assertEquals(missingContact.success, false);
 });

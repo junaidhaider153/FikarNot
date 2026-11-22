@@ -397,6 +397,7 @@ export function Footer() {
           </div>
           <div>
             <h4>Help</h4>
+            <Link to="/track">Track order</Link>
             <Link to="/help">Help Center</Link>
             <Link to="/shipping">Shipping</Link>
             <Link to="/returns">Returns</Link>
