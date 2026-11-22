@@ -630,13 +630,14 @@ export function CouponsTab() {
 
 export function DashboardTab() {
   const s = useApp();
-  const revenue = s.orders.reduce((t, o) => t + o.total, 0);
+  const paidOrders = s.orders.filter((o) => (o.payment_status === "paid" || o.paymentStatus === "paid") && o.status !== "cancelled");
+  const revenue = paidOrders.reduce((t, o) => t + Number(o.total || 0), 0);
   const revByCat = s.categories.map((c) => ({
     name: c.name,
-    revenue: +s.orders
-      .flatMap((o) => o.items)
+    revenue: +paidOrders
+      .flatMap((o) => o.items || [])
       .filter((i) => (s.products.find((p) => p.id === i.productId)?.categoryId || "") === c.id)
-      .reduce((t, i) => t + i.price * i.qty, 0)
+      .reduce((t, i) => t + Number(i.price || 0) * Number(i.qty || 0), 0)
       .toFixed(2),
   }));
   const byCat = s.categories
@@ -1475,7 +1476,7 @@ export function OrdersTab() {
                     aria-label={`Status for order ${o.id}`}
                     onChange={(e) => appActions.setOrderStatus(o.id, e.target.value)}
                   >
-                    <option>pending_payment</option>
+                    <option disabled={o.status === "shipped" || o.status === "delivered"}>pending_payment</option>
                     <option disabled={o.status === "pending_payment"}>paid</option>
                     <option disabled={o.status === "pending_payment"}>processing</option>
                     <option disabled={o.status === "pending_payment"}>shipped</option>

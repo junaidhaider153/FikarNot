@@ -39,6 +39,18 @@ Deno.test("orderLifecycle: validateStatusTransition blocks moving out of pending
   assertEquals(cancelRes.allowed, true);
 });
 
+Deno.test("orderLifecycle: validateStatusTransition blocks downgrading shipped or delivered to pending_payment", () => {
+  const shippedToPending = validateStatusTransition("shipped", "pending_payment", true);
+  assertEquals(shippedToPending.allowed, false);
+  assertEquals(shippedToPending.code, "INVALID_STATUS_TRANSITION");
+  assertEquals(shippedToPending.status, 409);
+
+  const deliveredToPending = validateStatusTransition("delivered", "pending_payment", true);
+  assertEquals(deliveredToPending.allowed, false);
+  assertEquals(deliveredToPending.code, "INVALID_STATUS_TRANSITION");
+  assertEquals(deliveredToPending.status, 409);
+});
+
 Deno.test("orderLifecycle: validateStatusTransition enforces forward-only progression for editors", () => {
   // Editor moving forward: allowed
   assertEquals(validateStatusTransition("paid", "processing", false).allowed, true);

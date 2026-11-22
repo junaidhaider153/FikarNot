@@ -20,7 +20,7 @@
     "verify": "npm run lint && npm run format:check && npm test && npm run build",
     "verify:rls": "node scripts/verify-rls.mjs",
     "functions:check": "deno check --config supabase/functions/deno.json supabase/functions/*/index.ts",
-    "functions:test": "deno test --allow-env --config supabase/functions/deno.json supabase/functions/tests"
+    "functions:test": "deno test --allow-env --env-file=supabase/functions/tests/test.env --config supabase/functions/deno.json supabase/functions/tests"
   },
   "dependencies": {
     "react": "^19.2.8",

@@ -42,7 +42,7 @@ jobs:
       - name: Type-check every Edge Function
         run: deno check --config supabase/functions/deno.json supabase/functions/*/index.ts
       - name: Test Edge Functions
-        run: deno test --allow-env --config supabase/functions/deno.json supabase/functions/tests
+        run: deno test --allow-env --env-file=supabase/functions/tests/test.env --config supabase/functions/deno.json supabase/functions/tests
 
   database:
     runs-on: ubuntu-latest
@@ -74,5 +74,6 @@ jobs:
           psql -v ON_ERROR_STOP=1 -q -d ci -f supabase/migrations/0005_checkout_hardening.sql
           psql -v ON_ERROR_STOP=1 -q -d ci -f supabase/migrations/0006_order_lifecycle.sql
           psql -v ON_ERROR_STOP=1 -q -d ci -f supabase/migrations/0007_atomic_return_restock.sql
+          psql -v ON_ERROR_STOP=1 -q -d ci -f supabase/migrations/0008_atomic_collect_cod.sql
       - name: Database assertions (RLS lockdown, checkout, coupons, cancel, rate limit)
         run: psql -v ON_ERROR_STOP=1 -d ci -f supabase/tests/assertions.sql

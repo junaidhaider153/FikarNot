@@ -91,6 +91,8 @@ const STATUS_RANK: Record<string, number> = { pending_payment: 0, paid: 1, proce
 const RPC_STATUS: Record<string, number> = {
   LOGIN_REQUIRED: 401,
   INVALID_PAYMENT_METHOD: 400,
+  INVALID_COD_ORDER: 400,
+  INVALID_ORDER_STATUS: 409,
   EMPTY_ORDER: 400,
   PRODUCT_NOT_FOUND: 409,
   INSUFFICIENT_STOCK: 409,
@@ -536,51 +538,25 @@ Deno.serve(async (req) => {
     if (req.method === "POST" && /^\/[^/]+\/collect-cod$/.test(path)) {
       if (!isStaff(caller)) return json(req, { error: "FORBIDDEN", message: "Staff permission required." }, 403);
       const id = decodeURIComponent(path.split("/")[1]);
-      const { data: order } = await admin.from("orders").select("*").eq("id", id).maybeSingle();
-      if (!order) return json(req, { error: "ORDER_NOT_FOUND", message: "Order not found." }, 404);
-      if (order.payment_method !== "cod")
-        return json(req, { error: "INVALID_COD_ORDER", message: "Only Cash on Delivery orders can be marked collected here." }, 400);
-      if (order.status === "cancelled")
-        return json(req, { error: "ORDER_CANCELLED", message: "Cannot collect payment for a cancelled order." }, 409);
 
-      const items = await itemsOf(id);
-      if (order.payment_status === "paid") {
-        return json(req, { ok: true, alreadyCollected: true, order: orderRow(order, items) });
-      }
-
-      const now = new Date().toISOString();
-      const { data: existingPayment } = await admin.from("payments").select("id").eq("order_id", id).eq("status", "paid").maybeSingle();
-
-      if (!existingPayment) {
-        await admin.from("payments").insert({
-          id: `pay-${crypto.randomUUID()}`,
-          order_id: id,
-          provider: "cod",
-          provider_payment_id: `cod-${id}`,
-          amount: Number(order.total),
-          currency: order.currency || "PKR",
-          status: "paid",
-          raw_status: "Collected by staff / courier",
-          created_at: now,
-          updated_at: now,
-        });
-      }
-
-      await admin
-        .from("orders")
-        .update({
-          payment_status: "paid",
-          updated_at: now,
-        })
-        .eq("id", id);
-
-      await audit(caller.id, "payment.cod_collected", id, {
-        total: Number(order.total),
-        currency: order.currency || "PKR",
+      const { data, error: rpcErr } = await admin.rpc("collect_cod", {
+        p_order_id: id,
+        p_actor: caller.id,
       });
 
+      if (rpcErr) {
+        const parsed = parseRpcError(rpcErr.message);
+        if (parsed) return json(req, { error: parsed.code, message: parsed.message }, RPC_STATUS[parsed.code] || 400);
+        throw rpcErr;
+      }
+
+      const items = await itemsOf(id);
       const { data: updatedOrder } = await admin.from("orders").select("*").eq("id", id).single();
-      return json(req, { ok: true, order: orderRow(updatedOrder, items) });
+      return json(req, {
+        ok: true,
+        alreadyCollected: Boolean(data?.alreadyCollected),
+        order: orderRow(updatedOrder, items),
+      });
     }
 
     // ---- POST /:id/fulfilment (staff) ----------------------------------------

@@ -29,7 +29,7 @@ Legend: ✅ done in this package · 🔧 you must do it (needs your accounts/das
 - ✅ Order confirmation / payment confirmed / tracking emails (Gmail API)
 - 🔧 Email setup: Google Cloud OAuth → refresh token → `supabase secrets set` (docs/EMAIL_SETUP.md)
 - 🔧 Supabase Auth → SMTP: Gmail App Password, port 465; confirm "Confirm email" is ON
-- ✅ Order lifecycle clean-up: explicit `pending_payment` order status (migration 0006); COD orders start as `processing`/`unpaid`; "COD collected" staff endpoint writes a `payments` row and enables COD refunds
+- ✅ Order lifecycle clean-up: explicit `pending_payment` order status (migration 0006); COD orders start as `processing`/`unpaid`; atomic `collect_cod` RPC (migration 0008) writes a `payments` row and enables COD refunds
 - ✅ Make return restocking atomic (RPC `complete_return` in migration 0007)
 - ✅ Zod request validation in every function (via `_shared/validate.ts`)
 

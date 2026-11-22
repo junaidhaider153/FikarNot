@@ -24,7 +24,7 @@ Authoritative context for Cursor / Copilot / Claude Code / Gemini working in thi
 6. **Guests may only use Cash on Delivery.** Bank transfer / JazzCash / Easypaisa require an account (payment slips are tied to the order owner).
 7. **No secrets in git or the browser.** Never put the service-role key, Gmail secrets or any password behind a `VITE_` name. `.env*` and `*.sqlite*` are git-ignored.
 8. **Unported features stay hidden** behind `FEATURES` in `src/config/appConfig.js` (`VITE_ENABLE_PAYFAST`, `VITE_ENABLE_AI_CHAT`, `VITE_ENABLE_VIDEO_UPLOAD`, default false). Enabling one requires the server side to exist first.
-9. **Migrations are additive and idempotent.** Never edit an applied migration (exception: 0003 was repaired because it could not run at all). Next number: `0008_`.
+9. **Migrations are additive and idempotent.** Never edit an applied migration (exception: 0003 was repaired because it could not run at all). Next number: `0009_`.
 10. **Keep `supabase/config.toml` in sync.** Every function needs `verify_jwt = false` (they authenticate internally; the new publishable keys are not JWTs).
 11. **Public endpoints must be rate limited** with `limit()` from `_shared/rateLimit.ts` ✅ and cap their input sizes.
 12. **Never return raw error messages** to clients; use `serverError()` ✅.
@@ -40,7 +40,7 @@ src/
   store/appStore.js    client state
 supabase/
   config.toml                 ✅ verify_jwt=false for all functions
-  migrations/                 0001–0007 ✅
+  migrations/                 0001–0008 ✅
   maintenance/                one-off admin SQL (not migrations)
   tests/                      assertions.sql (CI), checkout_smoke.sql, ci_stub.sql
   functions/

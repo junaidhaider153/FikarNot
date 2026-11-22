@@ -19,6 +19,8 @@ begin
   exception when insufficient_privilege then null; end;
   begin perform public.complete_return('ret-test', null); raise exception 'FAIL: anon could call complete_return';
   exception when insufficient_privilege then null; end;
+  begin perform public.collect_cod('test', null::text); raise exception 'FAIL: anon could call collect_cod';
+  exception when insufficient_privilege then null; end;
   reset role;
 
   -- 2. guest cannot use manual payment
@@ -66,7 +68,11 @@ begin
   if public.next_ticket_id() not like 'TKT-%' then raise exception 'FAIL: ticket id'; end if;
 
   -- 8. Order lifecycle (migration 0006): manual payment starts as pending_payment/pending
-  select id into u from auth.users where email = 'urwa@fikarnot.shop' limit 1;
+  insert into auth.users (id, email)
+  values ('00000000-0000-0000-0000-000000000099', 'assert-user@fikarnot.test')
+  on conflict (id) do nothing;
+  u := '00000000-0000-0000-0000-000000000099';
+
   r := public.create_order(u, jsonb_set(cust, '{paymentMethod}', '"bank_transfer"'), '[{"productId":"p3","qty":1}]', null, cfg);
   if (select status || '/' || payment_status from public.orders where id = r->>'orderId') <> 'pending_payment/pending' then
     raise exception 'FAIL: manual order status not pending_payment/pending';
@@ -109,19 +115,38 @@ begin
     end if;
   end;
 
-  -- 10. COD order collection: payments row and status
+  -- 10. collect_cod(): atomic collection on shipped or delivered order (migration 0008)
   r := public.create_order(u, cust, '[{"productId":"p3","qty":1}]', null, cfg);
   if (select status || '/' || payment_status from public.orders where id = r->>'orderId') <> 'processing/unpaid' then
     raise exception 'FAIL: COD order initial status';
   end if;
 
-  delete from public.payments where id = 'pay-assert-cod';
-  insert into public.payments (id, order_id, provider, provider_payment_id, amount, currency, status, raw_status)
-  values ('pay-assert-cod', r->>'orderId', 'cod', 'cod-' || (r->>'orderId'), 100, 'PKR', 'paid', 'Collected');
-  update public.orders set payment_status = 'paid' where id = r->>'orderId';
+  -- 10a. collect_cod rejects order while still in processing
+  begin
+    perform public.collect_cod(r->>'orderId', u::text, 'Collected too early');
+    raise exception 'FAIL: collect_cod allowed collecting order in processing status';
+  exception when others then
+    get stacked diagnostics msg = message_text;
+    if msg not like 'INVALID_ORDER_STATUS|%' then
+      raise exception 'FAIL: wrong error collecting processing order %', msg;
+    end if;
+  end;
 
-  if (select count(*) from public.payments where order_id = r->>'orderId' and status = 'paid') <> 1 then
+  -- 10b. Update to shipped -> collect_cod succeeds atomically
+  update public.orders set status = 'shipped' where id = r->>'orderId';
+  perform public.collect_cod(r->>'orderId', u::text, 'Collected by courier');
+
+  if (select payment_status from public.orders where id = r->>'orderId') <> 'paid' then
+    raise exception 'FAIL: collect_cod did not set payment_status to paid';
+  end if;
+  if (select count(*) from public.payments where order_id = r->>'orderId' and status = 'paid' and provider = 'cod') <> 1 then
     raise exception 'FAIL: payments row not found for collected COD';
+  end if;
+
+  -- 10c. Idempotency: second collect_cod on already paid order returns alreadyCollected
+  r := public.collect_cod(r->>'orderId', u::text, 'Collected again');
+  if (r->>'alreadyCollected')::boolean is not true then
+    raise exception 'FAIL: second collect_cod did not return alreadyCollected=true';
   end if;
 
   -- 11. CHECK constraint verifies pending_payment is valid and rejects unknown status

@@ -32,6 +32,14 @@ export function validateStatusTransition(previousStatus: string, targetStatus: s
       status: 409,
     };
   }
+  if ((previousStatus === "shipped" || previousStatus === "delivered") && targetStatus === "pending_payment") {
+    return {
+      allowed: false,
+      code: "INVALID_STATUS_TRANSITION",
+      message: "A shipped or delivered order cannot be moved back to pending_payment.",
+      status: 409,
+    };
+  }
   if (previousStatus === "pending_payment" && targetStatus !== "cancelled") {
     return {
       allowed: false,

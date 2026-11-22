@@ -3,7 +3,7 @@ const toTime = (value) => {
   return Number.isFinite(time) ? time : 0;
 };
 
-const isCancelled = (order) => order?.status === "cancelled";
+const isPaidOrder = (order) => (order?.payment_status === "paid" || order?.paymentStatus === "paid") && order?.status !== "cancelled";
 
 export function getAnalyticsRangeStart(range, now = Date.now()) {
   if (range === "all") return 0;
@@ -14,7 +14,7 @@ export function getAnalyticsRangeStart(range, now = Date.now()) {
 export function getAnalyticsData(state, range = "30", now = Date.now()) {
   const start = getAnalyticsRangeStart(range, now);
   const orders = (state.orders || []).filter((order) => toTime(order.createdAt) >= start);
-  const validOrders = orders.filter((order) => !isCancelled(order));
+  const validOrders = orders.filter(isPaidOrder);
   const revenue = validOrders.reduce((sum, order) => sum + Number(order.total || 0), 0);
   const unitsSold = validOrders.reduce(
     (sum, order) => sum + (order.items || []).reduce((itemSum, item) => itemSum + Number(item.qty || 0), 0),
