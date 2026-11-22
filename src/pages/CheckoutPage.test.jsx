@@ -38,6 +38,12 @@ vi.mock("../api/paymentsApi", () => ({
 describe("CheckoutPage components - Manual Payments & Proof Upload", () => {
   beforeEach(() => {
     vi.clearAllMocks();
+    useApp.mockReturnValue({
+      session: null,
+      siteSettings: {
+        whatsappNumber: "923709072688",
+      },
+    });
   });
 
   afterEach(() => {
@@ -95,6 +101,92 @@ describe("CheckoutPage components - Manual Payments & Proof Upload", () => {
       expect(screen.queryByRole("button", { name: /jazzcash/i })).toBeNull();
       expect(screen.queryByRole("button", { name: /easypaisa/i })).toBeNull();
       expect(screen.queryByRole("button", { name: /bank transfer/i })).toBeNull();
+    });
+  });
+
+  describe("Customer Phone & Checkout Validation", () => {
+    const dummyCart = [
+      {
+        p: { id: "prod-1", name: "Premium Shirt", price: 2500, images: ["/shirt.jpg"] },
+        qty: 1,
+      },
+    ];
+
+    it("renders phone input and rejects empty or invalid mobile phone format", async () => {
+      const { appActions } = await import("../store/appStore");
+      useApp.mockReturnValue({
+        session: { user: { id: "u-1" }, name: "Customer", email: "cust@example.com" },
+        siteSettings: {
+          allowCod: "1",
+        },
+      });
+      cartLines.mockReturnValue(dummyCart);
+
+      render(<CheckoutPage />);
+
+      // Fill valid address info except phone
+      fireEvent.change(screen.getByLabelText(/address/i), { target: { value: "123 Main St" } });
+      fireEvent.change(screen.getByLabelText(/^city/i), { target: { value: "Lahore" } });
+      fireEvent.change(screen.getByLabelText(/zip/i), { target: { value: "54000" } });
+
+      const submitBtn = screen.getByRole("button", { name: /place cod order/i });
+      fireEvent.click(submitBtn);
+
+      await waitFor(() => {
+        expect(screen.getByText(/phone number is required for courier delivery/i)).toBeTruthy();
+      });
+      expect(appActions.placeOrder).not.toHaveBeenCalled();
+
+      // Enter invalid phone
+      const phoneInput = screen.getByLabelText(/mobile phone/i);
+      fireEvent.change(phoneInput, { target: { value: "0211234567" } });
+      fireEvent.click(submitBtn);
+
+      await waitFor(() => {
+        expect(screen.getByText(/enter a valid pakistani mobile number/i)).toBeTruthy();
+      });
+      expect(appActions.placeOrder).not.toHaveBeenCalled();
+    });
+
+    it("submits order with validated customer phone number", async () => {
+      const { appActions } = await import("../store/appStore");
+      appActions.placeOrder.mockResolvedValueOnce({
+        id: "FN-9999",
+        status: "processing",
+        total: 2500,
+        customer: { name: "Customer", email: "cust@example.com", phone: "0300 1234567" },
+      });
+
+      useApp.mockReturnValue({
+        session: { user: { id: "u-1" }, name: "Customer", email: "cust@example.com" },
+        siteSettings: {
+          allowCod: "1",
+        },
+      });
+      cartLines.mockReturnValue(dummyCart);
+
+      render(<CheckoutPage />);
+
+      fireEvent.change(screen.getByLabelText(/mobile phone/i), { target: { value: "0300 1234567" } });
+      fireEvent.change(screen.getByLabelText(/address/i), { target: { value: "123 Main St" } });
+      fireEvent.change(screen.getByLabelText(/^city/i), { target: { value: "Lahore" } });
+      fireEvent.change(screen.getByLabelText(/zip/i), { target: { value: "54000" } });
+
+      const submitBtn = screen.getByRole("button", { name: /place cod order/i });
+      fireEvent.click(submitBtn);
+
+      await waitFor(() => {
+        expect(appActions.placeOrder).toHaveBeenCalledWith(
+          expect.objectContaining({
+            name: "Customer",
+            email: "cust@example.com",
+            phone: "0300 1234567",
+            address: "123 Main St, Lahore 54000",
+            paymentMethod: "cod",
+          }),
+          "",
+        );
+      });
     });
   });
 
@@ -187,6 +279,7 @@ describe("CheckoutPage components - Manual Payments & Proof Upload", () => {
       customer: {
         name: "Test Customer",
         email: "customer@example.com",
+        phone: "03001234567",
         address: "House 1, Street 2, Lahore",
         userId: "user-abc-123",
       },
@@ -267,6 +360,24 @@ describe("CheckoutPage components - Manual Payments & Proof Upload", () => {
 
       expect(screen.getByText(/this order has been cancelled\. payment proof can no longer be uploaded\./i)).toBeTruthy();
       expect(screen.queryByRole("button", { name: /submit payment proof/i })).toBeNull();
+    });
+
+    it("renders customer contact phone and 1-click WhatsApp order confirmation button", () => {
+      useApp.mockReturnValue({
+        siteSettings: {
+          whatsappNumber: "923709072688",
+        },
+      });
+
+      render(<OrderConfirmation order={baseOrder} />);
+
+      expect(screen.getByText("03001234567")).toBeTruthy();
+      const waBtn = screen.getByRole("link", { name: /confirm on whatsapp/i });
+      expect(waBtn).toBeTruthy();
+      expect(waBtn.getAttribute("href")).toContain("https://wa.me/923709072688?text=");
+      expect(decodeURIComponent(waBtn.getAttribute("href"))).toContain("ORD-TEST-123");
+      expect(decodeURIComponent(waBtn.getAttribute("href"))).toContain("03001234567");
+      expect(decodeURIComponent(waBtn.getAttribute("href"))).toContain("Test Customer");
     });
   });
 });

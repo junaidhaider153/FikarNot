@@ -51,10 +51,18 @@ const couponPayloadSchema = z
   .union([z.object({ coupon: couponInputSchema }), couponInputSchema])
   .transform((val) => ("coupon" in val ? val.coupon : val));
 
-const checkoutSchema = z.object({
+export const checkoutSchema = z.object({
   customer: z.object({
     name: z.string().trim().max(120).default("Guest"),
     email: z.string().trim().email("A valid customer email is required.").max(254),
+    phone: z
+      .string()
+      .trim()
+      .max(30)
+      .refine(
+        (val) => /^(?:\+92|0092|92|0)?3[0-9]{9}$/.test(val.replace(/[\s\-()]/g, "")),
+        "A valid Pakistani mobile number is required (e.g. 0300 1234567).",
+      ),
     address: z.string().trim().max(500).default(""),
     paymentMethod: z
       .enum(["cod", "jazzcash", "easypaisa", "bank_transfer"], {
@@ -117,6 +125,7 @@ const orderRow = (row: any, items: any[], proof: any = null, payment: any = null
     ...(row.user_id ? { userId: row.user_id } : {}),
     name: row.customer_name,
     email: row.customer_email,
+    phone: row.customer_phone || "",
     address: row.customer_address,
     paymentMethod: row.payment_method,
   },
@@ -239,7 +248,7 @@ async function audit(actorId: string, action: string, entityId: string, details:
   });
 }
 
-Deno.serve(async (req) => {
+export async function handleOrdersRequest(req: Request): Promise<Response> {
   const pre = preflight(req);
   if (pre) return pre;
   const url = new URL(req.url);
@@ -418,6 +427,7 @@ Deno.serve(async (req) => {
         return json(req, { error: "PAYMENT_METHOD_DISABLED", message: "Manual payment methods are currently unavailable." }, 503);
 
       const email = customer.email.toLowerCase();
+      const phone = customer.phone.trim();
       const items = body.items.map((r) => ({
         productId: r.productId,
         qty: r.qty,
@@ -425,7 +435,7 @@ Deno.serve(async (req) => {
 
       const { data: created, error: rpcError } = await admin.rpc("create_order", {
         p_user_id: caller?.id || null,
-        p_customer: { name: customer.name || "Guest", email, address: customer.address || "", paymentMethod },
+        p_customer: { name: customer.name || "Guest", email, phone, address: customer.address || "", paymentMethod },
         p_items: items,
         p_coupon_code: body.couponCode ? text(body.couponCode, 40) : null,
         p_config: {
@@ -650,4 +660,8 @@ Deno.serve(async (req) => {
   } catch (error) {
     return serverError(req, error);
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve((req) => handleOrdersRequest(req));
+}

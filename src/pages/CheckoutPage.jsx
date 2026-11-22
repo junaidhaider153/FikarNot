@@ -7,12 +7,13 @@ import { paymentsApi } from "../api/paymentsApi";
 import { ordersApi } from "../api/ordersApi";
 import { Empty } from "../components/common";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
-import { FEATURES } from "../config/appConfig";
+import { FEATURES, WHATSAPP_NUMBER } from "../config/appConfig";
 import { getPaymentAccounts } from "../config/paymentAccounts";
 
 const INITIAL_FORM = {
   name: "",
   email: "",
+  phone: "",
   address: "",
   city: "",
   zip: "",
@@ -71,6 +72,7 @@ export default function CheckoutPage() {
     ...INITIAL_FORM,
     name: s.session?.name || "",
     email: s.session?.email || "",
+    phone: s.session?.phone || "",
   }));
   const [paymentMethod, setPaymentMethod] = useState(commerce.allowOnlinePayments ? "payfast" : "cod");
   const [errs, setErrs] = useState({});
@@ -83,7 +85,7 @@ export default function CheckoutPage() {
   const paymentRef = useRef(null);
   const summaryRef = useRef(null);
 
-  const detailsComplete = Boolean(form.name.trim() && form.email.trim() && form.address.trim() && form.city.trim());
+  const detailsComplete = Boolean(form.name.trim() && form.email.trim() && form.phone.trim() && form.address.trim() && form.city.trim());
   const paymentComplete = Boolean(paymentMethod);
   const checkoutSteps = [
     { key: "details", label: "Details", ref: detailsRef, status: detailsComplete ? "complete" : "current" },
@@ -206,6 +208,12 @@ export default function CheckoutPage() {
     const next = {};
     if (!form.name.trim()) next.name = "Full name is required";
     if (!/.+@.+\..+/.test(form.email.trim())) next.email = "Enter a valid email";
+    const cleanPhone = form.phone.replace(/[\s\-()]/g, "");
+    if (!form.phone.trim()) {
+      next.phone = "Phone number is required for courier delivery";
+    } else if (!/^(?:\+92|0092|92|0)?3[0-9]{9}$/.test(cleanPhone)) {
+      next.phone = "Enter a valid Pakistani mobile number (e.g. 0300 1234567)";
+    }
     if (!form.address.trim()) next.address = "Address is required";
     if (!form.city.trim()) next.city = "City is required";
     if (!form.zip.trim()) next.zip = "ZIP / postal code is required";
@@ -228,6 +236,7 @@ export default function CheckoutPage() {
       {
         name: form.name.trim(),
         email: form.email.trim(),
+        phone: form.phone.trim(),
         address: `${form.address.trim()}, ${form.city.trim()} ${form.zip.trim()}`,
         paymentMethod,
       },
@@ -446,6 +455,24 @@ export default function CheckoutPage() {
                 {errs.email && <p className="f-err">{errs.email}</p>}
                 <p style={{ marginTop: 5, fontSize: 12, color: "var(--ink2)" }}>
                   {s.session ? "Signed in — this email is linked to your account." : "We'll use this email for your order confirmation."}
+                </p>
+              </div>
+              <div className="f-full">
+                <label className="lbl" htmlFor="f-phone">
+                  Mobile phone (for courier delivery)
+                </label>
+                <input
+                  id="f-phone"
+                  className="input"
+                  type="tel"
+                  value={form.phone}
+                  onChange={set("phone")}
+                  autoComplete="tel"
+                  placeholder="0300 1234567"
+                />
+                {errs.phone && <p className="f-err">{errs.phone}</p>}
+                <p style={{ marginTop: 5, fontSize: 12, color: "var(--ink2)" }}>
+                  Required for courier dispatch, delivery call, and SMS/WhatsApp order updates.
                 </p>
               </div>
               <div className="f-full">
@@ -904,6 +931,7 @@ export function ManualPaymentInstructions({ method, details = {}, amount, curren
 }
 
 export function OrderConfirmation({ order }) {
+  const s = useApp();
   const [proofBusy, setProofBusy] = useState(false);
   const [proofSubmitted, setProofSubmitted] = useState(Boolean(order.paymentProof));
   const [proofError, setProofError] = useState("");
@@ -926,6 +954,20 @@ export function OrderConfirmation({ order }) {
             : order.paymentMethod === "bank_transfer"
               ? "Bank transfer"
               : "Card (mock)";
+
+  const storeWhatsApp = String(s?.siteSettings?.whatsappNumber || WHATSAPP_NUMBER || "923709072688").replace(/[^0-9]/g, "");
+  const orderItemsSummary = (order.items || []).map((item) => `${item.qty}x ${item.name || item.productName || item.productId}`).join(", ");
+  const waMessage = [
+    `Assalam-o-Alaikum! I've placed order ${order.id} on FikarNot.`,
+    `Total: ${fmt(order.total, order.currency || "PKR", order.currency === "PKR" ? "en-PK" : undefined)} (${order.paymentMethod === "cod" ? "Cash on Delivery" : paymentLabel})`,
+    orderItemsSummary ? `Items: ${orderItemsSummary}` : "",
+    order.customer?.name ? `Customer: ${order.customer.name}` : "",
+    order.customer?.phone ? `Contact: ${order.customer.phone}` : "",
+    `Please confirm my order. Thank you!`,
+  ]
+    .filter(Boolean)
+    .join("\n");
+  const whatsappHref = `https://wa.me/${storeWhatsApp}?text=${encodeURIComponent(waMessage)}`;
 
   const handleUpload = async (e) => {
     if (e) e.preventDefault();
@@ -1138,9 +1180,45 @@ export function OrderConfirmation({ order }) {
           <strong>{order.customer?.address}</strong>
         </div>
         <div className="confirmation-address">
+          <span>Contact phone</span>
+          <strong>{order.customer?.phone || "N/A"}</strong>
+        </div>
+        <div className="confirmation-address">
           <span>Confirmation email</span>
           <strong>{order.customer?.email}</strong>
         </div>
+
+        {storeWhatsApp && (
+          <div className="confirmation-whatsapp-hub" style={{ margin: "22px 0 16px", textAlign: "center" }}>
+            <a
+              className="btn"
+              style={{
+                display: "inline-flex",
+                alignItems: "center",
+                justifyContent: "center",
+                gap: 8,
+                padding: "12px 24px",
+                fontSize: 15,
+                fontWeight: 600,
+                backgroundColor: "#25D366",
+                borderColor: "#25D366",
+                color: "#ffffff",
+                textDecoration: "none",
+                borderRadius: 8,
+                boxShadow: "0 2px 10px rgba(37, 211, 102, 0.35)",
+              }}
+              href={whatsappHref}
+              target="_blank"
+              rel="noreferrer noopener"
+            >
+              <Ic n="chat" s={18} />
+              <span>Confirm on WhatsApp</span>
+            </a>
+            <p style={{ marginTop: 8, fontSize: 13, color: "var(--ink2)" }}>
+              Tap above to message our support team on WhatsApp for fast order confirmation and priority dispatch.
+            </p>
+          </div>
+        )}
 
         <div className="confirmation-actions">
           <Link className="btn btn-dark" to="/products">

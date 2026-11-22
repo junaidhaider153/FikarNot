@@ -78,6 +78,12 @@ begin
     raise exception 'FAIL: manual order status not pending_payment/pending';
   end if;
 
+  -- 8b. Customer phone (migration 0010): customer_phone is recorded on order
+  r := public.create_order(u, jsonb_set(cust, '{phone}', '"03001234567"'), '[{"productId":"p3","qty":1}]', null, cfg);
+  if (select customer_phone from public.orders where id = r->>'orderId') <> '03001234567' then
+    raise exception 'FAIL: customer_phone was not stored';
+  end if;
+
   -- 9. cancel_order works on pending_payment orders and restocks
   select stock into s from public.products where id = 'p3';
   perform public.cancel_order(r->>'orderId', u, 'Changed mind');

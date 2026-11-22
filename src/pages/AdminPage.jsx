@@ -1266,7 +1266,12 @@ function ShipmentManager({ order }) {
     setShipmentStatus(order.shipmentStatus || "not_created");
   }, [order.courier, order.trackingNumber, order.trackingUrl, order.shipmentStatus]);
 
-  const customerPhone = String(order.customer?.phone || "").replace(/\D/g, "");
+  const rawCustomerPhone = String(order.customer?.phone || "").replace(/\D/g, "");
+  const customerPhone = rawCustomerPhone.startsWith("92")
+    ? rawCustomerPhone
+    : rawCustomerPhone.startsWith("0")
+      ? `92${rawCustomerPhone.slice(1)}`
+      : rawCustomerPhone;
   const whatsappText = order.trackingNumber
     ? `Hello ${order.customer?.name || "there"}, your FikarNot order ${order.id} has been shipped via ${order.courier || "courier"}. Tracking ID: ${order.trackingNumber}.${order.trackingUrl ? ` Track it here: ${order.trackingUrl}` : ""}`
     : `Hello ${order.customer?.name || "there"}, this is FikarNot regarding your order ${order.id}.`;
@@ -1491,6 +1496,7 @@ export function OrdersTab() {
                 <td>
                   <div>{o.customer.name}</div>
                   <div className="field-hint">{o.customer.email}</div>
+                  {o.customer.phone && <div className="field-hint">{o.customer.phone}</div>}
                 </td>
                 <td style={{ maxWidth: 260 }}>{o.items.map((i) => `${i.qty}× ${i.name}`).join(", ")}</td>
                 <td>{fmt(o.total)}</td>
