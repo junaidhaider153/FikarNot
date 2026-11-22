@@ -111,7 +111,7 @@ async function itemsOf(orderId: string): Promise<ItemOut[]> {
 }
 
 // deno-lint-ignore no-explicit-any
-const orderRow = (row: any, items: any[]) => ({
+const orderRow = (row: any, items: any[], proof: any = null, payment: any = null) => ({
   id: row.id,
   customer: {
     ...(row.user_id ? { userId: row.user_id } : {}),
@@ -129,6 +129,9 @@ const orderRow = (row: any, items: any[]) => ({
   currency: row.currency || "PKR",
   paymentStatus: row.payment_status || (row.status === "paid" ? "paid" : "pending"),
   paymentMethod: row.payment_method,
+  paymentProof: proof || null,
+  paymentReference: payment?.provider_payment_id || null,
+  paymentNote: payment?.raw_status || null,
   courier: row.courier || "",
   trackingNumber: row.tracking_number || "",
   trackingUrl: row.tracking_url || "",
@@ -344,15 +347,46 @@ Deno.serve(async (req) => {
 
       const ids = (orders || []).map((o) => o.id);
       const itemsByOrder = new Map<string, unknown[]>();
+      // deno-lint-ignore no-explicit-any
+      const proofsByOrder = new Map<string, any>();
+      // deno-lint-ignore no-explicit-any
+      const paymentsByOrder = new Map<string, any>();
+
       if (ids.length) {
-        const { data: items } = await admin.from("order_items").select("*").in("order_id", ids);
-        for (const item of items || []) {
+        const [itemsRes, proofsRes, paymentsRes] = await Promise.all([
+          admin.from("order_items").select("*").in("order_id", ids),
+          admin.from("payment_proofs").select("order_id, original_name, filename, mime_type, byte_size, created_at").in("order_id", ids),
+          admin.from("payments").select("order_id, provider_payment_id, raw_status, status").in("order_id", ids),
+        ]);
+
+        for (const item of itemsRes.data || []) {
           const bucket = itemsByOrder.get(item.order_id) || [];
           bucket.push({ productId: item.product_id, name: item.product_name, price: Number(item.price), qty: Number(item.qty) });
           itemsByOrder.set(item.order_id, bucket);
         }
+
+        for (const p of proofsRes.data || []) {
+          proofsByOrder.set(p.order_id, {
+            originalName: p.original_name,
+            filename: p.filename,
+            mimeType: p.mime_type,
+            byteSize: Number(p.byte_size),
+            createdAt: p.created_at,
+          });
+        }
+
+        for (const pay of paymentsRes.data || []) {
+          paymentsByOrder.set(pay.order_id, pay);
+        }
       }
-      return json(req, { orders: (orders || []).map((o) => orderRow(o, itemsByOrder.get(o.id) || [])), total: count ?? 0, limit, offset });
+      return json(req, {
+        orders: (orders || []).map((o) =>
+          orderRow(o, itemsByOrder.get(o.id) || [], proofsByOrder.get(o.id) || null, paymentsByOrder.get(o.id) || null),
+        ),
+        total: count ?? 0,
+        limit,
+        offset,
+      });
     }
 
     // ---- POST /  (checkout) -------------------------------------------------

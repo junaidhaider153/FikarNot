@@ -8,6 +8,7 @@ import { ordersApi } from "../api/ordersApi";
 import { Empty } from "../components/common";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
 import { FEATURES } from "../config/appConfig";
+import { getPaymentAccounts } from "../config/paymentAccounts";
 
 const INITIAL_FORM = {
   name: "",
@@ -32,15 +33,7 @@ export default function CheckoutPage() {
     allowCod: s.siteSettings?.allowCod !== "0",
     allowOnlinePayments: FEATURES.payfast && s.siteSettings?.allowOnlinePayments === "1",
     allowManualPayments: s.siteSettings?.allowManualPayments !== "0",
-    manualPaymentDetails: {
-      jazzcashNumber: s.siteSettings?.jazzcashNumber || "",
-      easypaisaNumber: s.siteSettings?.easypaisaNumber || "",
-      bankName: s.siteSettings?.bankName || "",
-      bankAccountTitle: s.siteSettings?.bankAccountTitle || "",
-      bankAccountNumber: s.siteSettings?.bankAccountNumber || "",
-      bankIban: s.siteSettings?.bankIban || "",
-      bankInstructions: s.siteSettings?.bankInstructions || "",
-    },
+    manualPaymentDetails: getPaymentAccounts(s.siteSettings),
   };
   const manualMethods = useMemo(
     () =>
@@ -561,7 +554,13 @@ export default function CheckoutPage() {
                 </p>
               </div>
             ) : ["jazzcash", "easypaisa", "bank_transfer"].includes(paymentMethod) ? (
-              <ManualPaymentInstructions method={paymentMethod} details={commerce.manualPaymentDetails} />
+              <ManualPaymentInstructions
+                method={paymentMethod}
+                details={commerce.manualPaymentDetails}
+                amount={totals.total}
+                currency={commerce.currency}
+                locale={commerce.currencyLocale}
+              />
             ) : (
               <div className="cod-note">
                 <span className="empty-ic">
@@ -680,64 +679,220 @@ export default function CheckoutPage() {
   );
 }
 
-function ManualPaymentInstructions({ method, details }) {
-  const label = method === "jazzcash" ? "JazzCash" : method === "easypaisa" ? "Easypaisa" : "Bank transfer";
+export function CopyButton({ text, label = "Copy" }) {
+  const [copied, setCopied] = useState(false);
+  const copy = async () => {
+    try {
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(text);
+      } else {
+        const textarea = document.createElement("textarea");
+        textarea.value = text;
+        textarea.style.position = "fixed";
+        textarea.style.opacity = "0";
+        document.body.appendChild(textarea);
+        textarea.focus();
+        textarea.select();
+        document.execCommand("copy");
+        document.body.removeChild(textarea);
+      }
+      setCopied(true);
+      setTimeout(() => setCopied(false), 2000);
+    } catch {
+      // fallback
+    }
+  };
   return (
-    <div className="panel" style={{ marginTop: 16, padding: 16 }}>
-      <strong>{label} payment instructions</strong>
-      <p style={{ margin: "6px 0 12px", color: "var(--ink2)", fontSize: 13 }}>
-        Complete the transfer in your own banking/wallet app. FikarNot will never ask for your wallet password, MPIN or OTP.
+    <button
+      type="button"
+      className="btn btn-ghost btn-sm"
+      onClick={copy}
+      title={`Copy ${label}`}
+      aria-label={`Copy ${label}`}
+      style={{ padding: "2px 8px", fontSize: 12, lineHeight: 1.3, marginLeft: 8 }}
+    >
+      {copied ? "Copied! ✓" : label}
+    </button>
+  );
+}
+
+export function ManualPaymentInstructions({ method, details = {}, amount, currency = "PKR", locale = "en-PK", orderId }) {
+  const label = method === "jazzcash" ? "JazzCash" : method === "easypaisa" ? "Easypaisa" : "Bank transfer";
+  const formattedAmount = amount != null ? fmt(amount, currency, locale) : null;
+
+  return (
+    <div className="panel manual-payment-card" style={{ marginTop: 16, padding: 18, borderLeft: "4px solid var(--lime, #b8f029)" }}>
+      <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
+        <strong style={{ fontSize: 16 }}>{label} payment instructions</strong>
+        {formattedAmount && (
+          <span style={{ fontSize: 14 }}>
+            Payable Amount: <strong style={{ color: "var(--ink, #111)" }}>{formattedAmount}</strong>
+            <CopyButton text={String(amount)} label="Copy" />
+          </span>
+        )}
+      </div>
+
+      <p style={{ margin: "8px 0 14px", color: "var(--ink2, #666)", fontSize: 13 }}>
+        Complete the transfer in your banking or wallet app. FikarNot will never ask for your wallet MPIN, password or OTP.
       </p>
+
+      {orderId ? (
+        <div
+          className="payment-remarks-reminder"
+          style={{
+            background: "rgba(184, 240, 41, 0.15)",
+            border: "1px solid rgba(184, 240, 41, 0.4)",
+            borderRadius: 6,
+            padding: "10px 14px",
+            marginBottom: 14,
+            fontSize: 13,
+            display: "flex",
+            alignItems: "center",
+            justifyContent: "space-between",
+            flexWrap: "wrap",
+            gap: 8,
+          }}
+        >
+          <div>
+            <strong>Important Remarks / Reference:</strong>
+            <div style={{ marginTop: 2 }}>
+              Enter Order ID <code style={{ fontWeight: "bold", fontSize: 13 }}>{orderId}</code> in transfer remarks/memo.
+            </div>
+          </div>
+          <CopyButton text={orderId} label="Copy Order ID" />
+        </div>
+      ) : (
+        <div
+          className="payment-remarks-reminder"
+          style={{
+            background: "rgba(184, 240, 41, 0.15)",
+            border: "1px solid rgba(184, 240, 41, 0.4)",
+            borderRadius: 6,
+            padding: "10px 14px",
+            marginBottom: 14,
+            fontSize: 13,
+          }}
+        >
+          <strong>Transfer Remarks Reminder:</strong>
+          <div style={{ marginTop: 2 }}>
+            Please include your Order ID in the transfer remarks/reference when completing payment. (Your Order ID will be shown on the next
+            screen once you place the order).
+          </div>
+        </div>
+      )}
+
       {method === "jazzcash" && (
-        <div>
-          <b>JazzCash number:</b> {details.jazzcashNumber}
+        <div style={{ display: "grid", gap: 8, fontSize: 14 }}>
+          {details.jazzcashTitle && (
+            <div>
+              <span className="muted" style={{ fontSize: 12, display: "block" }}>
+                Account title
+              </span>
+              <strong>{details.jazzcashTitle}</strong>
+            </div>
+          )}
+          {details.jazzcashNumber && (
+            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
+              <div>
+                <span className="muted" style={{ fontSize: 12, display: "block" }}>
+                  JazzCash mobile number
+                </span>
+                <strong style={{ fontSize: 15 }}>{details.jazzcashNumber}</strong>
+              </div>
+              <CopyButton text={details.jazzcashNumber} label="Copy Number" />
+            </div>
+          )}
         </div>
       )}
+
       {method === "easypaisa" && (
-        <div>
-          <b>Easypaisa number:</b> {details.easypaisaNumber}
+        <div style={{ display: "grid", gap: 8, fontSize: 14 }}>
+          {details.easypaisaTitle && (
+            <div>
+              <span className="muted" style={{ fontSize: 12, display: "block" }}>
+                Account title
+              </span>
+              <strong>{details.easypaisaTitle}</strong>
+            </div>
+          )}
+          {details.easypaisaNumber && (
+            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
+              <div>
+                <span className="muted" style={{ fontSize: 12, display: "block" }}>
+                  Easypaisa mobile number
+                </span>
+                <strong style={{ fontSize: 15 }}>{details.easypaisaNumber}</strong>
+              </div>
+              <CopyButton text={details.easypaisaNumber} label="Copy Number" />
+            </div>
+          )}
         </div>
       )}
+
       {method === "bank_transfer" && (
-        <div style={{ display: "grid", gap: 4 }}>
+        <div style={{ display: "grid", gap: 10, fontSize: 14 }}>
           {details.bankName && (
             <div>
-              <b>Bank:</b> {details.bankName}
+              <span className="muted" style={{ fontSize: 12, display: "block" }}>
+                Bank name
+              </span>
+              <strong>{details.bankName}</strong>
             </div>
           )}
           {details.bankAccountTitle && (
             <div>
-              <b>Account title:</b> {details.bankAccountTitle}
+              <span className="muted" style={{ fontSize: 12, display: "block" }}>
+                Account title
+              </span>
+              <strong>{details.bankAccountTitle}</strong>
             </div>
           )}
           {details.bankAccountNumber && (
-            <div>
-              <b>Account number:</b> {details.bankAccountNumber}
+            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
+              <div>
+                <span className="muted" style={{ fontSize: 12, display: "block" }}>
+                  Account number
+                </span>
+                <strong style={{ fontSize: 15 }}>{details.bankAccountNumber}</strong>
+              </div>
+              <CopyButton text={details.bankAccountNumber} label="Copy Account" />
             </div>
           )}
           {details.bankIban && (
-            <div>
-              <b>IBAN:</b> {details.bankIban}
+            <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
+              <div>
+                <span className="muted" style={{ fontSize: 12, display: "block" }}>
+                  IBAN
+                </span>
+                <strong style={{ fontSize: 15 }}>{details.bankIban}</strong>
+              </div>
+              <CopyButton text={details.bankIban} label="Copy IBAN" />
             </div>
+          )}
+          {details.bankInstructions && (
+            <p style={{ marginTop: 4, color: "var(--ink2)", fontSize: 13, fontStyle: "italic" }}>{details.bankInstructions}</p>
           )}
         </div>
       )}
-      {details.bankInstructions && method === "bank_transfer" && (
-        <p style={{ marginTop: 10, color: "var(--ink2)", fontSize: 13 }}>{details.bankInstructions}</p>
-      )}
-      <p style={{ margin: "12px 0 0", fontSize: 13 }}>
-        After payment, keep your receipt/screenshot ready. You can upload it immediately after placing the order.
+
+      <p style={{ margin: "14px 0 0", fontSize: 13, color: "var(--ink2)" }}>
+        After sending payment, save your receipt or screenshot to upload as proof.
       </p>
     </div>
   );
 }
-function OrderConfirmation({ order }) {
+
+export function OrderConfirmation({ order }) {
   const [proofBusy, setProofBusy] = useState(false);
   const [proofSubmitted, setProofSubmitted] = useState(Boolean(order.paymentProof));
   const [proofError, setProofError] = useState("");
+  const [reference, setReference] = useState(order.paymentReference || "");
+  const [note, setNote] = useState(order.paymentNote || "");
+  const [selectedFile, setSelectedFile] = useState(null);
   const [token] = useState(order.paymentProofToken || "");
   const manual = ["jazzcash", "easypaisa", "bank_transfer"].includes(order.paymentMethod);
-  const totalItems = order.items.reduce((count, item) => count + item.qty, 0);
+  const isCancelled = order.status === "cancelled";
+  const totalItems = (order.items || []).reduce((count, item) => count + item.qty, 0);
   const paymentLabel =
     order.paymentMethod === "cod"
       ? "Cash on delivery"
@@ -751,8 +906,20 @@ function OrderConfirmation({ order }) {
               ? "Bank transfer"
               : "Card (mock)";
 
-  const uploadProof = async (file) => {
-    if (!file) return;
+  const handleUpload = async (e) => {
+    if (e) e.preventDefault();
+    if (!selectedFile) {
+      setProofError("Please select a receipt or screenshot file to upload.");
+      return;
+    }
+    if (isCancelled) {
+      setProofError("Cannot upload payment proof for a cancelled order.");
+      return;
+    }
+    if (selectedFile.size > 3 * 1024 * 1024) {
+      setProofError("File size exceeds 3MB limit. Please upload a smaller file.");
+      return;
+    }
     setProofBusy(true);
     setProofError("");
     try {
@@ -760,10 +927,18 @@ function OrderConfirmation({ order }) {
         const r = new FileReader();
         r.onload = () => resolve(r.result);
         r.onerror = reject;
-        r.readAsDataURL(file);
+        r.readAsDataURL(selectedFile);
       });
-      const result = await ordersApi.uploadPaymentProof(order.id, { dataUrl, originalName: file.name, token, email: order.customer.email });
+      const result = await ordersApi.uploadPaymentProof(order.id, {
+        dataUrl,
+        originalName: selectedFile.name,
+        token,
+        email: order.customer?.email,
+        reference: reference.trim() || undefined,
+        note: note.trim() || undefined,
+      });
       setProofSubmitted(Boolean(result.proof));
+      appActions.toast("Payment slip submitted for review.");
     } catch (error) {
       setProofError(error.message || "Payment slip could not be uploaded.");
     } finally {
@@ -791,7 +966,7 @@ function OrderConfirmation({ order }) {
           Thanks for your order.
         </h1>
         <p className="confirmation-copy">
-          Your order <strong>{order.id}</strong> has been created for <strong>{order.customer.name}</strong>.
+          Your order <strong>{order.id}</strong> has been created for <strong>{order.customer?.name}</strong>.
         </p>
 
         <ol className="order-next-steps">
@@ -831,35 +1006,101 @@ function OrderConfirmation({ order }) {
         </div>
 
         {manual && order.manualPaymentDetails && (
-          <ManualPaymentInstructions method={order.paymentMethod} details={order.manualPaymentDetails} />
+          <ManualPaymentInstructions
+            method={order.paymentMethod}
+            details={order.manualPaymentDetails}
+            amount={order.total}
+            currency={order.currency || "PKR"}
+            locale={order.currency === "PKR" ? "en-PK" : undefined}
+            orderId={order.id}
+          />
         )}
 
         {manual && (
-          <div className="panel" style={{ marginTop: 16, padding: 16, textAlign: "left" }}>
-            <strong>Upload your payment slip</strong>
-            <p style={{ margin: "6px 0 12px", color: "var(--ink2)", fontSize: 13 }}>
-              Upload a clear screenshot or receipt. Staff will review it before the order moves to fulfilment.
+          <form onSubmit={handleUpload} className="panel" style={{ marginTop: 16, padding: 18, textAlign: "left" }}>
+            <h3 style={{ fontSize: 16, marginBottom: 6 }}>Upload payment proof</h3>
+            <p style={{ margin: "0 0 14px", color: "var(--ink2)", fontSize: 13 }}>
+              Upload your transaction screenshot or receipt (PNG, JPG, WebP, or PDF up to 3MB). Our team will verify it and begin processing
+              your order.
             </p>
-            <input
-              type="file"
-              accept="image/jpeg,image/png,image/webp,image/gif"
-              disabled={proofBusy || proofSubmitted}
-              onChange={(e) => {
-                uploadProof(e.target.files?.[0]);
-                e.target.value = "";
-              }}
-            />
+
+            {isCancelled ? (
+              <p className="f-err" role="alert">
+                This order has been cancelled. Payment proof can no longer be uploaded.
+              </p>
+            ) : (
+              <div style={{ display: "grid", gap: 12 }}>
+                <div>
+                  <label className="lbl" htmlFor="proof-reference">
+                    Transaction ID / Reference (optional)
+                  </label>
+                  <input
+                    id="proof-reference"
+                    className="input"
+                    placeholder="e.g. TRX987654321 or Bank Transfer ID"
+                    value={reference}
+                    onChange={(e) => setReference(e.target.value)}
+                    disabled={proofBusy || proofSubmitted}
+                    maxLength={100}
+                  />
+                  <span className="field-hint" style={{ fontSize: 12 }}>
+                    The transaction ID or reference provided by your banking or wallet app.
+                  </span>
+                </div>
+
+                <div>
+                  <label className="lbl" htmlFor="proof-note">
+                    Note / Remarks (optional)
+                  </label>
+                  <input
+                    id="proof-note"
+                    className="input"
+                    placeholder="e.g. Paid from Meezan Bank mobile app"
+                    value={note}
+                    onChange={(e) => setNote(e.target.value)}
+                    disabled={proofBusy || proofSubmitted}
+                    maxLength={500}
+                  />
+                </div>
+
+                <div>
+                  <label className="lbl" htmlFor="proof-file">
+                    Payment receipt / screenshot (Image or PDF)
+                  </label>
+                  <input
+                    id="proof-file"
+                    type="file"
+                    accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+                    disabled={proofBusy || proofSubmitted}
+                    onChange={(e) => {
+                      setSelectedFile(e.target.files?.[0] || null);
+                      setProofError("");
+                    }}
+                  />
+                  <span className="field-hint" style={{ fontSize: 12 }}>
+                    Accepted formats: JPEG, PNG, WebP, GIF, PDF (Max 3MB).
+                  </span>
+                </div>
+
+                <div>
+                  <button type="submit" className="btn btn-lime btn-sm" disabled={proofBusy || proofSubmitted || !selectedFile}>
+                    {proofBusy ? "Uploading…" : proofSubmitted ? "Proof submitted" : "Submit payment proof"}
+                  </button>
+                </div>
+              </div>
+            )}
+
             {proofSubmitted && (
-              <p role="status" style={{ marginTop: 10 }}>
-                ✓ Payment slip submitted for review.
+              <p role="status" style={{ marginTop: 12, color: "var(--success, #16a34a)", fontWeight: "bold" }}>
+                ✓ Payment proof submitted for review.
               </p>
             )}
             {proofError && (
-              <p className="f-err" role="alert">
+              <p className="f-err" role="alert" style={{ marginTop: 10 }}>
                 {proofError}
               </p>
             )}
-          </div>
+          </form>
         )}
 
         {order.coupon && (
@@ -873,11 +1114,11 @@ function OrderConfirmation({ order }) {
 
         <div className="confirmation-address">
           <span>Deliver to</span>
-          <strong>{order.customer.address}</strong>
+          <strong>{order.customer?.address}</strong>
         </div>
         <div className="confirmation-address">
           <span>Confirmation email</span>
-          <strong>{order.customer.email}</strong>
+          <strong>{order.customer?.email}</strong>
         </div>
 
         <div className="confirmation-actions">
@@ -887,7 +1128,7 @@ function OrderConfirmation({ order }) {
           <Link className="btn btn-ghost" to="/account">
             View account
           </Link>
-          {order.customer.userId && (
+          {order.customer?.userId && (
             <Link className="btn btn-ghost" to={`/invoice/${encodeURIComponent(order.id)}`} target="_blank" rel="noreferrer">
               View invoice
             </Link>

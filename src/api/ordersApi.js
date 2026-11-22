@@ -19,6 +19,7 @@ export const ordersApi = {
   remove: (id) => request(`/api/orders/${encodeURIComponent(id)}`, { method: "DELETE" }),
   uploadPaymentProof: (id, payload) =>
     request(`/api/orders/${encodeURIComponent(id)}/payment-proof`, { method: "POST", body: JSON.stringify(payload) }),
+  getPaymentProof: (id) => request(`/api/admin/orders/${encodeURIComponent(id)}/payment-proof`),
   confirmPayment: (id, payload = {}) =>
     request(`/api/admin/orders/${encodeURIComponent(id)}/confirm-payment`, { method: "POST", body: JSON.stringify(payload) }),
   collectCod: (id) => request(`/api/admin/orders/${encodeURIComponent(id)}/collect-cod`, { method: "POST" }),

@@ -30,6 +30,8 @@ import { usePagination } from "../hooks/usePagination";
 import { TwoFactorSection } from "../components/TwoFactorSection";
 import { RETURN_STATUSES } from "../utils/returns";
 import { AnalyticsTab } from "../components/admin/AnalyticsTab";
+import { ordersApi } from "../api/ordersApi";
+import { DEFAULT_PAYMENT_ACCOUNTS } from "../config/paymentAccounts";
 
 export function ProductEditor({ initial, onClose }) {
   const s = useApp();
@@ -1414,8 +1416,25 @@ function ShipmentManager({ order }) {
 export function OrdersTab() {
   const s = useApp();
   const [filter, setFilter] = useState("all");
+  const [viewingProofId, setViewingProofId] = useState(null);
   const filtered = filter === "all" ? s.orders : s.orders.filter((o) => o.status === filter);
   const { page, pageCount, pageItems, setPage, start, end, total } = usePagination(filtered, 10);
+
+  const viewPaymentProof = async (orderId) => {
+    try {
+      setViewingProofId(orderId);
+      const res = await ordersApi.getPaymentProof(orderId);
+      if (res?.url) {
+        window.open(res.url, "_blank", "noopener,noreferrer");
+      } else {
+        appActions.toast("Could not retrieve payment proof URL", "err");
+      }
+    } catch (err) {
+      appActions.toast(err.message || "Could not retrieve payment proof", "err");
+    } finally {
+      setViewingProofId(null);
+    }
+  };
   return (
     <>
       <div className="toolbar" style={{ marginBottom: 12 }}>
@@ -1489,18 +1508,32 @@ export function OrdersTab() {
                     <b>{o.paymentStatus || "—"}</b>
                   </div>
                   {o.paymentMethod && <div className="field-hint">{o.paymentMethod}</div>}
+                  {o.paymentReference && (
+                    <div className="field-hint" style={{ marginTop: 2, wordBreak: "break-all" }}>
+                      <strong>Ref:</strong> {o.paymentReference}
+                    </div>
+                  )}
+                  {o.paymentNote && (
+                    <div className="field-hint" style={{ marginTop: 2, wordBreak: "break-word" }}>
+                      <strong>Note:</strong> {o.paymentNote}
+                    </div>
+                  )}
                   {o.paymentProof && (
                     <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      <a
+                      <button
                         className="btn btn-ghost btn-sm"
-                        href={`${import.meta.env.VITE_API_URL || ""}/api/admin/orders/${encodeURIComponent(o.id)}/payment-proof`}
-                        target="_blank"
-                        rel="noreferrer"
+                        type="button"
+                        disabled={viewingProofId === o.id}
+                        onClick={() => viewPaymentProof(o.id)}
                       >
-                        View slip
-                      </a>
+                        {viewingProofId === o.id ? "Opening…" : "View slip"}
+                      </button>
                       {o.paymentStatus === "pending" && ["jazzcash", "easypaisa", "bank_transfer"].includes(o.paymentMethod) && (
-                        <button className="btn btn-dark btn-sm" type="button" onClick={() => appActions.confirmPayment(o.id, {})}>
+                        <button
+                          className="btn btn-dark btn-sm"
+                          type="button"
+                          onClick={() => appActions.confirmPayment(o.id, { providerReference: o.paymentReference || "" })}
+                        >
                           Confirm
                         </button>
                       )}
@@ -1989,13 +2022,7 @@ function SettingsTab() {
     allowCod: "1",
     allowOnlinePayments: "0",
     allowManualPayments: "1",
-    jazzcashNumber: "923709072688",
-    easypaisaNumber: "923709072688",
-    bankName: "",
-    bankAccountTitle: "",
-    bankAccountNumber: "",
-    bankIban: "",
-    bankInstructions: "",
+    ...DEFAULT_PAYMENT_ACCOUNTS,
   });
   useEffect(() => {
     let alive = true;
@@ -2443,6 +2470,18 @@ function SettingsTab() {
           />
         </div>
         <div>
+          <label className="lbl" htmlFor="settings-jazzcash-title">
+            JazzCash account title
+          </label>
+          <input
+            id="settings-jazzcash-title"
+            className="input"
+            placeholder="FikarNot Store"
+            value={form.jazzcashTitle || ""}
+            onChange={(e) => set("jazzcashTitle", e.target.value)}
+          />
+        </div>
+        <div>
           <label className="lbl" htmlFor="settings-easypaisa">
             Easypaisa number
           </label>
@@ -2452,6 +2491,18 @@ function SettingsTab() {
             placeholder="923001234567"
             value={form.easypaisaNumber}
             onChange={(e) => set("easypaisaNumber", e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="lbl" htmlFor="settings-easypaisa-title">
+            Easypaisa account title
+          </label>
+          <input
+            id="settings-easypaisa-title"
+            className="input"
+            placeholder="FikarNot Store"
+            value={form.easypaisaTitle || ""}
+            onChange={(e) => set("easypaisaTitle", e.target.value)}
           />
         </div>
         <div>

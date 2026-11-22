@@ -27,8 +27,10 @@ const uploadImageSchema = z.object({
 });
 
 const paymentProofSchema = z.object({
-  dataUrl: z.string().min(1, "Payment slip image is required."),
+  dataUrl: z.string().min(1, "Payment slip image or PDF is required."),
   originalName: z.string().trim().max(255).optional(),
+  reference: z.string().trim().max(100).optional(),
+  note: z.string().trim().max(500).optional(),
 });
 
 const confirmPaymentSchema = z.object({
@@ -64,7 +66,15 @@ const videoCompleteSchema = z.object({
 });
 
 const ALLOWED_IMAGE_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };
+const ALLOWED_PROOF_TYPES: Record<string, string> = {
+  "image/jpeg": "jpg",
+  "image/png": "png",
+  "image/webp": "webp",
+  "image/gif": "gif",
+  "application/pdf": "pdf",
+};
 const DATA_URL_RE = /^data:(image\/(?:jpeg|png|webp|gif));base64,([a-zA-Z0-9+/=]+)$/;
+const PROOF_DATA_URL_RE = /^data:((?:image\/(?:jpeg|png|webp|gif)|application\/pdf));base64,([a-zA-Z0-9+/=]+)$/;
 const MAX_UPLOAD_BYTES = 8 * 1024 * 1024;
 const MAX_PAYMENT_PROOF_BYTES = 3 * 1024 * 1024;
 
@@ -84,8 +94,25 @@ function imageMatchesMagicBytes(mimeType: string, buf: Uint8Array): boolean {
   return false;
 }
 
+function proofMatchesMagicBytes(mimeType: string, buf: Uint8Array): boolean {
+  if (mimeType === "application/pdf") {
+    return buf.length >= 4 && buf[0] === 0x25 && buf[1] === 0x50 && buf[2] === 0x44 && buf[3] === 0x46; // %PDF
+  }
+  return imageMatchesMagicBytes(mimeType, buf);
+}
+
 function decodeDataUrl(dataUrl: string) {
   const match = DATA_URL_RE.exec(String(dataUrl || "").trim());
+  if (!match) return null;
+  const [, mimeType, base64] = match;
+  const binary = atob(base64);
+  const bytes = new Uint8Array(binary.length);
+  for (let i = 0; i < binary.length; i++) bytes[i] = binary.charCodeAt(i);
+  return { mimeType, bytes };
+}
+
+function decodeProofDataUrl(dataUrl: string) {
+  const match = PROOF_DATA_URL_RE.exec(String(dataUrl || "").trim());
   if (!match) return null;
   const [, mimeType, base64] = match;
   const binary = atob(base64);
@@ -402,15 +429,15 @@ Deno.serve(async (req) => {
       const val = await validateJson(req, paymentProofSchema, 5 * 1024 * 1024);
       if (!val.success) return val.response;
       const body = val.data;
-      const decoded = decodeDataUrl(body.dataUrl);
+      const decoded = decodeProofDataUrl(body.dataUrl);
       if (!decoded)
-        return json(req, { error: "INVALID_PAYMENT_PROOF", message: "Only JPEG, PNG, WebP, or GIF payment slips are accepted." }, 400);
+        return json(req, { error: "INVALID_PAYMENT_PROOF", message: "Only JPEG, PNG, WebP, GIF, or PDF payment slips are accepted." }, 400);
       if (!decoded.bytes.length || decoded.bytes.length > MAX_PAYMENT_PROOF_BYTES)
-        return json(req, { error: "PAYMENT_PROOF_TOO_LARGE", message: "Payment slip must be a valid image under 3MB." }, 413);
-      if (!imageMatchesMagicBytes(decoded.mimeType, decoded.bytes))
+        return json(req, { error: "PAYMENT_PROOF_TOO_LARGE", message: "Payment slip must be a valid file under 3MB." }, 413);
+      if (!proofMatchesMagicBytes(decoded.mimeType, decoded.bytes))
         return json(
           req,
-          { error: "INVALID_PAYMENT_PROOF_CONTENT", message: "The payment slip does not match its declared image type." },
+          { error: "INVALID_PAYMENT_PROOF_CONTENT", message: "The payment slip does not match its declared file type." },
           400,
         );
 
@@ -421,7 +448,7 @@ Deno.serve(async (req) => {
       const { data: dupe } = await admin.from("payment_proofs").select("id").eq("sha256", sha256).maybeSingle();
       if (dupe) return json(req, { error: "PAYMENT_PROOF_DUPLICATE", message: "This payment image has already been submitted." }, 409);
 
-      const ext = ALLOWED_IMAGE_TYPES[decoded.mimeType];
+      const ext = ALLOWED_PROOF_TYPES[decoded.mimeType];
       const filename = `${orderId}/proof-${crypto.randomUUID()}.${ext}`;
       const { error: uploadError } = await admin.storage
         .from("payment-proofs")
@@ -441,13 +468,48 @@ Deno.serve(async (req) => {
         uploaded_by: caller.id,
         created_at: now,
       });
+
+      // Update or record the transaction reference and customer note
+      if (body.reference || body.note) {
+        const { data: existingPayment } = await admin.from("payments").select("id").eq("order_id", orderId).maybeSingle();
+
+        if (existingPayment) {
+          await admin
+            .from("payments")
+            .update({
+              provider_payment_id: body.reference ? body.reference.trim() : undefined,
+              raw_status: body.note ? body.note.trim() : undefined,
+              updated_at: now,
+            })
+            .eq("id", existingPayment.id);
+        } else {
+          await admin.from("payments").insert({
+            id: `pay-${crypto.randomUUID()}`,
+            order_id: orderId,
+            provider: order.payment_method || "manual",
+            provider_payment_id: body.reference?.trim() || null,
+            amount: Number(order.total),
+            currency: order.currency || "PKR",
+            status: "pending",
+            raw_status: body.note?.trim() || "Customer submitted reference",
+            created_at: now,
+            updated_at: now,
+          });
+        }
+      }
+
       await admin.from("audit_logs").insert({
         id: `audit-${crypto.randomUUID()}`,
         actor_user_id: caller.id,
         action: "payment.proof_upload",
         entity_type: "order",
         entity_id: orderId,
-        details_json: { proofId: id, byteSize: decoded.bytes.length },
+        details_json: {
+          proofId: id,
+          byteSize: decoded.bytes.length,
+          reference: body.reference || null,
+          note: body.note || null,
+        },
       });
       return json(
         req,
@@ -458,6 +520,8 @@ Deno.serve(async (req) => {
             mimeType: decoded.mimeType,
             byteSize: decoded.bytes.length,
             status: "submitted",
+            reference: body.reference || null,
+            note: body.note || null,
           },
         },
         201,
