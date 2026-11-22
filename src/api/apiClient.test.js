@@ -40,8 +40,21 @@ describe("apiRequest routing", () => {
     expect(urlOf()).toMatch(/\/functions\/v1\/chat\/?$/);
   });
 
+  it("routes video upload endpoints to the storage function", async () => {
+    await apiRequest("/api/uploads/video/signed-url", { method: "POST", body: JSON.stringify({ mimeType: "video/mp4", byteSize: 100 }) });
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/functions\/v1\/storage\/video\/signed-url$/);
+
+    fetchMock.mockClear();
+    await apiRequest("/api/uploads/video/complete", { method: "POST", body: JSON.stringify({ filename: "vid-1.mp4" }) });
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/functions\/v1\/storage\/video\/complete$/);
+
+    fetchMock.mockClear();
+    await apiRequest("/api/uploads/video", { method: "POST" });
+    expect(fetchMock.mock.calls[0][0]).toMatch(/\/functions\/v1\/storage\/video$/);
+  });
+
   it("fails fast with 501 for features that are not ported", async () => {
-    await expect(apiRequest("/api/uploads/video")).rejects.toMatchObject({ status: 501, code: "NOT_YET_MIGRATED" });
+    await expect(apiRequest("/api/media/cleanup")).rejects.toMatchObject({ status: 501, code: "NOT_YET_MIGRATED" });
     await expect(apiRequest("/api/payments/payfast/session")).rejects.toMatchObject({ status: 501 });
   });
 

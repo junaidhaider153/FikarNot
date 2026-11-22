@@ -18,6 +18,8 @@ import { queueEmail } from "../_shared/email.ts";
 import { paymentConfirmed } from "../_shared/emailTemplates.ts";
 import { validateJson, z } from "../_shared/validate.ts";
 import { validateConfirmPayment, validatePaymentProofUpload } from "../_shared/orderLifecycle.ts";
+import { limit } from "../_shared/rateLimit.ts";
+import { hexToBytes, MAX_VIDEO_BYTES, validateVideoMetadata } from "../_shared/video.ts";
 
 const uploadImageSchema = z.object({
   dataUrl: z.string().min(1, "Image data URL is required."),
@@ -33,6 +35,32 @@ const confirmPaymentSchema = z.object({
   requireProof: z.boolean().optional(),
   providerReference: z.string().trim().max(200).optional(),
   note: z.string().trim().max(500).optional(),
+});
+
+const videoSignedUrlSchema = z.object({
+  originalName: z.string().trim().max(255).optional().default(""),
+  mimeType: z.string().trim().min(1),
+  byteSize: z.number().int().positive(),
+  sha256: z
+    .string()
+    .trim()
+    .regex(/^[0-9a-fA-F]{64}$/, "SHA-256 must be a 64-character hex string.")
+    .optional(),
+  headerHex: z.string().trim().optional(),
+});
+
+const videoCompleteSchema = z.object({
+  filename: z
+    .string()
+    .trim()
+    .regex(/^vid-[0-9a-fA-F-]{36}\.(mp4|webm)$/, "Invalid video filename."),
+  originalName: z.string().trim().max(255).optional().default(""),
+  mimeType: z.enum(["video/mp4", "video/webm"]),
+  byteSize: z.number().int().positive().max(MAX_VIDEO_BYTES),
+  sha256: z
+    .string()
+    .trim()
+    .regex(/^[0-9a-fA-F]{64}$/, "SHA-256 must be a 64-character hex string."),
 });
 
 const ALLOWED_IMAGE_TYPES: Record<string, string> = { "image/jpeg": "jpg", "image/png": "png", "image/webp": "webp", "image/gif": "gif" };
@@ -152,6 +180,160 @@ Deno.serve(async (req) => {
         entity_type: "media",
         entity_id: id,
         details_json: { byteSize: decoded.bytes.length, mimeType: decoded.mimeType },
+      });
+      const { data: saved } = await admin.from("media_assets").select("*").eq("id", id).single();
+      return json(req, { url: saved.url, asset: mediaRow(saved, 0) }, 201);
+    }
+
+    // ---- POST /video/signed-url (staff — hero/site videos) ---------------------
+    if (req.method === "POST" && path === "/video/signed-url") {
+      const caller = await getCaller(req);
+      if (!isStaff(caller)) return json(req, { error: "FORBIDDEN", message: "Staff permission required." }, caller ? 403 : 401);
+      const limited = await limit(req, "video_upload", 20, 3600);
+      if (limited) return limited;
+
+      const val = await validateJson(req, videoSignedUrlSchema, 10 * 1024);
+      if (!val.success) return val.response;
+      const body = val.data;
+
+      const headerBytes = body.headerHex ? hexToBytes(body.headerHex) : undefined;
+      const check = validateVideoMetadata(body.mimeType, body.byteSize, headerBytes);
+      if (!check.valid) {
+        return json(req, { error: check.code!, message: check.message! }, check.status!);
+      }
+
+      if (body.sha256) {
+        const { data: existing } = await admin.from("media_assets").select("*").eq("sha256", body.sha256.toLowerCase()).maybeSingle();
+        if (existing) {
+          return json(
+            req,
+            {
+              alreadyExists: true,
+              url: existing.url,
+              asset: mediaRow(existing, await mediaUsageCount(existing.url)),
+            },
+            200,
+          );
+        }
+      }
+
+      const filename = `vid-${crypto.randomUUID()}.${check.ext}`;
+      const { data: signedData, error: signError } = await admin.storage.from("media").createSignedUploadUrl(filename);
+      if (signError) throw signError;
+
+      const { data: pub } = admin.storage.from("media").getPublicUrl(filename);
+      const supabaseUrl = Deno.env.get("SUPABASE_URL") || "";
+      const signedUrl = signedData.signedUrl.startsWith("http")
+        ? signedData.signedUrl
+        : `${supabaseUrl.replace(/\/$/, "")}/storage/v1${signedData.signedUrl.startsWith("/") ? "" : "/"}${signedData.signedUrl}`;
+
+      return json(
+        req,
+        {
+          alreadyExists: false,
+          signedUrl,
+          path: signedData.path,
+          token: signedData.token,
+          publicUrl: pub.publicUrl,
+          filename,
+          mimeType: body.mimeType,
+          maxBytes: MAX_VIDEO_BYTES,
+        },
+        200,
+      );
+    }
+
+    // ---- POST /video/complete (staff — register uploaded video) ----------------
+    if (req.method === "POST" && path === "/video/complete") {
+      const caller = await getCaller(req);
+      if (!isStaff(caller)) return json(req, { error: "FORBIDDEN", message: "Staff permission required." }, caller ? 403 : 401);
+
+      const val = await validateJson(req, videoCompleteSchema, 10 * 1024);
+      if (!val.success) return val.response;
+      const body = val.data;
+
+      const sha256 = body.sha256.toLowerCase();
+      const { data: existing } = await admin.from("media_assets").select("*").eq("sha256", sha256).maybeSingle();
+      if (existing) {
+        return json(req, { url: existing.url, asset: mediaRow(existing, await mediaUsageCount(existing.url)) }, 200);
+      }
+
+      const { data: pub } = admin.storage.from("media").getPublicUrl(body.filename);
+      const id = `media-${crypto.randomUUID()}`;
+      const now = new Date().toISOString();
+      await admin.from("media_assets").insert({
+        id,
+        filename: body.filename,
+        original_name: body.originalName.slice(0, 255),
+        mime_type: body.mimeType,
+        byte_size: body.byteSize,
+        sha256,
+        url: pub.publicUrl,
+        uploaded_by: caller!.id,
+        created_at: now,
+      });
+      await admin.from("audit_logs").insert({
+        id: `audit-${crypto.randomUUID()}`,
+        actor_user_id: caller!.id,
+        action: "media.upload",
+        entity_type: "media",
+        entity_id: id,
+        details_json: { byteSize: body.byteSize, mimeType: body.mimeType, filename: body.filename },
+      });
+      const { data: saved } = await admin.from("media_assets").select("*").eq("id", id).single();
+      return json(req, { url: saved.url, asset: mediaRow(saved, 0) }, 201);
+    }
+
+    // ---- POST /video (staff — direct binary upload fallback) ------------------
+    if (req.method === "POST" && path === "/video") {
+      const caller = await getCaller(req);
+      if (!isStaff(caller)) return json(req, { error: "FORBIDDEN", message: "Staff permission required." }, caller ? 403 : 401);
+      const limited = await limit(req, "video_upload", 20, 3600);
+      if (limited) return limited;
+
+      const rawMime = String(req.headers.get("content-type") || "")
+        .split(";")[0]
+        .trim()
+        .toLowerCase();
+      const buffer = new Uint8Array(await req.arrayBuffer());
+      const headerBytes = buffer.subarray(0, 16);
+      const check = validateVideoMetadata(rawMime, buffer.length, headerBytes);
+      if (!check.valid) {
+        return json(req, { error: check.code!, message: check.message! }, check.status!);
+      }
+
+      const sha256 = await sha256Hex(buffer);
+      const { data: existing } = await admin.from("media_assets").select("*").eq("sha256", sha256).maybeSingle();
+      if (existing) {
+        return json(req, { url: existing.url, asset: mediaRow(existing, await mediaUsageCount(existing.url)) }, 200);
+      }
+
+      const filename = `vid-${crypto.randomUUID()}.${check.ext}`;
+      const { error: uploadError } = await admin.storage.from("media").upload(filename, buffer, { contentType: rawMime, upsert: false });
+      if (uploadError) throw uploadError;
+
+      const { data: pub } = admin.storage.from("media").getPublicUrl(filename);
+      const id = `media-${crypto.randomUUID()}`;
+      const now = new Date().toISOString();
+      const originalName = decodeURIComponent(String(req.headers.get("x-original-name") || "")).slice(0, 255);
+      await admin.from("media_assets").insert({
+        id,
+        filename,
+        original_name: originalName,
+        mime_type: rawMime,
+        byte_size: buffer.length,
+        sha256,
+        url: pub.publicUrl,
+        uploaded_by: caller!.id,
+        created_at: now,
+      });
+      await admin.from("audit_logs").insert({
+        id: `audit-${crypto.randomUUID()}`,
+        actor_user_id: caller!.id,
+        action: "media.upload",
+        entity_type: "media",
+        entity_id: id,
+        details_json: { byteSize: buffer.length, mimeType: rawMime, filename },
       });
       const { data: saved } = await admin.from("media_assets").select("*").eq("id", id).single();
       return json(req, { url: saved.url, asset: mediaRow(saved, 0) }, 201);

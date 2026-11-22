@@ -37,6 +37,9 @@ const ROUTES = [
 
   // ---- storage (uploads + payment proofs) — checked BEFORE orders ----------
   [/^\/api\/uploads\/image$/, "storage", () => "/image"],
+  [/^\/api\/uploads\/video\/signed-url$/, "storage", () => "/video/signed-url"],
+  [/^\/api\/uploads\/video\/complete$/, "storage", () => "/video/complete"],
+  [/^\/api\/uploads\/video$/, "storage", () => "/video"],
   [/^\/api\/media\/(.+)$/, "storage", (m) => `/media/${m[1]}`],
   [/^\/api\/media$/, "storage", () => "/media"],
   [/^\/api\/orders\/(.+)\/payment-proof$/, "storage", (m) => `/payment-proof/${m[1]}`],
@@ -84,7 +87,6 @@ const KNOWN_UNSUPPORTED = {
   "/api/orders/migrate": "One-time data migration tool — no longer needed, your data is already in Supabase.",
   "/api/engagement/migrate": "One-time data migration tool — no longer needed, your data is already in Supabase.",
   "/api/media/cleanup": "Bulk media cleanup hasn't been ported yet.",
-  "/api/uploads/video": "Video upload hasn't been ported yet (only images are supported so far).",
   "/api/payments/payfast/session": "Online/card payments (PayFast) aren't wired up yet — only COD and manual transfer work right now.",
 };
 
