@@ -104,8 +104,8 @@ export function analyticsCsv(data) {
   const rows = [
     ["Metric", "Value"],
     ["Revenue", data.revenue.toFixed(2)],
-    ["Orders", data.validOrders.length],
-    ["Units sold", data.unitsSold],
+    ["Paid orders", data.validOrders.length],
+    ["Paid units", data.unitsSold],
     ["Average order value", data.averageOrderValue.toFixed(2)],
     ["Customers", data.customerCount],
     ["Repeat customers", data.repeatCustomerCount],

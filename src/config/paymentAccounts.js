@@ -1,43 +1,57 @@
 // Centralized payment account configurations for manual bank and wallet transfers.
-// Dynamic values from admin site_settings override these defaults.
+// Dynamic values from admin site_settings configure these accounts.
+// If admin settings are blank, the payment method is hidden.
 
 export const DEFAULT_PAYMENT_ACCOUNTS = Object.freeze({
   bank: {
-    name: "Meezan Bank",
-    accountTitle: "FikarNot Official",
-    accountNumber: "02010108927451",
-    iban: "PK72MEZN0002010108927451",
+    name: "",
+    accountTitle: "",
+    accountNumber: "",
+    iban: "",
     instructions: "Transfer from any bank app or ATM. Always enter your Order ID in the transfer remarks/reference.",
   },
   jazzcash: {
-    title: "FikarNot Official",
-    number: "03709072688",
+    title: "",
+    number: "",
     instructions: "Send money via JazzCash App or *786#. Enter your Order ID in the reference / message field.",
   },
   easypaisa: {
-    title: "FikarNot Official",
-    number: "03709072688",
+    title: "",
+    number: "",
     instructions: "Send money via Easypaisa App or *786#. Enter your Order ID in the reference / message field.",
   },
 });
 
+export const DEFAULT_PAYMENT_FORM_FIELDS = Object.freeze({
+  jazzcashNumber: "",
+  jazzcashTitle: "",
+  easypaisaNumber: "",
+  easypaisaTitle: "",
+  bankName: "",
+  bankAccountTitle: "",
+  bankAccountNumber: "",
+  bankIban: "",
+  bankInstructions: "Transfer from any bank app or ATM. Always enter your Order ID in the transfer remarks/reference.",
+});
+
 /**
- * Resolves current payment accounts by merging store settings with system defaults.
+ * Resolves current payment accounts from store settings.
+ * If numbers/accounts are not configured, they remain empty string so they are not shown.
  * @param {Record<string, any>} siteSettings
  */
 export function getPaymentAccounts(siteSettings = {}) {
-  const bankName = siteSettings?.bankName || DEFAULT_PAYMENT_ACCOUNTS.bank.name;
-  const bankAccountTitle = siteSettings?.bankAccountTitle || DEFAULT_PAYMENT_ACCOUNTS.bank.accountTitle;
-  const bankAccountNumber = siteSettings?.bankAccountNumber || DEFAULT_PAYMENT_ACCOUNTS.bank.accountNumber;
-  const bankIban = siteSettings?.bankIban || DEFAULT_PAYMENT_ACCOUNTS.bank.iban;
+  const bankName = siteSettings?.bankName || "";
+  const bankAccountTitle = siteSettings?.bankAccountTitle || "";
+  const bankAccountNumber = siteSettings?.bankAccountNumber || "";
+  const bankIban = siteSettings?.bankIban || "";
   const bankInstructions = siteSettings?.bankInstructions || DEFAULT_PAYMENT_ACCOUNTS.bank.instructions;
 
-  const jazzcashNumber = siteSettings?.jazzcashNumber || DEFAULT_PAYMENT_ACCOUNTS.jazzcash.number;
-  const jazzcashTitle = siteSettings?.jazzcashTitle || bankAccountTitle || DEFAULT_PAYMENT_ACCOUNTS.jazzcash.title;
+  const jazzcashNumber = siteSettings?.jazzcashNumber || "";
+  const jazzcashTitle = siteSettings?.jazzcashTitle || bankAccountTitle || "";
   const jazzcashInstructions = siteSettings?.jazzcashInstructions || DEFAULT_PAYMENT_ACCOUNTS.jazzcash.instructions;
 
-  const easypaisaNumber = siteSettings?.easypaisaNumber || DEFAULT_PAYMENT_ACCOUNTS.easypaisa.number;
-  const easypaisaTitle = siteSettings?.easypaisaTitle || bankAccountTitle || DEFAULT_PAYMENT_ACCOUNTS.easypaisa.title;
+  const easypaisaNumber = siteSettings?.easypaisaNumber || "";
+  const easypaisaTitle = siteSettings?.easypaisaTitle || bankAccountTitle || "";
   const easypaisaInstructions = siteSettings?.easypaisaInstructions || DEFAULT_PAYMENT_ACCOUNTS.easypaisa.instructions;
 
   return {

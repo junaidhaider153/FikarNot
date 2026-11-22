@@ -1,7 +1,8 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 import { cleanup, fireEvent, render, screen, waitFor } from "@testing-library/react";
-import { CopyButton, ManualPaymentInstructions, OrderConfirmation } from "./CheckoutPage";
+import CheckoutPage, { CopyButton, ManualPaymentInstructions, OrderConfirmation } from "./CheckoutPage";
 import { ordersApi } from "../api/ordersApi";
+import { useApp, cartLines } from "../store/appStore";
 
 vi.mock("react-router-dom", () => ({
   Link: ({ children, to, ...props }) => (
@@ -41,6 +42,60 @@ describe("CheckoutPage components - Manual Payments & Proof Upload", () => {
 
   afterEach(() => {
     cleanup();
+  });
+
+  describe("CheckoutPage manual methods gating", () => {
+    const dummyCart = [
+      {
+        p: { id: "prod-1", name: "Premium Shirt", price: 2500, images: ["/shirt.jpg"] },
+        qty: 1,
+      },
+    ];
+
+    it("displays manual payment options when configured in siteSettings for authenticated user", () => {
+      useApp.mockReturnValue({
+        session: { user: { id: "u-1" }, name: "Customer", email: "cust@example.com" },
+        siteSettings: {
+          allowCod: "1",
+          allowManualPayments: "1",
+          jazzcashNumber: "03001234567",
+          easypaisaNumber: "03451234567",
+          bankName: "Meezan Bank",
+          bankAccountNumber: "0102030405",
+        },
+      });
+      cartLines.mockReturnValue(dummyCart);
+
+      render(<CheckoutPage />);
+
+      expect(screen.getByRole("button", { name: /cash on delivery/i })).toBeTruthy();
+      expect(screen.getByRole("button", { name: /jazzcash/i })).toBeTruthy();
+      expect(screen.getByRole("button", { name: /easypaisa/i })).toBeTruthy();
+      expect(screen.getByRole("button", { name: /bank transfer/i })).toBeTruthy();
+    });
+
+    it("hides manual payment options when accounts are blank in siteSettings", () => {
+      useApp.mockReturnValue({
+        session: { user: { id: "u-1" }, name: "Customer", email: "cust@example.com" },
+        siteSettings: {
+          allowCod: "1",
+          allowManualPayments: "1",
+          jazzcashNumber: "",
+          easypaisaNumber: "",
+          bankName: "",
+          bankAccountNumber: "",
+          bankIban: "",
+        },
+      });
+      cartLines.mockReturnValue(dummyCart);
+
+      render(<CheckoutPage />);
+
+      expect(screen.getByRole("button", { name: /cash on delivery/i })).toBeTruthy();
+      expect(screen.queryByRole("button", { name: /jazzcash/i })).toBeNull();
+      expect(screen.queryByRole("button", { name: /easypaisa/i })).toBeNull();
+      expect(screen.queryByRole("button", { name: /bank transfer/i })).toBeNull();
+    });
   });
 
   describe("<CopyButton />", () => {
@@ -147,7 +202,7 @@ describe("CheckoutPage components - Manual Payments & Proof Upload", () => {
 
     it("renders order confirmation and allows uploading payment proof with reference and note", async () => {
       ordersApi.uploadPaymentProof.mockResolvedValueOnce({
-        proof: { id: "proof-1", filename: "receipt.pdf" },
+        proof: { id: "proof-1", filename: "receipt.png" },
       });
 
       render(<OrderConfirmation order={baseOrder} />);
@@ -163,7 +218,7 @@ describe("CheckoutPage components - Manual Payments & Proof Upload", () => {
       fireEvent.change(refInput, { target: { value: "TRX-BANK-555" } });
       fireEvent.change(noteInput, { target: { value: "Paid via Meezan mobile app" } });
 
-      const file = new File(["dummy pdf content"], "receipt.pdf", { type: "application/pdf" });
+      const file = new File(["dummy png content"], "receipt.png", { type: "image/png" });
       fireEvent.change(fileInput, { target: { files: [file] } });
 
       const submitBtn = screen.getByRole("button", { name: /submit payment proof/i });
@@ -174,7 +229,7 @@ describe("CheckoutPage components - Manual Payments & Proof Upload", () => {
         expect(ordersApi.uploadPaymentProof).toHaveBeenCalledWith(
           "ORD-TEST-123",
           expect.objectContaining({
-            originalName: "receipt.pdf",
+            originalName: "receipt.png",
             email: "customer@example.com",
             token: "tok-secret-xyz",
             reference: "TRX-BANK-555",

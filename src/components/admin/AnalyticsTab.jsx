@@ -83,7 +83,7 @@ export function AnalyticsTab() {
             <Ic n="cart" s={17} />
           </span>
           <b>{data.validOrders.length}</b>
-          <span>Completed orders</span>
+          <span>Paid Orders</span>
         </div>
         <div className="stat">
           <span className="ic">
@@ -104,7 +104,7 @@ export function AnalyticsTab() {
       <div className="analytics-signal-row">
         <div className="analytics-signal">
           <strong>{data.unitsSold}</strong>
-          <span>Units sold</span>
+          <span>Paid Units</span>
         </div>
         <div className="analytics-signal">
           <strong>{data.repeatCustomerCount}</strong>

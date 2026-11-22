@@ -7,7 +7,7 @@ import { admin } from "../_shared/supabase.ts";
 import { validateJson, z } from "../_shared/validate.ts";
 import { buildSystemInstruction, callGemini } from "../_shared/gemini.ts";
 
-const chatSchema = z.object({
+export const chatSchema = z.object({
   message: z.string().trim().min(1, "Message can't be empty.").max(1200, "Please keep messages under 1200 characters."),
   history: z
     .array(
@@ -20,7 +20,60 @@ const chatSchema = z.object({
     .default([]),
 });
 
-Deno.serve(async (req) => {
+/**
+ * Strips leading assistant/model welcome turns so that message history sent to Gemini
+ * always starts with a user turn (or is empty for the first prompt).
+ */
+export function cleanChatHistory(
+  rawHistory: Array<{ role: "user" | "model"; text?: string }>,
+): Array<{ role: "user" | "model"; text: string }> {
+  const filtered = rawHistory.map((t) => ({ role: t.role, text: (t.text || "").trim() })).filter((t) => t.text.length > 0);
+
+  let firstUserIdx = 0;
+  while (firstUserIdx < filtered.length && filtered[firstUserIdx].role === "model") {
+    firstUserIdx++;
+  }
+  return filtered.slice(firstUserIdx).slice(-10);
+}
+
+/**
+ * Loads store settings, categories, and products for assistant grounding.
+ * Explicitly verifies all query responses and throws if any database query fails.
+ */
+// deno-lint-ignore no-explicit-any
+export async function fetchCatalogContext(client: any) {
+  const [settingsRes, categoriesRes, productsRes] = await Promise.all([
+    client.from("site_settings").select("key, value"),
+    client.from("categories").select("name").order("name"),
+    client
+      .from("products")
+      .select("name, price, stock, categories(name)")
+      .order("featured", { ascending: false })
+      .order("updated_at", { ascending: false })
+      .limit(40),
+  ]);
+
+  if (settingsRes?.error) {
+    throw new Error(`Failed to load site_settings: ${settingsRes.error.message || JSON.stringify(settingsRes.error)}`);
+  }
+  if (categoriesRes?.error) {
+    throw new Error(`Failed to load categories: ${categoriesRes.error.message || JSON.stringify(categoriesRes.error)}`);
+  }
+  if (productsRes?.error) {
+    throw new Error(`Failed to load products: ${productsRes.error.message || JSON.stringify(productsRes.error)}`);
+  }
+
+  const settings: Record<string, string> = {};
+  for (const row of settingsRes?.data || []) settings[row.key] = String(row.value ?? "");
+  // deno-lint-ignore no-explicit-any
+  const categories = (categoriesRes?.data || []).map((c: any) => c.name);
+  const products = productsRes?.data || [];
+
+  return { settings, categories, products };
+}
+
+// deno-lint-ignore no-explicit-any
+export async function handleChatRequest(req: Request, deps?: { client?: any; callGeminiFn?: typeof callGemini; apiKey?: string }) {
   if (req.method === "OPTIONS") return new Response(null, { status: 204, headers: corsHeaders(req) });
 
   if (req.method !== "POST") {
@@ -31,7 +84,7 @@ Deno.serve(async (req) => {
   const limited = await limit(req, "chat", 12, 60);
   if (limited) return limited;
 
-  const apiKey = Deno.env.get("GEMINI_API_KEY");
+  const apiKey = deps?.apiKey ?? Deno.env.get("GEMINI_API_KEY");
   if (!apiKey) {
     return json(
       req,
@@ -47,31 +100,17 @@ Deno.serve(async (req) => {
   if (!val.success) return val.response;
 
   const { message, history: rawHistory } = val.data;
-  const history = rawHistory.filter((t) => t.text.length > 0).slice(-10);
+  const history = cleanChatHistory(rawHistory);
 
   try {
-    const [settingsRes, categoriesRes, productsRes] = await Promise.all([
-      admin.from("site_settings").select("key, value"),
-      admin.from("categories").select("name").order("name"),
-      admin
-        .from("products")
-        .select("name, price, stock, categories(name)")
-        .eq("status", "published")
-        .order("featured", { ascending: false })
-        .order("updated_at", { ascending: false })
-        .limit(40),
-    ]);
-
-    const settings: Record<string, string> = {};
-    for (const row of settingsRes.data || []) settings[row.key] = String(row.value ?? "");
-    // deno-lint-ignore no-explicit-any
-    const categories = (categoriesRes.data || []).map((c: any) => c.name);
-    const products = productsRes.data || [];
+    const client = deps?.client ?? admin;
+    const { settings, categories, products } = await fetchCatalogContext(client);
 
     const systemInstruction = buildSystemInstruction(settings, categories, products);
     const model = Deno.env.get("GEMINI_MODEL") || "gemini-2.5-flash";
 
-    const reply = await callGemini(apiKey, model, systemInstruction, history, message);
+    const runner = deps?.callGeminiFn ?? callGemini;
+    const reply = await runner(apiKey, model, systemInstruction, history, message);
     return json(req, { reply });
     // deno-lint-ignore no-explicit-any
   } catch (err: any) {
@@ -89,4 +128,8 @@ Deno.serve(async (req) => {
       status,
     );
   }
-});
+}
+
+if (import.meta.main) {
+  Deno.serve((req) => handleChatRequest(req));
+}

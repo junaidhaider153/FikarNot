@@ -38,26 +38,29 @@ export default function CheckoutPage() {
   const manualMethods = useMemo(
     () =>
       [
-        { key: "jazzcash", label: "JazzCash", detail: commerce.manualPaymentDetails.jazzcashNumber },
-        { key: "easypaisa", label: "Easypaisa", detail: commerce.manualPaymentDetails.easypaisaNumber },
+        {
+          key: "jazzcash",
+          label: "JazzCash",
+          detail: commerce.manualPaymentDetails.jazzcash?.number || commerce.manualPaymentDetails.jazzcashNumber,
+        },
+        {
+          key: "easypaisa",
+          label: "Easypaisa",
+          detail: commerce.manualPaymentDetails.easypaisa?.number || commerce.manualPaymentDetails.easypaisaNumber,
+        },
         {
           key: "bank_transfer",
           label: "Bank transfer",
           detail:
+            commerce.manualPaymentDetails.bank?.name ||
+            commerce.manualPaymentDetails.bank?.accountNumber ||
+            commerce.manualPaymentDetails.bank?.iban ||
             commerce.manualPaymentDetails.bankName ||
             commerce.manualPaymentDetails.bankAccountNumber ||
             commerce.manualPaymentDetails.bankIban,
         },
-      ].filter((method) => method.detail && commerce.allowManualPayments && Boolean(s.session)),
-    [
-      commerce.manualPaymentDetails.jazzcashNumber,
-      commerce.manualPaymentDetails.easypaisaNumber,
-      commerce.manualPaymentDetails.bankName,
-      commerce.manualPaymentDetails.bankAccountNumber,
-      commerce.manualPaymentDetails.bankIban,
-      commerce.allowManualPayments,
-      s.session,
-    ],
+      ].filter((method) => Boolean(method.detail) && commerce.allowManualPayments && Boolean(s.session)),
+    [commerce.manualPaymentDetails, commerce.allowManualPayments, s.session],
   );
   useDocumentMeta({ title: "Checkout", noindex: true });
   const lines = cartLines(s);
@@ -720,6 +723,24 @@ export function ManualPaymentInstructions({ method, details = {}, amount, curren
   const label = method === "jazzcash" ? "JazzCash" : method === "easypaisa" ? "Easypaisa" : "Bank transfer";
   const formattedAmount = amount != null ? fmt(amount, currency, locale) : null;
 
+  const jazzcash = details.jazzcash || {
+    title: details.jazzcashTitle,
+    number: details.jazzcashNumber,
+    instructions: details.jazzcashInstructions,
+  };
+  const easypaisa = details.easypaisa || {
+    title: details.easypaisaTitle,
+    number: details.easypaisaNumber,
+    instructions: details.easypaisaInstructions,
+  };
+  const bank = details.bank || {
+    name: details.bankName,
+    accountTitle: details.bankAccountTitle,
+    accountNumber: details.bankAccountNumber,
+    iban: details.bankIban,
+    instructions: details.bankInstructions,
+  };
+
   return (
     <div className="panel manual-payment-card" style={{ marginTop: 16, padding: 18, borderLeft: "4px solid var(--lime, #b8f029)" }}>
       <div style={{ display: "flex", justifyContent: "space-between", alignItems: "baseline", flexWrap: "wrap", gap: 8 }}>
@@ -783,23 +804,23 @@ export function ManualPaymentInstructions({ method, details = {}, amount, curren
 
       {method === "jazzcash" && (
         <div style={{ display: "grid", gap: 8, fontSize: 14 }}>
-          {details.jazzcashTitle && (
+          {jazzcash.title && (
             <div>
               <span className="muted" style={{ fontSize: 12, display: "block" }}>
                 Account title
               </span>
-              <strong>{details.jazzcashTitle}</strong>
+              <strong>{jazzcash.title}</strong>
             </div>
           )}
-          {details.jazzcashNumber && (
+          {jazzcash.number && (
             <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
               <div>
                 <span className="muted" style={{ fontSize: 12, display: "block" }}>
                   JazzCash mobile number
                 </span>
-                <strong style={{ fontSize: 15 }}>{details.jazzcashNumber}</strong>
+                <strong style={{ fontSize: 15 }}>{jazzcash.number}</strong>
               </div>
-              <CopyButton text={details.jazzcashNumber} label="Copy Number" />
+              <CopyButton text={jazzcash.number} label="Copy Number" />
             </div>
           )}
         </div>
@@ -807,23 +828,23 @@ export function ManualPaymentInstructions({ method, details = {}, amount, curren
 
       {method === "easypaisa" && (
         <div style={{ display: "grid", gap: 8, fontSize: 14 }}>
-          {details.easypaisaTitle && (
+          {easypaisa.title && (
             <div>
               <span className="muted" style={{ fontSize: 12, display: "block" }}>
                 Account title
               </span>
-              <strong>{details.easypaisaTitle}</strong>
+              <strong>{easypaisa.title}</strong>
             </div>
           )}
-          {details.easypaisaNumber && (
+          {easypaisa.number && (
             <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
               <div>
                 <span className="muted" style={{ fontSize: 12, display: "block" }}>
                   Easypaisa mobile number
                 </span>
-                <strong style={{ fontSize: 15 }}>{details.easypaisaNumber}</strong>
+                <strong style={{ fontSize: 15 }}>{easypaisa.number}</strong>
               </div>
-              <CopyButton text={details.easypaisaNumber} label="Copy Number" />
+              <CopyButton text={easypaisa.number} label="Copy Number" />
             </div>
           )}
         </div>
@@ -831,46 +852,46 @@ export function ManualPaymentInstructions({ method, details = {}, amount, curren
 
       {method === "bank_transfer" && (
         <div style={{ display: "grid", gap: 10, fontSize: 14 }}>
-          {details.bankName && (
+          {bank.name && (
             <div>
               <span className="muted" style={{ fontSize: 12, display: "block" }}>
                 Bank name
               </span>
-              <strong>{details.bankName}</strong>
+              <strong>{bank.name}</strong>
             </div>
           )}
-          {details.bankAccountTitle && (
+          {bank.accountTitle && (
             <div>
               <span className="muted" style={{ fontSize: 12, display: "block" }}>
                 Account title
               </span>
-              <strong>{details.bankAccountTitle}</strong>
+              <strong>{bank.accountTitle}</strong>
             </div>
           )}
-          {details.bankAccountNumber && (
+          {bank.accountNumber && (
             <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
               <div>
                 <span className="muted" style={{ fontSize: 12, display: "block" }}>
                   Account number
                 </span>
-                <strong style={{ fontSize: 15 }}>{details.bankAccountNumber}</strong>
+                <strong style={{ fontSize: 15 }}>{bank.accountNumber}</strong>
               </div>
-              <CopyButton text={details.bankAccountNumber} label="Copy Account" />
+              <CopyButton text={bank.accountNumber} label="Copy Account" />
             </div>
           )}
-          {details.bankIban && (
+          {bank.iban && (
             <div style={{ display: "flex", alignItems: "center", flexWrap: "wrap" }}>
               <div>
                 <span className="muted" style={{ fontSize: 12, display: "block" }}>
                   IBAN
                 </span>
-                <strong style={{ fontSize: 15 }}>{details.bankIban}</strong>
+                <strong style={{ fontSize: 15 }}>{bank.iban}</strong>
               </div>
-              <CopyButton text={details.bankIban} label="Copy IBAN" />
+              <CopyButton text={bank.iban} label="Copy IBAN" />
             </div>
           )}
-          {details.bankInstructions && (
-            <p style={{ marginTop: 4, color: "var(--ink2)", fontSize: 13, fontStyle: "italic" }}>{details.bankInstructions}</p>
+          {bank.instructions && (
+            <p style={{ marginTop: 4, color: "var(--ink2)", fontSize: 13, fontStyle: "italic" }}>{bank.instructions}</p>
           )}
         </div>
       )}
@@ -1020,7 +1041,7 @@ export function OrderConfirmation({ order }) {
           <form onSubmit={handleUpload} className="panel" style={{ marginTop: 16, padding: 18, textAlign: "left" }}>
             <h3 style={{ fontSize: 16, marginBottom: 6 }}>Upload payment proof</h3>
             <p style={{ margin: "0 0 14px", color: "var(--ink2)", fontSize: 13 }}>
-              Upload your transaction screenshot or receipt (PNG, JPG, WebP, or PDF up to 3MB). Our team will verify it and begin processing
+              Upload your transaction screenshot or receipt (PNG, JPG, WebP, or GIF up to 3MB). Our team will verify it and begin processing
               your order.
             </p>
 
@@ -1065,12 +1086,12 @@ export function OrderConfirmation({ order }) {
 
                 <div>
                   <label className="lbl" htmlFor="proof-file">
-                    Payment receipt / screenshot (Image or PDF)
+                    Payment receipt / screenshot (Image)
                   </label>
                   <input
                     id="proof-file"
                     type="file"
-                    accept="image/jpeg,image/png,image/webp,image/gif,application/pdf"
+                    accept="image/jpeg,image/png,image/webp,image/gif"
                     disabled={proofBusy || proofSubmitted}
                     onChange={(e) => {
                       setSelectedFile(e.target.files?.[0] || null);
@@ -1078,7 +1099,7 @@ export function OrderConfirmation({ order }) {
                     }}
                   />
                   <span className="field-hint" style={{ fontSize: 12 }}>
-                    Accepted formats: JPEG, PNG, WebP, GIF, PDF (Max 3MB).
+                    Accepted formats: JPEG, PNG, WebP, GIF (Max 3MB).
                   </span>
                 </div>
 

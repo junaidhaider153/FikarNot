@@ -169,13 +169,7 @@ export const authApi = {
     return { secret: data.totp.secret, otpauthUrl: data.totp.uri, factorId: data.id };
   },
 
-  async twoFactorEnable(factorIdOrPassword, factorIdOrCode, maybeCode) {
-    let factorId = factorIdOrPassword;
-    let code = factorIdOrCode;
-    if (maybeCode !== undefined) {
-      factorId = factorIdOrCode;
-      code = maybeCode;
-    }
+  async twoFactorEnable(factorId, code) {
     const { data: challenge, error: challengeError } = await supabase.auth.mfa.challenge({ factorId });
     if (challengeError) throw mapAuthError(challengeError);
     const { error } = await supabase.auth.mfa.verify({ factorId, challengeId: challenge.id, code });

@@ -72,7 +72,7 @@ describe("<TwoFactorSection />", () => {
     fireEvent.click(verifyBtn);
 
     await waitFor(() => {
-      expect(authApi.twoFactorEnable).toHaveBeenCalledWith("", "factor-123", "123456");
+      expect(authApi.twoFactorEnable).toHaveBeenCalledWith("factor-123", "123456");
       expect(screen.getByText("Active")).toBeTruthy();
       expect(screen.getByText(/2fa is active/i)).toBeTruthy();
     });

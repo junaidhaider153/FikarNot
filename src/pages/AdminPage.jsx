@@ -31,7 +31,7 @@ import { TwoFactorSection } from "../components/TwoFactorSection";
 import { RETURN_STATUSES } from "../utils/returns";
 import { AnalyticsTab } from "../components/admin/AnalyticsTab";
 import { ordersApi } from "../api/ordersApi";
-import { DEFAULT_PAYMENT_ACCOUNTS } from "../config/paymentAccounts";
+import { DEFAULT_PAYMENT_FORM_FIELDS } from "../config/paymentAccounts";
 
 export function ProductEditor({ initial, onClose }) {
   const s = useApp();
@@ -1421,15 +1421,22 @@ export function OrdersTab() {
   const { page, pageCount, pageItems, setPage, start, end, total } = usePagination(filtered, 10);
 
   const viewPaymentProof = async (orderId) => {
+    const popup = window.open("about:blank", "_blank");
     try {
       setViewingProofId(orderId);
       const res = await ordersApi.getPaymentProof(orderId);
       if (res?.url) {
-        window.open(res.url, "_blank", "noopener,noreferrer");
+        if (popup) {
+          popup.location.href = res.url;
+        } else {
+          window.open(res.url, "_blank", "noopener,noreferrer");
+        }
       } else {
+        if (popup) popup.close();
         appActions.toast("Could not retrieve payment proof URL", "err");
       }
     } catch (err) {
+      if (popup) popup.close();
       appActions.toast(err.message || "Could not retrieve payment proof", "err");
     } finally {
       setViewingProofId(null);
@@ -2022,7 +2029,7 @@ function SettingsTab() {
     allowCod: "1",
     allowOnlinePayments: "0",
     allowManualPayments: "1",
-    ...DEFAULT_PAYMENT_ACCOUNTS,
+    ...DEFAULT_PAYMENT_FORM_FIELDS,
   });
   useEffect(() => {
     let alive = true;

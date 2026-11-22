@@ -68,7 +68,7 @@ export function TwoFactorSection({ isStaff = false }) {
     if (code.length !== 6) return;
     setBusy(true);
     try {
-      await authApi.twoFactorEnable("", factorId, code);
+      await authApi.twoFactorEnable(factorId, code);
       setStatus({ enabled: true, required: isStaff });
       setCode("");
       setSecret("");
