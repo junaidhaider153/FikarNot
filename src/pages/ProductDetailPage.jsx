@@ -143,7 +143,7 @@ export default function ProductDetailPage() {
     offers: {
       "@type": "Offer",
       url: productUrl,
-      priceCurrency: "USD",
+      priceCurrency: s.siteSettings?.currency || "PKR",
       price: p.price,
       availability: p.stock > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
     },
@@ -261,13 +261,31 @@ export default function ProductDetailPage() {
               </div>
               <div>
                 <Ic n="truck" s={15} />
-                <span>Free shipping over $75</span>
+                <span>
+                  Free shipping over{" "}
+                  {fmt(
+                    Number(s.siteSettings?.freeShippingThreshold || 5000),
+                    s.siteSettings?.currency || "PKR",
+                    s.siteSettings?.currencyLocale || "en-PK",
+                  )}
+                </span>
               </div>
               <div>
                 <Ic n="shield" s={15} />
                 <span>Simple 30-day returns</span>
               </div>
             </div>
+
+            {p.stock > 0 && p.stock <= (p.stockThreshold ?? 5) && (
+              <p className="stock-urgency" style={{ color: "#d97706", fontWeight: 600, fontSize: 13, margin: "6px 0 12px" }}>
+                ⚡ Only {p.stock} item{p.stock === 1 ? "" : "s"} left in stock — order soon!
+              </p>
+            )}
+            {p.stock === 0 && (
+              <p className="stock-urgency" style={{ color: "var(--danger, #ef4444)", fontWeight: 600, fontSize: 13, margin: "6px 0 12px" }}>
+                ✕ Out of stock
+              </p>
+            )}
 
             <div className="product-actions">
               <Qty value={qty} set={setQty} max={Math.max(1, p.stock)} />

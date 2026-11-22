@@ -8,6 +8,7 @@ import { ProductCard } from "../components/ProductCard";
 import { Ic } from "../components/icons";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
 import { TwoFactorSection } from "../components/TwoFactorSection";
+import { WHATSAPP_NUMBER } from "../config/appConfig";
 
 const emptyAddress = { id: "", label: "Home", name: "", line1: "", city: "", region: "", postalCode: "", country: "", isDefault: false };
 
@@ -71,6 +72,7 @@ export default function AccountPage() {
   const navigate = useNavigate();
   useDocumentMeta({ title: "My account", noindex: true });
   const user = s.session;
+  const storeWhatsApp = String(s.siteSettings?.whatsappNumber || WHATSAPP_NUMBER || "").replace(/[^0-9]/g, "");
   const [tab, setTab] = useState("overview");
   const [profile, setProfile] = useState({ name: user?.name || "", email: user?.email || "" });
   const [passwords, setPasswords] = useState({ current: "", next: "", confirm: "" });
@@ -442,6 +444,36 @@ export default function AccountPage() {
                         <span>Total</span>
                         <span>{fmt(order.total)}</span>
                       </div>
+                      {order.trackingNumber && (
+                        <div
+                          className="order-tracking-card"
+                          style={{
+                            background: "rgba(184, 240, 41, 0.1)",
+                            border: "1px solid rgba(184, 240, 41, 0.35)",
+                            borderRadius: 6,
+                            padding: "10px 14px",
+                            margin: "12px 0",
+                            fontSize: 13,
+                            display: "flex",
+                            alignItems: "center",
+                            justifyContent: "space-between",
+                            flexWrap: "wrap",
+                            gap: 8,
+                          }}
+                        >
+                          <div>
+                            <strong>Courier Tracking:</strong>
+                            <div style={{ marginTop: 2 }}>
+                              {order.courier || "Courier"} tracking ID: <code>{order.trackingNumber}</code>
+                            </div>
+                          </div>
+                          {order.trackingUrl && (
+                            <a className="btn btn-ghost btn-sm" href={order.trackingUrl} target="_blank" rel="noreferrer noopener">
+                              Track package ↗
+                            </a>
+                          )}
+                        </div>
+                      )}
                       {order.customer?.email && (
                         <p className="account-note u-mt">
                           <Ic n="check" s={15} /> Updates for this order are associated with <b>{order.customer.email}</b>.
@@ -454,6 +486,24 @@ export default function AccountPage() {
                         </div>
                       )}
                       <div className="order-actions">
+                        <Link
+                          className="btn btn-ghost btn-sm"
+                          to={`/invoice/${encodeURIComponent(order.id)}`}
+                          target="_blank"
+                          rel="noreferrer"
+                        >
+                          View invoice
+                        </Link>
+                        {storeWhatsApp && (
+                          <a
+                            className="btn btn-ghost btn-sm"
+                            href={`https://wa.me/${storeWhatsApp}?text=${encodeURIComponent(`Assalam-o-Alaikum! I have a question regarding my order ${order.id}.`)}`}
+                            target="_blank"
+                            rel="noreferrer noopener"
+                          >
+                            <Ic n="chat" s={14} /> WhatsApp support
+                          </a>
+                        )}
                         {canCancelOrder(order) && (
                           <button
                             className="btn btn-danger btn-sm"

@@ -68,6 +68,7 @@ export default function InvoicePage() {
         <strong>Billed to</strong>
         <div>{order.customer.name}</div>
         <div>{order.customer.email}</div>
+        {order.customer.phone && <div>Phone: {order.customer.phone}</div>}
         <div>{order.customer.address}</div>
         <div>
           Payment: {PAYMENT_LABELS[order.paymentMethod] || order.paymentMethod} · {order.paymentStatus}
