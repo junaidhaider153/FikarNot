@@ -21,7 +21,7 @@ export default function OrderTrackingPage() {
   const s = useApp();
   const [searchParams, setSearchParams] = useSearchParams();
   const [orderId, setOrderId] = useState(searchParams.get("id") || searchParams.get("orderId") || "");
-  const [contact, setContact] = useState(searchParams.get("contact") || searchParams.get("phone") || "");
+  const [contact, setContact] = useState("");
   const [order, setOrder] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
@@ -41,7 +41,7 @@ export default function OrderTrackingPage() {
       const res = await ordersApi.lookup(lookupId.trim(), lookupContact.trim());
       if (res?.order) {
         setOrder(res.order);
-        setSearchParams({ id: lookupId.trim(), contact: lookupContact.trim() });
+        setSearchParams({ id: lookupId.trim() });
       } else {
         setError("No order found matching those details.");
       }
@@ -55,14 +55,10 @@ export default function OrderTrackingPage() {
 
   useEffect(() => {
     const queryId = searchParams.get("id") || searchParams.get("orderId");
-    const queryContact = searchParams.get("contact") || searchParams.get("phone");
-    if (queryId && queryContact) {
+    if (queryId) {
       setOrderId(queryId);
-      setContact(queryContact);
-      performLookup(queryId, queryContact);
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [searchParams]);
 
   const handleSubmit = (e) => {
     e.preventDefault();
@@ -250,8 +246,13 @@ export default function OrderTrackingPage() {
 
             <div style={{ marginTop: 20, borderTop: "1px solid var(--line)", paddingTop: 16, fontSize: 13 }}>
               <div>
-                <strong>Delivery details:</strong> {order.customer?.name} ({order.customer?.phone || "No phone"}) ·{" "}
-                {order.customer?.address}
+                <strong>Destination:</strong> {order.city || "Pakistan"}
+                {order.maskedPhone && (
+                  <span>
+                    {" "}
+                    · <strong>Verified contact:</strong> {order.maskedPhone}
+                  </span>
+                )}
               </div>
               <div style={{ marginTop: 4 }}>
                 <strong>Payment method:</strong> {PAYMENT_LABELS[order.paymentMethod] || order.paymentMethod} (

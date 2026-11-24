@@ -1,6 +1,6 @@
 import { assertEquals, assertRejects, assertStringIncludes } from "@std/assert";
 import { buildSystemInstruction, callGemini } from "../_shared/gemini.ts";
-import { cleanChatHistory, fetchCatalogContext, handleChatRequest } from "../chat/index.ts";
+import { cleanChatHistory, fetchCatalogContext, handleChatRequest } from "../chat/handler.ts";
 
 Deno.test("chat: buildSystemInstruction constructs grounding prompt with catalog and policies", () => {
   const settings = {

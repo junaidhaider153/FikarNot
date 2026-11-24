@@ -1,5 +1,5 @@
 import { assertEquals } from "@std/assert";
-import { limit } from "../_shared/rateLimit.ts";
+import { limit, limitKey } from "../_shared/rateLimit.ts";
 
 Deno.test("rateLimit: returns null when limit is not exceeded", async () => {
   let calledWith: Record<string, unknown> | null = null;
@@ -56,4 +56,24 @@ Deno.test("rateLimit: fails open (returns null) on database error or thrown exce
     },
   };
   assertEquals(await limit(req, "test", 5, 60, mockClientThrow), null);
+});
+
+Deno.test("rateLimit: limitKey enforces arbitrary key without IP appending", async () => {
+  let calledWith: Record<string, unknown> | null = null;
+  const mockClient = {
+    rpc: async (fn: string, params: Record<string, unknown>) => {
+      assertEquals(fn, "rate_limit_hit");
+      calledWith = params;
+      return { data: true, error: null };
+    },
+  };
+
+  const req = new Request("http://localhost/");
+  const res = await limitKey(req, "order_lookup:FN-1001", 5, 3600, mockClient);
+  assertEquals(res, null);
+  assertEquals(calledWith, {
+    p_key: "order_lookup:FN-1001",
+    p_window_seconds: 3600,
+    p_limit: 5,
+  });
 });

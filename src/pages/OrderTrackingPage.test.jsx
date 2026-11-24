@@ -74,12 +74,8 @@ describe("OrderTrackingPage", () => {
         trackingNumber: "PEX-99887766",
         trackingUrl: "https://postex.pk/tracking/PEX-99887766",
         shipmentStatus: "shipped",
-        customer: {
-          name: "Hamza Tariq",
-          email: "hamza@example.com",
-          phone: "0300 7654321",
-          address: "DHA Phase 5, Lahore",
-        },
+        city: "Lahore",
+        maskedPhone: "0300****321",
         items: [{ productId: "p-2", name: "Premium Leather Wallet", qty: 1, price: 3500 }],
       },
     });
@@ -100,6 +96,9 @@ describe("OrderTrackingPage", () => {
       expect(screen.getByRole("link", { name: /track with postex ↗/i })).toBeTruthy();
       expect(screen.getAllByText(/Premium Leather Wallet/i).length).toBeGreaterThan(0);
       expect(screen.getAllByText(/3,500/).length).toBeGreaterThan(0);
+      expect(screen.getByText(/Lahore/)).toBeTruthy();
+      expect(screen.getByText(/0300\*\*\*\*321/)).toBeTruthy();
+      expect(screen.queryByText("Hamza Tariq")).toBeNull();
       expect(screen.getByRole("link", { name: /ask about this order on whatsapp/i })).toBeTruthy();
     });
   });

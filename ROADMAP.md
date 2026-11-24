@@ -33,23 +33,31 @@ Legend: ✅ done in this package · 🔧 you must do it (needs your accounts/das
 - ✅ Make return restocking atomic (RPC `complete_return` in migration 0007)
 - ✅ Zod request validation in every function (via `_shared/validate.ts`)
 
-## Phase 2 — Features hidden behind flags
+## Phase 2 — Features hidden behind flags & manual payments
 
 - ✅ PayFast, AI chat, hero-video upload hidden by `FEATURES`
 - ✅ Port AI chat (Gemini) to a new `chat` function (reference: `legacy/server/lib/gemini.js`), connected ChatWidget, enabled `VITE_ENABLE_AI_CHAT=true`
 - ✅ Hero video upload via Supabase Storage signed upload URLs
+- ✅ Manual Pakistani payment methods (Meezan/Bank Transfer, JazzCash, EasyPaisa) with central admin settings configuration and payment instruction card
+- ✅ Payment slip image upload and verification with admin preview, security checks, and single-click payment confirmation
 - ⬜ PayFast (only if you actually need card payments in Pakistan)
 - ✅ Customer-side 2FA enrollment screen (shared TwoFactorSection in Account & Admin)
 
-## Phase 3 — Tests & cleanup
+## Phase 3 — Localization, tracking, warehouse operations & hardening
 
-- ✅ CI: lint, prettier, vitest (26 tests), build, `npm audit`, Deno type-check, DB assertions on Postgres 16
-- ✅ Edge Function unit tests (`deno test` with a mocked client)
-- ⬜ Delete `legacy/` once the above is comfortable (it stays in git history)
-- ⬜ Real product catalogue: seed prices (249, 89…) are USD-scale for a PKR store and images hotlink `image.qwenlm.ai`; replace both, then drop that host from the CSP in `index.html`
+- ✅ Customer mobile phone verification (`03xx-xxxxxxx`, `+923xxxxxxxxx`) at checkout and migration `0010_customer_phone.sql`
+- ✅ 1-Click WhatsApp Order Hub: WhatsApp order confirmation button on storefront and normalized courier WhatsApp dispatch from Admin Order details
+- ✅ Storefront polish: real-time low-stock urgency alerts, account tracking banner, invoice phone display, and Schema.org SEO PKR currency fix
+- ✅ Public & Guest Order Tracking Hub (`/track`): dual-factor verification (Order ID + exact normalized phone/email), rate limited per IP and per order ID, with sensitive customer PII stripped
+- ✅ Printable Courier Packing Slips & Thermal Shipping Labels (`/admin/orders/:orderId/packing-slip`): 4×6" flyer label & standard A4 formats, vector Code 39 barcodes, and high-contrast COD vs Prepaid callouts
+- ✅ Hardened Edge Function architecture: isolated `handler.ts` modules and clean unconditional `Deno.serve(handler)` entrypoints across `orders` and `chat`
+- ✅ Media storage bucket XSS security: removed `image/svg+xml` from allowed MIME types in migration 0009 and ci_stub
+- ✅ Full automated test coverage: 15 Vitest test files (74+ tests) + 48 Deno Edge Function tests
 
 ## Phase 4 — Quality (post-launch)
 
 - ⬜ Split `AdminPage.jsx` (2.2k lines) and slim `appStore.js`; adopt TanStack Query
 - ⬜ Lazy-load Account/Checkout/ProductDetail (AdminPage is already a separate chunk; main bundle is 183 KB gz)
 - ⬜ Accessibility pass, Lighthouse CI
+- ⬜ Delete `legacy/` once comfortable (it stays in git history)
+- ⬜ Real product catalogue: replace demo prices and external placeholder image URLs
