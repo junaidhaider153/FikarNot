@@ -206,7 +206,7 @@ export default function PackingSlipPage() {
             <h1 className="slip-store-title">{store.name || "FikarNot"}</h1>
             <div className="slip-store-sub">
               {store.address && <div>{store.address}</div>}
-              <div>{store.phone ? `Phone: ${store.phone}` : "Phone: 0370 9072688"}</div>
+              {store.phone && <div>Phone: {store.phone}</div>}
               {store.email && <div>{store.email}</div>}
             </div>
           </div>

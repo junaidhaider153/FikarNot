@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { Link, useSearchParams } from "react-router-dom";
 import { ordersApi } from "../api/ordersApi";
-import { fmt } from "../utils/helpers";
+import { fmt, safeHttpUrl } from "../utils/helpers";
 import { Ic } from "../components/icons";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
 import { useApp } from "../store/appStore";
@@ -190,8 +190,8 @@ export default function OrderTrackingPage() {
                 </div>
                 <div style={{ display: "flex", gap: 8, alignItems: "center" }}>
                   <CopyButton text={order.trackingNumber} label="Copy Tracking ID" />
-                  {order.trackingUrl && (
-                    <a className="btn btn-dark btn-sm" href={order.trackingUrl} target="_blank" rel="noreferrer noopener">
+                  {safeHttpUrl(order.trackingUrl) && (
+                    <a className="btn btn-dark btn-sm" href={safeHttpUrl(order.trackingUrl)} target="_blank" rel="noreferrer noopener">
                       Track with {order.courier || "Courier"} ↗
                     </a>
                   )}

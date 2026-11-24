@@ -13,22 +13,29 @@ export function UserEditor({ initial, onClose }) {
     password: "",
   }));
   const [errs, setErrs] = useState({});
+  const [saving, setSaving] = useState(false);
   const save = async (e) => {
     e.preventDefault();
+    if (saving) return;
     const er = {};
     if (!f.name.trim()) er.name = "Required";
     if (!/.+@.+\..+/.test(f.email)) er.email = "Valid email required";
     if (!initial && f.password.length < 8) er.password = "Min 8 chars";
     setErrs(er);
     if (Object.keys(er).length) return;
-    const ok = await appActions.upsertUser({
-      id: initial?.id || "u" + uid(),
-      name: f.name.trim(),
-      email: f.email.trim(),
-      role: f.role,
-      password: f.password ? f.password : initial?.password || `fikarnot-${uid().slice(0, 8)}`,
-    });
-    if (ok) onClose();
+    setSaving(true);
+    try {
+      const ok = await appActions.upsertUser({
+        id: initial?.id || "u" + uid(),
+        name: f.name.trim(),
+        email: f.email.trim(),
+        role: f.role,
+        password: f.password ? f.password : initial?.password || `fikarnot-${uid().slice(0, 8)}`,
+      });
+      if (ok) onClose();
+    } finally {
+      setSaving(false);
+    }
   };
   return (
     <Modal title={initial ? "Edit user" : "New user"} onClose={onClose}>
@@ -74,8 +81,8 @@ export function UserEditor({ initial, onClose }) {
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <button className="btn btn-dark">
-            <Ic n="check" s={15} /> Save user
+          <button className="btn btn-dark" disabled={saving}>
+            <Ic n="check" s={15} /> {saving ? "Saving…" : "Save user"}
           </button>
         </div>
       </form>

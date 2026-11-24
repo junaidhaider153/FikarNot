@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useApp, appActions } from "../../store/appStore";
-import { fmt } from "../../utils/helpers";
+import { FALLBACK_PRODUCT_IMAGE, fmt, onImageError } from "../../utils/helpers";
 import { Ic } from "../icons";
 import { Modal, Empty, Pagination } from "../common";
 import { usePagination } from "../../hooks/usePagination";
@@ -145,7 +145,7 @@ export function InventoryTab() {
                 <tr key={p.id}>
                   <td>
                     <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                      <img className="thumb" src={p.image} alt="" loading="lazy" />
+                      <img className="thumb" src={p.image || FALLBACK_PRODUCT_IMAGE} alt="" loading="lazy" onError={onImageError} />
                       <div>
                         <b>{p.name}</b>
                         <div className="field-hint">{fmt(p.price)} each</div>

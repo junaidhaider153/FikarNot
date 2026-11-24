@@ -12,7 +12,6 @@ const SUPABASE_ANON_KEY = import.meta.env.VITE_SUPABASE_ANON_KEY;
 // calls will just fail with a clear network error) instead of crashing outright.
 const MISSING_ENV = !SUPABASE_URL || !SUPABASE_ANON_KEY;
 if (MISSING_ENV) {
-  // eslint-disable-next-line no-console
   console.error(
     "[FikarNot] Missing VITE_SUPABASE_URL / VITE_SUPABASE_ANON_KEY.\n" +
       "Create a .env file in the project root (see .env.example) with both values, " +

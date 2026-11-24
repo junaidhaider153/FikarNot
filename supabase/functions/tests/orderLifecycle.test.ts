@@ -1,10 +1,5 @@
 import { assertEquals } from "@std/assert";
-import {
-  STATUS_RANK,
-  validateConfirmPayment,
-  validatePaymentProofUpload,
-  validateStatusTransition,
-} from "../_shared/orderLifecycle.ts";
+import { STATUS_RANK, validateConfirmPayment, validatePaymentProofUpload, validateStatusTransition } from "../_shared/orderLifecycle.ts";
 
 Deno.test("orderLifecycle: STATUS_RANK gives paid and processing distinct ranks", () => {
   assertEquals(STATUS_RANK.pending_payment, 0);

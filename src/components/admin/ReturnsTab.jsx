@@ -1,11 +1,20 @@
+import { useState } from "react";
 import { useApp, appActions } from "../../store/appStore";
 import { fmt } from "../../utils/helpers";
 import { Empty } from "../common";
 import { RETURN_STATUSES } from "../../utils/returns";
 
+const toMs = (value) => {
+  const num = Number(value);
+  if (Number.isFinite(num) && num > 0) return num;
+  const parsed = Date.parse(String(value || ""));
+  return Number.isFinite(parsed) ? parsed : 0;
+};
+
 export function ReturnsTab() {
   const s = useApp();
-  const requests = (s.returnRequests || []).slice().sort((a, b) => b.createdAt - a.createdAt);
+  const [busyId, setBusyId] = useState("");
+  const requests = (s.returnRequests || []).slice().sort((a, b) => toMs(b.createdAt) - toMs(a.createdAt));
   return (
     <div>
       <div className="sec-hd">
@@ -56,8 +65,17 @@ export function ReturnsTab() {
                       <select
                         className="status-sel"
                         value={request.status}
+                        disabled={busyId === request.id}
                         aria-label={`Status for return ${request.id}`}
-                        onChange={(e) => appActions.setReturnStatus(request.id, e.target.value)}
+                        onChange={async (e) => {
+                          const next = e.target.value;
+                          setBusyId(request.id);
+                          try {
+                            await appActions.setReturnStatus(request.id, next);
+                          } finally {
+                            setBusyId("");
+                          }
+                        }}
                       >
                         {Object.values(RETURN_STATUSES).map((status) => (
                           <option key={status}>{status}</option>
@@ -70,13 +88,19 @@ export function ReturnsTab() {
                             <button
                               className="btn btn-ghost btn-sm"
                               style={{ marginLeft: 8 }}
-                              onClick={() =>
-                                appActions.setReturnRefund(request.id, {
-                                  status: "refunded",
-                                  providerRef: window.prompt("Enter refund/provider reference") || "",
-                                  note: "Refund confirmed by staff.",
-                                })
-                              }
+                              disabled={busyId === request.id}
+                              onClick={async () => {
+                                setBusyId(request.id);
+                                try {
+                                  await appActions.setReturnRefund(request.id, {
+                                    status: "refunded",
+                                    providerRef: window.prompt("Enter refund/provider reference") || "",
+                                    note: "Refund confirmed by staff.",
+                                  });
+                                } finally {
+                                  setBusyId("");
+                                }
+                              }}
                             >
                               Mark refunded
                             </button>

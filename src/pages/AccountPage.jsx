@@ -1,7 +1,7 @@
 import { useMemo, useState } from "react";
 import { Link, useNavigate } from "react-router-dom";
 import { useApp, appActions } from "../store/appStore";
-import { fmt } from "../utils/helpers";
+import { fmt, safeHttpUrl } from "../utils/helpers";
 import { Empty, Modal } from "../components/common";
 import { RETURN_REASONS, canCancelOrder, canRequestReturn } from "../utils/returns";
 import { ProductCard } from "../components/ProductCard";
@@ -17,7 +17,7 @@ function formatDate(value) {
 }
 
 function StatusPill({ status }) {
-  const label = status === "pending_payment" ? "Pending payment" : status;
+  const label = String(status || "").replaceAll("_", " ");
   return <span className={`account-status ${status}`}>{label}</span>;
 }
 
@@ -30,6 +30,19 @@ export function OrderProgress({ status, order }) {
           <div>
             <strong>Order cancelled</strong>
             <p>This order was cancelled.</p>
+          </div>
+        </div>
+      </div>
+    );
+  }
+  if (status === "return_approved" || status === "returned") {
+    return (
+      <div className="order-progress">
+        <div className="order-progress-step active">
+          <span className="step-n">↺</span>
+          <div>
+            <strong>{status === "returned" ? "Order returned" : "Return approved"}</strong>
+            <p>{status === "returned" ? "This order has been returned and processed." : "Your return request has been approved."}</p>
           </div>
         </div>
       </div>
@@ -86,6 +99,11 @@ export default function AccountPage() {
   const [returnOrder, setReturnOrder] = useState(null);
   const [returnReason, setReturnReason] = useState(RETURN_REASONS[0]);
   const [returnNote, setReturnNote] = useState("");
+  const [profileBusy, setProfileBusy] = useState(false);
+  const [passBusy, setPassBusy] = useState(false);
+  const [addrBusy, setAddrBusy] = useState(false);
+  const [returnBusy, setReturnBusy] = useState(false);
+  const [cancellingId, setCancellingId] = useState("");
 
   const orders = useMemo(
     () =>
@@ -103,18 +121,30 @@ export default function AccountPage() {
 
   const saveProfile = async (e) => {
     e.preventDefault();
-    const ok = await appActions.updateProfile(profile);
-    if (ok) setTab("overview");
+    if (profileBusy) return;
+    setProfileBusy(true);
+    try {
+      const ok = await appActions.updateProfile(profile);
+      if (ok) setTab("overview");
+    } finally {
+      setProfileBusy(false);
+    }
   };
 
   const savePassword = async (e) => {
     e.preventDefault();
+    if (passBusy) return;
     if (passwords.next !== passwords.confirm) {
       appActions.toast("New passwords do not match", "err");
       return;
     }
-    if (await appActions.changePassword(passwords.current, passwords.next)) {
-      setPasswords({ current: "", next: "", confirm: "" });
+    setPassBusy(true);
+    try {
+      if (await appActions.changePassword(passwords.current, passwords.next)) {
+        setPasswords({ current: "", next: "", confirm: "" });
+      }
+    } finally {
+      setPassBusy(false);
     }
   };
 
@@ -132,16 +162,22 @@ export default function AccountPage() {
     setTab("addresses");
   };
 
-  const saveAddress = (e) => {
+  const saveAddress = async (e) => {
     e.preventDefault();
+    if (addrBusy) return;
     const required = [address.name, address.line1, address.city, address.country];
     if (required.some((value) => !value?.trim())) {
       setAddressError("Please complete your name, address, city and country.");
       return;
     }
-    if (appActions.saveAddress(address)) {
-      setEditingAddress(false);
-      setAddress(emptyAddress);
+    setAddrBusy(true);
+    try {
+      if (await appActions.saveAddress(address)) {
+        setEditingAddress(false);
+        setAddress(emptyAddress);
+      }
+    } finally {
+      setAddrBusy(false);
     }
   };
 
@@ -168,13 +204,18 @@ export default function AccountPage() {
     }
   };
 
-  const submitReturn = (e) => {
+  const submitReturn = async (e) => {
     e.preventDefault();
-    if (!returnOrder) return;
-    if (appActions.requestReturn(returnOrder.id, returnReason, returnNote)) {
-      setReturnOrder(null);
-      setReturnReason(RETURN_REASONS[0]);
-      setReturnNote("");
+    if (!returnOrder || returnBusy) return;
+    setReturnBusy(true);
+    try {
+      if (await appActions.requestReturn(returnOrder.id, returnReason, returnNote)) {
+        setReturnOrder(null);
+        setReturnReason(RETURN_REASONS[0]);
+        setReturnNote("");
+      }
+    } finally {
+      setReturnBusy(false);
     }
   };
 
@@ -293,8 +334,8 @@ export default function AccountPage() {
                         <strong>
                           {orders[0].courier || "Courier"} · {orders[0].trackingNumber}
                         </strong>
-                        {orders[0].trackingUrl && (
-                          <a href={orders[0].trackingUrl} target="_blank" rel="noreferrer">
+                        {safeHttpUrl(orders[0].trackingUrl) && (
+                          <a href={safeHttpUrl(orders[0].trackingUrl)} target="_blank" rel="noreferrer noopener">
                             Track shipment
                           </a>
                         )}
@@ -467,8 +508,13 @@ export default function AccountPage() {
                               {order.courier || "Courier"} tracking ID: <code>{order.trackingNumber}</code>
                             </div>
                           </div>
-                          {order.trackingUrl && (
-                            <a className="btn btn-ghost btn-sm" href={order.trackingUrl} target="_blank" rel="noreferrer noopener">
+                          {safeHttpUrl(order.trackingUrl) && (
+                            <a
+                              className="btn btn-ghost btn-sm"
+                              href={safeHttpUrl(order.trackingUrl)}
+                              target="_blank"
+                              rel="noreferrer noopener"
+                            >
                               Track package ↗
                             </a>
                           )}
@@ -507,12 +553,18 @@ export default function AccountPage() {
                         {canCancelOrder(order) && (
                           <button
                             className="btn btn-danger btn-sm"
-                            onClick={() => {
-                              if (window.confirm(`Cancel order ${order.id}? The items will be returned to stock.`))
-                                appActions.cancelOrder(order.id);
+                            disabled={cancellingId === order.id}
+                            onClick={async () => {
+                              if (!window.confirm(`Cancel order ${order.id}? The items will be returned to stock.`)) return;
+                              setCancellingId(order.id);
+                              try {
+                                await appActions.cancelOrder(order.id);
+                              } finally {
+                                setCancellingId("");
+                              }
                             }}
                           >
-                            Cancel order
+                            {cancellingId === order.id ? "Cancelling…" : "Cancel order"}
                           </button>
                         )}
                         {canRequestReturn(order) && (
@@ -649,8 +701,8 @@ export default function AccountPage() {
                     <button type="button" className="btn btn-ghost" onClick={() => setEditingAddress(false)}>
                       Cancel
                     </button>
-                    <button className="btn btn-dark">
-                      <Ic n="check" s={15} /> Save address
+                    <button className="btn btn-dark" disabled={addrBusy}>
+                      <Ic n="check" s={15} /> {addrBusy ? "Saving…" : "Save address"}
                     </button>
                   </div>
                 </form>
@@ -745,8 +797,8 @@ export default function AccountPage() {
                   </div>
                 </div>
                 <div className="form-actions">
-                  <button className="btn btn-dark">
-                    <Ic n="check" s={15} /> Save changes
+                  <button className="btn btn-dark" disabled={profileBusy}>
+                    <Ic n="check" s={15} /> {profileBusy ? "Saving…" : "Save changes"}
                   </button>
                 </div>
               </form>
@@ -810,8 +862,8 @@ export default function AccountPage() {
                   <Ic n="shield" s={15} /> Use at least 8 characters.
                 </p>
                 <div className="form-actions">
-                  <button className="btn btn-dark">
-                    <Ic n="check" s={15} /> Change password
+                  <button className="btn btn-dark" disabled={passBusy}>
+                    <Ic n="check" s={15} /> {passBusy ? "Updating…" : "Change password"}
                   </button>
                 </div>
               </form>
@@ -871,8 +923,8 @@ export default function AccountPage() {
               <button type="button" className="btn btn-ghost" onClick={() => setReturnOrder(null)}>
                 Cancel
               </button>
-              <button className="btn btn-dark">
-                <Ic n="check" s={15} /> Submit return request
+              <button className="btn btn-dark" disabled={returnBusy}>
+                <Ic n="check" s={15} /> {returnBusy ? "Submitting…" : "Submit return request"}
               </button>
             </div>
           </form>

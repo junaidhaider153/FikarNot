@@ -263,7 +263,10 @@ Deno.serve(async (req) => {
           return json(req, { product: toCatalogRow(saved) });
         } catch (e) {
           const err = e as { code?: string; message?: string };
-          return json(req, { error: err.code || "INVALID_PRODUCT", message: err.message }, err.code === "DUPLICATE_SKU" ? 409 : 400);
+          if (err.code === "DUPLICATE_SKU") {
+            return json(req, { error: "DUPLICATE_SKU", message: err.message }, 409);
+          }
+          throw e;
         }
       }
 
@@ -329,7 +332,8 @@ Deno.serve(async (req) => {
         if (!product) return json(req, { error: "PRODUCT_NOT_FOUND", message: "Product not found." }, 404);
         const next = body.nextStock;
         const now = new Date().toISOString();
-        await admin.from("products").update({ stock: next, updated_at: now }).eq("id", body.productId);
+        const { error: updateErr } = await admin.from("products").update({ stock: next, updated_at: now }).eq("id", body.productId);
+        if (updateErr) throw updateErr;
 
         const log = {
           id: `inv-${crypto.randomUUID()}`,

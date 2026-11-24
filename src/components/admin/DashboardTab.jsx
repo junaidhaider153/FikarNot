@@ -59,7 +59,7 @@ export function DashboardTab() {
             <Ic n="chart" s={17} />
           </span>
           <b>{fmt(revenue)}</b>
-          <span>Revenue (mock)</span>
+          <span>Revenue (paid)</span>
         </div>
       </div>
       <div className="chart-row">
@@ -112,6 +112,9 @@ export function DashboardTab() {
                 <td>{fmt(o.total)}</td>
                 <td>
                   <span className="role-badge editor">{o.status}</span>
+                </td>
+                <td>
+                  <span className="field-hint">{o.paymentStatus || "pending"}</span>
                 </td>
               </tr>
             ))}

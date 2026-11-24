@@ -183,6 +183,71 @@ export const cartLines = (snapshot = state) =>
     .map((line) => ({ p: snapshot.products.find((product) => product.id === line.productId), qty: line.qty }))
     .filter((line) => line.p);
 
+const linkReturnRequestsToOrders = (orders = [], returnRequests = []) => {
+  const byOrderId = new Map();
+  for (const req of returnRequests) {
+    if (req?.orderId && req.status !== "rejected" && req.status !== "cancelled" && !byOrderId.has(req.orderId)) {
+      byOrderId.set(req.orderId, req.id);
+    }
+  }
+  return orders.map((order) => ({
+    ...order,
+    returnRequest: order.returnRequest || byOrderId.get(order.id) || null,
+  }));
+};
+
+async function syncAuthenticatedDomainData(user) {
+  if (!user?.id) return;
+  const patch = {};
+  try {
+    const remoteOrders = await ordersApi.list();
+    if (Array.isArray(remoteOrders?.orders)) patch.orders = remoteOrders.orders;
+    if (Array.isArray(remoteOrders?.inventoryLog)) patch.inventoryLog = remoteOrders.inventoryLog;
+  } catch (err) {
+    console.warn("[FikarNot] Could not load orders after sign-in.", err);
+  }
+  try {
+    const remoteEngagement = await engagementApi.list();
+    if (Array.isArray(remoteEngagement?.reviews)) patch.reviews = remoteEngagement.reviews;
+    if (Array.isArray(remoteEngagement?.coupons)) {
+      patch.coupons = remoteEngagement.coupons.map((coupon) => ({
+        ...coupon,
+        code: normalizeCouponCode(coupon.code),
+        usedCount: Number(coupon.usedCount || 0),
+      }));
+    }
+    if (Array.isArray(remoteEngagement?.supportTickets)) patch.supportTickets = remoteEngagement.supportTickets;
+    if (Array.isArray(remoteEngagement?.returnRequests)) {
+      patch.returnRequests = remoteEngagement.returnRequests.map(normalizeReturnRequest);
+    }
+    if (Array.isArray(remoteEngagement?.notifications)) patch.notifications = remoteEngagement.notifications;
+  } catch (err) {
+    console.warn("[FikarNot] Could not load engagement data after sign-in.", err);
+  }
+  if (["admin", "editor"].includes(user.role)) {
+    try {
+      const remoteCatalog = await catalogApi.list();
+      if (Array.isArray(remoteCatalog?.inventoryLog)) patch.inventoryLog = remoteCatalog.inventoryLog;
+    } catch {
+      // ignore — best effort
+    }
+  }
+  if (user.role === "admin") {
+    try {
+      const remoteUsers = await usersApi.list();
+      if (Array.isArray(remoteUsers?.users)) {
+        patch.users = remoteUsers.users.map((u) => (u.id === user.id ? { ...user, ...u, addresses: user.addresses ?? u.addresses } : u));
+      }
+    } catch {
+      // ignore — best effort
+    }
+  }
+  if (patch.orders || patch.returnRequests) {
+    patch.orders = linkReturnRequestsToOrders(patch.orders || state.orders, patch.returnRequests || state.returnRequests);
+  }
+  if (Object.keys(patch).length) setState(patch);
+}
+
 export const appActions = {
   toast,
 
@@ -348,6 +413,7 @@ export const appActions = {
           .filter((id) => data.products.some((product) => product.id === id))
           .slice(0, 3);
         saveLS(STORAGE_KEYS.comparison, comparison);
+        data.orders = linkReturnRequestsToOrders(data.orders, data.returnRequests);
         setState({ ...data, cart, wishlist, recentlyViewed, comparison, notifications, session, ready: true });
       } catch (error) {
         setState({ bootError: error?.message || "Failed to load store data", ready: false });
@@ -479,6 +545,7 @@ export const appActions = {
       });
       writeAccountBucket(STORAGE_KEYS.customerCarts, user.id, cart);
       writeAccountBucket(STORAGE_KEYS.customerWishlists, user.id, accountWishlist);
+      await syncAuthenticatedDomainData({ ...localUser, addresses: remoteAddresses });
       toast(`Welcome back, ${user.name.split(" ")[0]}`);
       return localUser;
     } catch (error) {
@@ -511,6 +578,7 @@ export const appActions = {
       });
       writeNotifications(user.id, [welcome]);
       setState({ notifications: [welcome] });
+      await syncAuthenticatedDomainData(user);
       toast(`Account created — welcome, ${user.name.split(" ")[0]}`);
       return user;
     } catch (error) {
@@ -1367,7 +1435,7 @@ export const appActions = {
     }
   },
 
-  requestReturn(orderId, reason, note = "") {
+  async requestReturn(orderId, reason, note = "") {
     if (!state.session) {
       toast("Please sign in to request a return", "err");
       return false;
@@ -1377,107 +1445,12 @@ export const appActions = {
       toast("This order is not eligible for a return", "err");
       return false;
     }
-    const request = normalizeReturnRequest({
-      id: `ret-${uid()}`,
-      orderId,
-      userId: state.session.id,
-      reason,
-      note,
-      status: RETURN_STATUSES.REQUESTED,
-    });
-    const returnRequests = [request, ...state.returnRequests];
-    const orders = state.orders.map((item) => (item.id === orderId ? { ...item, returnRequest: request.id } : item));
-    setState({ returnRequests, orders });
-    saveLS(STORAGE_KEYS.returnRequests, returnRequests);
-    saveLS(STORAGE_KEYS.orders, orders);
-    engagementApi
-      .createReturn({ orderId, reason, note })
-      .then(({ request: remoteRequest }) => {
-        const nextRequests = [
-          remoteRequest,
-          ...state.returnRequests.filter((item) => item.id !== request.id && item.id !== remoteRequest.id),
-        ];
-        const nextOrders = state.orders.map((item) => (item.id === orderId ? { ...item, returnRequest: remoteRequest.id } : item));
-        setState({ returnRequests: nextRequests, orders: nextOrders });
-        saveLS(STORAGE_KEYS.returnRequests, nextRequests);
-        saveLS(STORAGE_KEYS.orders, nextOrders);
-      })
-      .catch((error) => toast(error.message || "Return request could not be saved to the server", "err"));
-    engagementApi
-      .listNotifications()
-      .then(({ notifications }) => {
-        if (Array.isArray(notifications)) setState({ notifications });
-      })
-      .catch(() => {
-        // Notification refresh failure should not interrupt the current action.
-      });
-    toast("Return request submitted");
-    return true;
-  },
-
-  setReturnStatus(returnId, status) {
-    if (!state.session || !["admin", "editor"].includes(state.session.role)) {
-      toast("You do not have permission to update returns", "err");
-      return false;
-    }
-    const request = state.returnRequests.find((item) => item.id === returnId);
-    if (!request) return false;
-    if (![...Object.values(RETURN_STATUSES)].includes(status)) return false;
-    const previous = request.status;
-    if (previous === status) return true;
-    const returnRequests = state.returnRequests.map((item) => (item.id === returnId ? { ...item, status, updatedAt: Date.now() } : item));
-    let orders = state.orders;
-    let products = state.products;
-    let inventoryLog = state.inventoryLog || [];
-    const order = state.orders.find((item) => item.id === request.orderId);
-    if (order && status === RETURN_STATUSES.APPROVED && previous !== RETURN_STATUSES.APPROVED) {
-      orders = orders.map((item) => (item.id === order.id ? { ...item, status: "return_approved" } : item));
-    }
-    if (order && status === RETURN_STATUSES.COMPLETED && previous !== RETURN_STATUSES.COMPLETED) {
-      orders = orders.map((item) => (item.id === order.id ? { ...item, status: "returned" } : item));
-      products = products.map((product) => {
-        const line = order.items?.find((item) => item.productId === product.id);
-        return line ? { ...product, stock: product.stock + line.qty } : product;
-      });
-      inventoryLog = [
-        ...order.items
-          .map((item) => {
-            const product = state.products.find((entry) => entry.id === item.productId);
-            return product
-              ? {
-                  id: uid(),
-                  productId: product.id,
-                  productName: product.name,
-                  previousStock: product.stock,
-                  nextStock: product.stock + item.qty,
-                  change: item.qty,
-                  reason: `Return ${request.id} completed`,
-                  createdAt: Date.now(),
-                  userId: state.session.id,
-                }
-              : null;
-          })
-          .filter(Boolean),
-        ...inventoryLog,
-      ].slice(0, 100);
-    }
-    if (order && status === RETURN_STATUSES.REJECTED && previous !== RETURN_STATUSES.REJECTED) {
-      orders = orders.map((item) => (item.id === order.id ? { ...item, returnRequest: null } : item));
-    }
-    setState({ returnRequests, orders, products, inventoryLog });
-    saveLS(STORAGE_KEYS.returnRequests, returnRequests);
-    saveLS(STORAGE_KEYS.orders, orders);
-    saveLS(STORAGE_KEYS.products, products);
-    saveLS(STORAGE_KEYS.inventoryLog, inventoryLog);
-    engagementApi
-      .setReturnStatus(returnId, status)
-      .then(({ request: remoteRequest }) => {
-        const nextRequests = state.returnRequests.map((item) => (item.id === returnId ? remoteRequest : item));
-        setState({ returnRequests: nextRequests });
-        saveLS(STORAGE_KEYS.returnRequests, nextRequests);
-      })
-      .catch((error) => toast(error.message || "Return status could not be saved to the server", "err"));
-    if (request.userId) {
+    try {
+      const { request: remoteRequest } = await engagementApi.createReturn({ orderId, reason, note });
+      const normalized = normalizeReturnRequest(remoteRequest);
+      const returnRequests = [normalized, ...state.returnRequests.filter((item) => item.id !== normalized.id)];
+      const orders = state.orders.map((item) => (item.id === orderId ? { ...item, returnRequest: normalized.id } : item));
+      setState({ returnRequests, orders });
       engagementApi
         .listNotifications()
         .then(({ notifications }) => {
@@ -1486,9 +1459,66 @@ export const appActions = {
         .catch(() => {
           // Notification refresh failure should not interrupt the current action.
         });
+      toast("Return request submitted");
+      return true;
+    } catch (error) {
+      toast(error.message || "Return request could not be saved to the server", "err");
+      return false;
     }
-    toast("Return status updated");
-    return true;
+  },
+
+  async setReturnStatus(returnId, status) {
+    if (!state.session || !["admin", "editor"].includes(state.session.role)) {
+      toast("You do not have permission to update returns", "err");
+      return false;
+    }
+    const request = state.returnRequests.find((item) => item.id === returnId);
+    if (!request) return false;
+    if (![...Object.values(RETURN_STATUSES)].includes(status)) return false;
+    if (request.status === status) return true;
+    try {
+      const { request: remoteRequest } = await engagementApi.setReturnStatus(returnId, status);
+      const normalized = normalizeReturnRequest(remoteRequest);
+      const returnRequests = state.returnRequests.map((item) => (item.id === returnId ? normalized : item));
+      let orders = state.orders;
+      if (status === RETURN_STATUSES.APPROVED) {
+        orders = orders.map((item) => (item.id === request.orderId ? { ...item, status: "return_approved" } : item));
+      } else if (status === RETURN_STATUSES.COMPLETED) {
+        orders = orders.map((item) => (item.id === request.orderId ? { ...item, status: "returned" } : item));
+      } else if (status === RETURN_STATUSES.REJECTED) {
+        orders = orders.map((item) =>
+          item.id === request.orderId
+            ? { ...item, returnRequest: null, status: item.status === "return_approved" ? "delivered" : item.status }
+            : item,
+        );
+      }
+      setState({ returnRequests, orders });
+      if (status === RETURN_STATUSES.COMPLETED) {
+        try {
+          const remoteCatalog = await catalogApi.list();
+          if (Array.isArray(remoteCatalog?.products)) {
+            setState({ products: remoteCatalog.products, inventoryLog: remoteCatalog.inventoryLog || [] });
+          }
+        } catch {
+          // Best-effort catalog refresh after atomic complete_return restock
+        }
+      }
+      if (request.userId) {
+        engagementApi
+          .listNotifications()
+          .then(({ notifications }) => {
+            if (Array.isArray(notifications)) setState({ notifications });
+          })
+          .catch(() => {
+            // Notification refresh failure should not interrupt the current action.
+          });
+      }
+      toast("Return status updated");
+      return true;
+    } catch (error) {
+      toast(error.message || "Return status could not be updated", "err");
+      return false;
+    }
   },
 
   async setReturnRefund(returnId, payload) {
@@ -1498,9 +1528,9 @@ export const appActions = {
     }
     try {
       const { request } = await engagementApi.setReturnRefund(returnId, payload);
-      const returnRequests = state.returnRequests.map((item) => (item.id === returnId ? request : item));
+      const normalized = normalizeReturnRequest(request);
+      const returnRequests = state.returnRequests.map((item) => (item.id === returnId ? normalized : item));
       setState({ returnRequests });
-      saveLS(STORAGE_KEYS.returnRequests, returnRequests);
       toast("Refund status updated");
       return true;
     } catch (error) {
@@ -1511,12 +1541,10 @@ export const appActions = {
 
   async confirmPayment(id, payload = {}) {
     try {
-      const { order } = await ordersApi.confirmPayment(id, payload);
-      const orders = state.orders.map((item) =>
-        item.id === id ? order || { ...item, status: "processing", paymentStatus: "paid" } : item,
-      );
+      const res = await ordersApi.confirmPayment(id, payload);
+      const patch = res?.order || res?.orderPatch || { status: "processing", paymentStatus: "paid" };
+      const orders = state.orders.map((item) => (item.id === id ? { ...item, ...patch } : item));
       setState({ orders });
-      saveLS(STORAGE_KEYS.orders, orders);
       toast("Payment confirmed");
       return true;
     } catch (error) {
@@ -1530,7 +1558,6 @@ export const appActions = {
       const res = await ordersApi.collectCod(id);
       const orders = state.orders.map((item) => (item.id === id ? res.order || { ...item, paymentStatus: "paid" } : item));
       setState({ orders });
-      saveLS(STORAGE_KEYS.orders, orders);
       toast("Cash collected");
       return true;
     } catch (error) {
@@ -1542,9 +1569,8 @@ export const appActions = {
   async setOrderFulfilment(id, payload) {
     try {
       const { order } = await ordersApi.setFulfilment(id, payload);
-      const orders = state.orders.map((item) => (item.id === id ? order : item));
+      const orders = state.orders.map((item) => (item.id === id ? { ...item, ...order } : item));
       setState({ orders });
-      saveLS(STORAGE_KEYS.orders, orders);
       toast(payload.shipmentStatus === "delivered" ? "Shipment marked delivered" : "Shipment details saved");
       return true;
     } catch (error) {
@@ -1558,12 +1584,21 @@ export const appActions = {
     if (!previous) return false;
     if (previous.status === status) return true;
     try {
-      await ordersApi.setStatus(id, status);
+      const res = await ordersApi.setStatus(id, status);
       const orders = state.orders.map((order) =>
-        order.id === id ? { ...order, status, cancelledAt: status === "cancelled" ? Date.now() : undefined } : order,
+        order.id === id ? res?.order || { ...order, status, cancelledAt: status === "cancelled" ? Date.now() : order.cancelledAt } : order,
       );
       setState({ orders });
-      saveLS(STORAGE_KEYS.orders, orders);
+      if (status === "cancelled") {
+        try {
+          const remoteCatalog = await catalogApi.list();
+          if (Array.isArray(remoteCatalog?.products)) {
+            setState({ products: remoteCatalog.products, inventoryLog: remoteCatalog.inventoryLog || [] });
+          }
+        } catch {
+          // Best-effort catalog refresh after cancellation restock
+        }
+      }
       if (previous.customer?.userId) {
         engagementApi
           .listNotifications()

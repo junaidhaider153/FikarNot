@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useState } from "react";
 import { useNavigate, Link, useLocation } from "react-router-dom";
 import { useApp, appActions } from "../store/appStore";
-import { fmt } from "../utils/helpers";
+import { FALLBACK_PRODUCT_IMAGE, fmt, onImageError } from "../utils/helpers";
 import { Ic } from "./icons";
 import { ConfirmModal, Stars } from "./common";
 
@@ -47,7 +47,7 @@ export function ProductCard({ p }) {
     >
       <div className="card-media">
         <Link to={`/product/${p.id}`} aria-label={p.name}>
-          <img className="card-img" src={image} alt={p.name} loading="lazy" />
+          <img className="card-img" src={image || FALLBACK_PRODUCT_IMAGE} alt={p.name} loading="lazy" onError={onImageError} />
         </Link>
         {cat && (
           <Link className="card-cat" to={`/products?cat=${cat.id}`}>

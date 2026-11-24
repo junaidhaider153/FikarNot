@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "react-router-dom";
 import { useApp, appActions } from "../../store/appStore";
 import { ordersApi } from "../../api/ordersApi";
-import { fmt } from "../../utils/helpers";
+import { fmt, safeHttpUrl } from "../../utils/helpers";
 import { Ic } from "../icons";
 import { Pagination } from "../common";
 import { usePagination } from "../../hooks/usePagination";
@@ -207,23 +207,28 @@ export function OrdersTab() {
   const s = useApp();
   const [filter, setFilter] = useState("all");
   const [viewingProofId, setViewingProofId] = useState(null);
+  const [confirmingId, setConfirmingId] = useState(null);
+  const [collectingId, setCollectingId] = useState(null);
+  const [statusBusyId, setStatusBusyId] = useState(null);
   const filtered = filter === "all" ? s.orders : s.orders.filter((o) => o.status === filter);
   const { page, pageCount, pageItems, setPage, start, end, total } = usePagination(filtered, 10);
 
   const viewPaymentProof = async (orderId) => {
     const popup = window.open("about:blank", "_blank");
+    if (popup) popup.opener = null;
     try {
       setViewingProofId(orderId);
       const res = await ordersApi.getPaymentProof(orderId);
-      if (res?.url) {
+      const safeUrl = safeHttpUrl(res?.url);
+      if (safeUrl) {
         if (popup) {
-          popup.location.href = res.url;
+          popup.location.replace(safeUrl);
         } else {
-          window.open(res.url, "_blank", "noopener,noreferrer");
+          window.open(safeUrl, "_blank", "noopener,noreferrer");
         }
       } else {
         if (popup) popup.close();
-        appActions.toast("Could not retrieve payment proof URL", "err");
+        appActions.toast("Could not retrieve a valid payment proof URL", "err");
       }
     } catch (err) {
       if (popup) popup.close();
@@ -290,14 +295,25 @@ export function OrdersTab() {
                   <select
                     className="status-sel"
                     value={o.status}
+                    disabled={statusBusyId === o.id}
                     aria-label={`Status for order ${o.id}`}
-                    onChange={(e) => appActions.setOrderStatus(o.id, e.target.value)}
+                    onChange={async (e) => {
+                      const nextStatus = e.target.value;
+                      setStatusBusyId(o.id);
+                      try {
+                        await appActions.setOrderStatus(o.id, nextStatus);
+                      } finally {
+                        setStatusBusyId(null);
+                      }
+                    }}
                   >
                     <option disabled={o.status === "shipped" || o.status === "delivered"}>pending_payment</option>
                     <option disabled={o.status === "pending_payment"}>paid</option>
                     <option disabled={o.status === "pending_payment"}>processing</option>
                     <option disabled={o.status === "pending_payment"}>shipped</option>
                     <option disabled={o.status === "pending_payment"}>delivered</option>
+                    <option disabled>return_approved</option>
+                    <option disabled>returned</option>
                     <option>cancelled</option>
                   </select>
                 </td>
@@ -316,31 +332,60 @@ export function OrdersTab() {
                       <strong>Note:</strong> {o.paymentNote}
                     </div>
                   )}
-                  {o.paymentProof && (
+                  {(o.paymentProof ||
+                    (o.paymentStatus === "pending" && ["jazzcash", "easypaisa", "bank_transfer"].includes(o.paymentMethod))) && (
                     <div style={{ marginTop: 6, display: "flex", gap: 6, flexWrap: "wrap" }}>
-                      <button
-                        className="btn btn-ghost btn-sm"
-                        type="button"
-                        disabled={viewingProofId === o.id}
-                        onClick={() => viewPaymentProof(o.id)}
-                      >
-                        {viewingProofId === o.id ? "Opening…" : "View slip"}
-                      </button>
+                      {o.paymentProof && (
+                        <button
+                          className="btn btn-ghost btn-sm"
+                          type="button"
+                          disabled={viewingProofId === o.id}
+                          onClick={() => viewPaymentProof(o.id)}
+                        >
+                          {viewingProofId === o.id ? "Opening…" : "View slip"}
+                        </button>
+                      )}
                       {o.paymentStatus === "pending" && ["jazzcash", "easypaisa", "bank_transfer"].includes(o.paymentMethod) && (
                         <button
                           className="btn btn-dark btn-sm"
                           type="button"
-                          onClick={() => appActions.confirmPayment(o.id, { providerReference: o.paymentReference || "" })}
+                          disabled={confirmingId === o.id}
+                          onClick={async () => {
+                            if (!o.paymentProof && !window.confirm(`Confirm manual payment for ${o.id} without an uploaded slip?`)) {
+                              return;
+                            }
+                            setConfirmingId(o.id);
+                            try {
+                              await appActions.confirmPayment(o.id, {
+                                requireProof: Boolean(o.paymentProof),
+                                providerReference: o.paymentReference || "",
+                              });
+                            } finally {
+                              setConfirmingId(null);
+                            }
+                          }}
                         >
-                          Confirm
+                          {confirmingId === o.id ? "Confirming…" : o.paymentProof ? "Confirm" : "Confirm payment"}
                         </button>
                       )}
                     </div>
                   )}
                   {o.paymentMethod === "cod" && o.paymentStatus !== "paid" && o.status !== "cancelled" && (
                     <div style={{ marginTop: 6 }}>
-                      <button className="btn btn-dark btn-sm" type="button" onClick={() => appActions.collectCod(o.id)}>
-                        Mark COD Collected
+                      <button
+                        className="btn btn-dark btn-sm"
+                        type="button"
+                        disabled={collectingId === o.id}
+                        onClick={async () => {
+                          setCollectingId(o.id);
+                          try {
+                            await appActions.collectCod(o.id);
+                          } finally {
+                            setCollectingId(null);
+                          }
+                        }}
+                      >
+                        {collectingId === o.id ? "Saving…" : "Mark COD Collected"}
                       </button>
                     </div>
                   )}

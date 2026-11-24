@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { appActions } from "../store/appStore";
-import { fmt } from "../utils/helpers";
+import { FALLBACK_PRODUCT_IMAGE, fmt, onImageError } from "../utils/helpers";
 import { Ic } from "./icons";
 import { Qty } from "./common";
 
@@ -19,7 +19,7 @@ export function CartItem({ line }) {
   return (
     <article className="cart-item">
       <Link className="cart-item-media" to={`/product/${p.id}`} aria-label={`View ${p.name}`}>
-        <img src={image} alt={p.name} loading="lazy" />
+        <img src={image || FALLBACK_PRODUCT_IMAGE} alt={p.name} loading="lazy" onError={onImageError} />
         {images.length > 1 && <span className="cart-item-image-count">{images.length} photos</span>}
       </Link>
       <div className="cart-item-info">

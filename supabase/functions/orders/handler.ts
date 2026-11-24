@@ -94,7 +94,12 @@ export const orderLookupSchema = z.object({
 export const fulfilmentSchema = z.object({
   courier: z.string().trim().max(80).optional(),
   trackingNumber: z.string().trim().max(80).optional(),
-  trackingUrl: z.string().trim().max(500).optional(),
+  trackingUrl: z
+    .string()
+    .trim()
+    .max(500)
+    .refine((val) => !val || /^https?:\/\//i.test(val), "Tracking URL must start with http:// or https://.")
+    .optional(),
   shipmentStatus: z.string().trim().max(40).optional(),
 });
 
@@ -200,6 +205,7 @@ export const orderRow = (row: any, items: any[], proof: any = null, payment: any
   coupon: row.coupon_json || null,
   status: row.status,
   createdAt: row.created_at,
+  ...(row.delivered_at ? { deliveredAt: row.delivered_at } : {}),
   ...(row.cancelled_at ? { cancelledAt: row.cancelled_at } : {}),
 });
 
@@ -237,7 +243,9 @@ export async function getCommerceConfig(client: any = admin) {
     allowManualPayments: String(s.allowManualPayments) !== "0",
     manualPaymentDetails: {
       jazzcashNumber: String(s.jazzcashNumber || ""),
+      jazzcashTitle: String(s.jazzcashTitle || ""),
       easypaisaNumber: String(s.easypaisaNumber || ""),
+      easypaisaTitle: String(s.easypaisaTitle || ""),
       bankName: String(s.bankName || ""),
       bankAccountTitle: String(s.bankAccountTitle || ""),
       bankAccountNumber: String(s.bankAccountNumber || ""),
@@ -635,7 +643,7 @@ export async function handleOrdersRequest(req: Request, deps?: { client?: any })
         name: String(s.storeName || s.siteName || "FikarNot"),
         email: String(s.supportEmail || s.contactEmail || ""),
         address: String(s.storeAddress || s.contactAddress || ""),
-        phone: String(s.contactPhone || ""),
+        phone: String(s.contactPhone || s.whatsappNumber || ""),
       };
       return json(req, { invoice: { store, order: orderRow(order, await itemsOf(id, db)) } });
     }

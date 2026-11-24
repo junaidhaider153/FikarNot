@@ -1,7 +1,7 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Link } from "react-router-dom";
 import { useApp, appActions, cartLines } from "../store/appStore";
-import { fmt, delay } from "../utils/helpers";
+import { FALLBACK_PRODUCT_IMAGE, fmt, delay, onImageError, safeHttpUrl } from "../utils/helpers";
 import { Ic } from "../components/icons";
 import { paymentsApi } from "../api/paymentsApi";
 import { ordersApi } from "../api/ordersApi";
@@ -251,9 +251,11 @@ export default function CheckoutPage() {
     if (paymentMethod === "payfast") {
       try {
         const session = await paymentsApi.createPayFastSession(order.id);
+        const safeAction = safeHttpUrl(session?.action);
+        if (!safeAction) throw new Error("Invalid payment redirect URL.");
         const formElement = document.createElement("form");
         formElement.method = "POST";
-        formElement.action = session.action;
+        formElement.action = safeAction;
         Object.entries(session.fields || {}).forEach(([name, value]) => {
           const input = document.createElement("input");
           input.type = "hidden";
@@ -365,7 +367,7 @@ export default function CheckoutPage() {
             <div className="checkout-lines">
               {lines.map((line) => (
                 <div className="checkout-line" key={line.p.id}>
-                  <img src={line.p.images?.[0] || line.p.image} alt="" loading="lazy" />
+                  <img src={line.p.images?.[0] || line.p.image || FALLBACK_PRODUCT_IMAGE} alt="" loading="lazy" onError={onImageError} />
                   <div>
                     <strong>{line.p.name}</strong>
                     <span>Qty {line.qty}</span>
@@ -398,7 +400,7 @@ export default function CheckoutPage() {
       : paymentMethod === "jazzcash" || paymentMethod === "easypaisa" || paymentMethod === "bank_transfer"
         ? "Place order & show payment details"
         : paymentMethod === "card"
-          ? "Place demo card order"
+          ? "Continue to payment"
           : "Place COD order";
 
   return (
@@ -634,7 +636,7 @@ export default function CheckoutPage() {
           <div className="checkout-lines">
             {lines.map((line) => (
               <div className="checkout-line" key={line.p.id}>
-                <img src={line.p.images?.[0] || line.p.image} alt="" loading="lazy" />
+                <img src={line.p.images?.[0] || line.p.image || FALLBACK_PRODUCT_IMAGE} alt="" loading="lazy" onError={onImageError} />
                 <div>
                   <strong>{line.p.name}</strong>
                   <span>Qty {line.qty}</span>
@@ -953,7 +955,7 @@ export function OrderConfirmation({ order }) {
             ? "Easypaisa"
             : order.paymentMethod === "bank_transfer"
               ? "Bank transfer"
-              : "Card (mock)";
+              : "Online payment";
 
   const storeWhatsApp = String(s?.siteSettings?.whatsappNumber || WHATSAPP_NUMBER || "923709072688").replace(/[^0-9]/g, "");
   const orderItemsSummary = (order.items || []).map((item) => `${item.qty}x ${item.name || item.productName || item.productId}`).join(", ");

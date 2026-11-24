@@ -129,7 +129,7 @@ export default function CartPage() {
               <Ic n="truck" s={15} /> Free shipping over Rs 5,000
             </div>
             <div>
-              <Ic n="check" s={15} /> 7-day easy returns
+              <Ic n="check" s={15} /> 30-day easy returns
             </div>
           </div>
         </aside>

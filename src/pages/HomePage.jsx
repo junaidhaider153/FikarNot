@@ -267,7 +267,7 @@ export default function HomePage() {
               <span className="icw">
                 <Ic n="refresh" s={17} />
               </span>
-              7-day easy returns
+              30-day easy returns
             </div>
             <div>
               <span className="icw">
@@ -370,7 +370,7 @@ export default function HomePage() {
             <button className="btn btn-dark" type="submit">
               Join the list <Ic n="arrow" s={14} />
             </button>
-            <span className="newsletter-note">Demo signup — no email is sent yet.</span>
+            <span className="newsletter-note">Unsubscribe anytime — no spam, ever.</span>
           </form>
         </div>
       </section>

@@ -85,10 +85,10 @@ export function ProductFilters({
             <span>Up to {fmt(priceCap)}</span>
             <input
               type="range"
-              min={10}
+              min={maxPrice >= 1000 ? 500 : 10}
               max={maxPrice}
-              step={5}
-              value={priceCap}
+              step={maxPrice >= 1000 ? 100 : 5}
+              value={Math.min(priceCap, maxPrice)}
               onChange={(e) => setPriceCap(Number(e.target.value))}
               aria-label="Maximum price"
             />

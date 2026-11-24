@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import { appActions } from "../../store/appStore";
 import { mediaApi } from "../../api/mediaApi";
+import { FALLBACK_PRODUCT_IMAGE, onImageError } from "../../utils/helpers";
 import { Empty, SkelMediaGrid } from "../common";
 
 export function MediaTab() {
@@ -38,19 +39,6 @@ export function MediaTab() {
       setWorking(false);
     }
   };
-  const cleanup = async () => {
-    if (!window.confirm("Remove all uploaded images that are no longer used anywhere in FikarNot?")) return;
-    setWorking(true);
-    try {
-      const result = await mediaApi.cleanup();
-      appActions.toast(`${result.removed || 0} unused image${result.removed === 1 ? "" : "s"} removed`);
-      await load();
-    } catch (error) {
-      appActions.toast(error.message || "Could not clean media", "err");
-    } finally {
-      setWorking(false);
-    }
-  };
   return (
     <div>
       <div className="sec-hd">
@@ -58,9 +46,6 @@ export function MediaTab() {
           <h2 className="sec-title display">Media library</h2>
           <p className="section-sub">Uploaded product and storefront images stored by FikarNot.</p>
         </div>
-        <button className="btn btn-ghost" onClick={cleanup} disabled={working || loading}>
-          Clean unused
-        </button>
       </div>
       {loading ? (
         <SkelMediaGrid n={8} />
@@ -71,7 +56,12 @@ export function MediaTab() {
           {assets.map((asset) => (
             <article className="media-library-card" key={asset.id}>
               <div className="media-library-thumb">
-                <img src={asset.url} alt={asset.originalName || "Uploaded media"} loading="lazy" />
+                <img
+                  src={asset.url || FALLBACK_PRODUCT_IMAGE}
+                  alt={asset.originalName || "Uploaded media"}
+                  loading="lazy"
+                  onError={onImageError}
+                />
               </div>
               <div className="media-library-info">
                 <strong title={asset.originalName || asset.filename}>{asset.originalName || asset.filename}</strong>

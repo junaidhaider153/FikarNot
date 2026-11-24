@@ -313,7 +313,9 @@ Deno.serve(async (req) => {
           if (password) authUpdate.password = password;
           const { error: updateAuthError } = await admin.auth.admin.updateUserById(existingId, authUpdate);
           if (updateAuthError) {
-            return json(req, { error: "EMAIL_IN_USE", message: updateAuthError.message }, 409);
+            const conflict = /already|registered|exists|duplicate/i.test(updateAuthError.message || "");
+            if (conflict) return json(req, { error: "EMAIL_IN_USE", message: "That email address is already in use." }, 409);
+            throw updateAuthError;
           }
           await admin.from("profiles").update({ name, role, updated_at: new Date().toISOString() }).eq("id", existingId);
 
@@ -339,7 +341,11 @@ Deno.serve(async (req) => {
           email_confirm: true,
           user_metadata: { name },
         });
-        if (createError) return json(req, { error: "EMAIL_IN_USE", message: createError.message }, 409);
+        if (createError) {
+          const conflict = /already|registered|exists|duplicate/i.test(createError.message || "");
+          if (conflict) return json(req, { error: "EMAIL_IN_USE", message: "That email address is already in use." }, 409);
+          throw createError;
+        }
         if (role !== "customer") await admin.from("profiles").update({ role }).eq("id", created.user!.id);
 
         await admin.from("audit_logs").insert({

@@ -4,7 +4,7 @@ import { useApp, appActions } from "../store/appStore";
 import { api } from "../api/storeApi";
 import { useAsync } from "../hooks/useAsync";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
-import { fmt, NotFoundError } from "../utils/helpers";
+import { FALLBACK_PRODUCT_IMAGE, fmt, NotFoundError, onImageError } from "../utils/helpers";
 import { getProductReviews, getProductReviewSummary } from "../utils/reviews";
 import { getRecommendations } from "../utils/recommendations";
 import { Ic } from "../components/icons";
@@ -181,7 +181,7 @@ export default function ProductDetailPage() {
                 aria-label="Open product image, zoomed"
                 style={magnify ? { "--zoom-x": `${magnifyPos.x}%`, "--zoom-y": `${magnifyPos.y}%` } : undefined}
               >
-                <img src={currentImage} alt={p.name} fetchPriority="high" />
+                <img src={currentImage || FALLBACK_PRODUCT_IMAGE} alt={p.name} fetchPriority="high" onError={onImageError} />
                 {images.length > 1 && (
                   <span className="detail-image-counter">
                     {activeImage + 1} / {images.length}
@@ -225,7 +225,7 @@ export default function ProductDetailPage() {
                     onClick={() => setActiveImage(index)}
                     aria-label={`View product image ${index + 1}`}
                   >
-                    <img src={image} alt="" loading="lazy" />
+                    <img src={image || FALLBACK_PRODUCT_IMAGE} alt="" loading="lazy" onError={onImageError} />
                   </button>
                 ))}
               </div>
@@ -617,7 +617,7 @@ export default function ProductDetailPage() {
                 </span>
               </>
             )}
-            <img src={currentImage} alt={p.name} />
+            <img src={currentImage || FALLBACK_PRODUCT_IMAGE} alt={p.name} onError={onImageError} />
             {images.length > 1 && (
               <div className="lightbox-thumbs">
                 {images.map((image, index) => (
@@ -628,7 +628,7 @@ export default function ProductDetailPage() {
                     onClick={() => setActiveImage(index)}
                     aria-label={`View product image ${index + 1}`}
                   >
-                    <img src={image} alt="" loading="lazy" />
+                    <img src={image || FALLBACK_PRODUCT_IMAGE} alt="" loading="lazy" onError={onImageError} />
                   </button>
                 ))}
               </div>

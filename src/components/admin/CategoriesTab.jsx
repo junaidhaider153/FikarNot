@@ -12,19 +12,26 @@ export function CategoryEditor({ initial, onClose }) {
     color: initial?.color || SWATCHES[0],
   }));
   const [err, setErr] = useState("");
+  const [saving, setSaving] = useState(false);
   const save = async (e) => {
     e.preventDefault();
+    if (saving) return;
     if (!f.name.trim()) {
       setErr("Required");
       return;
     }
-    const saved = await appActions.upsertCategory({
-      id: initial?.id || "c" + uid(),
-      name: f.name.trim(),
-      description: f.description.trim(),
-      color: f.color,
-    });
-    if (saved) onClose();
+    setSaving(true);
+    try {
+      const saved = await appActions.upsertCategory({
+        id: initial?.id || "c" + uid(),
+        name: f.name.trim(),
+        description: f.description.trim(),
+        color: f.color,
+      });
+      if (saved) onClose();
+    } finally {
+      setSaving(false);
+    }
   };
   return (
     <Modal title={initial ? "Edit category" : "New category"} onClose={onClose}>
@@ -68,8 +75,8 @@ export function CategoryEditor({ initial, onClose }) {
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <button className="btn btn-dark">
-            <Ic n="check" s={15} /> Save category
+          <button className="btn btn-dark" disabled={saving}>
+            <Ic n="check" s={15} /> {saving ? "Saving…" : "Save category"}
           </button>
         </div>
       </form>

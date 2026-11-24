@@ -15,7 +15,7 @@ const FAQS = [
   ],
   [
     "Can I cancel my order?",
-    "For this personal project, order status is managed from the Studio. The customer-facing cancellation flow is intentionally simple for now.",
+    "Yes. Signed-in customers can cancel an order directly from My Account → Orders before it ships, and stock is restored automatically.",
   ],
   [
     "How do I track my order?",
@@ -27,7 +27,7 @@ const FAQS = [
   ],
   [
     "Where are my cart and wishlist stored?",
-    "They are associated with your FikarNot account in the current browser-based project. Logging out clears the active session state and signing back in restores that account's saved data.",
+    "When you are signed in, your cart, wishlist, and saved addresses sync securely with your FikarNot account across sessions.",
   ],
   [
     "What payment methods are supported?",
@@ -210,7 +210,7 @@ export default function HelpCenterPage() {
               <div
                 style={{ display: "flex", justifyContent: "space-between", alignItems: "center", gap: 14, marginTop: 18, flexWrap: "wrap" }}
               >
-                <p className="form-hint">This personal project stores support requests in the browser.</p>
+                <p className="form-hint">Our team typically replies within 24 hours.</p>
                 <button className="btn btn-dark">
                   <Ic n="mail" s={15} /> Send request
                 </button>

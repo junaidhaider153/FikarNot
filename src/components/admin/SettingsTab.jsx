@@ -35,6 +35,8 @@ export function SettingsTab() {
     aboutIntro: "",
     aboutBody: "",
     whatsappNumber: "923709072688",
+    contactPhone: "",
+    storeAddress: "",
     instagramUrl: "",
     facebookUrl: "",
     metaTitle: "",
@@ -631,6 +633,30 @@ export function SettingsTab() {
             placeholder="923001234567"
             value={form.whatsappNumber}
             onChange={(e) => set("whatsappNumber", e.target.value)}
+          />
+        </div>
+        <div>
+          <label className="lbl" htmlFor="settings-contact-phone">
+            Contact phone (invoices & slips)
+          </label>
+          <input
+            id="settings-contact-phone"
+            className="input"
+            placeholder="0300 1234567"
+            value={form.contactPhone}
+            onChange={(e) => set("contactPhone", e.target.value)}
+          />
+        </div>
+        <div className="f-full">
+          <label className="lbl" htmlFor="settings-store-address">
+            Store / dispatch address (invoices & slips)
+          </label>
+          <input
+            id="settings-store-address"
+            className="input"
+            placeholder="Warehouse / return address printed on invoices"
+            value={form.storeAddress}
+            onChange={(e) => set("storeAddress", e.target.value)}
           />
         </div>
         <div>

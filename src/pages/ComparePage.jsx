@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { useApp, appActions } from "../store/appStore";
-import { fmt } from "../utils/helpers";
+import { FALLBACK_PRODUCT_IMAGE, fmt, onImageError } from "../utils/helpers";
 import { Stars, Empty } from "../components/common";
 import { Ic } from "../components/icons";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
@@ -61,7 +61,7 @@ export default function ComparePage() {
               {products.map((p) => (
                 <th key={p.id}>
                   <div className="compare-product">
-                    <img src={p.images?.[0] || p.image} alt="" loading="lazy" />
+                    <img src={p.images?.[0] || p.image || FALLBACK_PRODUCT_IMAGE} alt="" loading="lazy" onError={onImageError} />
                     <Link to={`/product/${p.id}`}>{p.name}</Link>
                     <button
                       className="icon-btn"

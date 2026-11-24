@@ -2,7 +2,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Link, NavLink, useLocation, useNavigate } from "react-router-dom";
 import { useApp, appActions } from "../../store/appStore";
 import { useDebounced } from "../../hooks/useDebounced";
-import { fmt } from "../../utils/helpers";
+import { FALLBACK_PRODUCT_IMAGE, fmt, onImageError } from "../../utils/helpers";
 import { relevance } from "../../utils/search";
 import { Ic } from "../icons";
 import { WHATSAPP_NUMBER, FEATURES } from "../../config/appConfig";
@@ -104,7 +104,7 @@ export function HeaderSearch() {
                 pick(p);
               }}
             >
-              <img src={p.image} alt="" loading="lazy" />
+              <img src={p.image || FALLBACK_PRODUCT_IMAGE} alt="" loading="lazy" onError={onImageError} />
               <span className="nm">{p.name}</span>
               <span className="pr">{fmt(p.price)}</span>
             </li>
@@ -349,7 +349,7 @@ export function Header() {
 const DEFAULT_MARQUEE_ITEMS = [
   "Free shipping across Pakistan over Rs 5,000",
   "Cash on Delivery & Instant Bank / JazzCash Transfer",
-  "7-day easy returns & exchanges",
+  "30-day easy returns & exchanges",
   "100% authentic curated essentials",
   "Dispatched via Trax, TCS & PostEx",
 ];
@@ -440,7 +440,7 @@ export function CompareTray() {
       <div className="compare-tray-items">
         {products.map((product) => (
           <div className="compare-tray-item" key={product.id}>
-            <img src={product.image} alt="" loading="lazy" />
+            <img src={product.image || FALLBACK_PRODUCT_IMAGE} alt="" loading="lazy" onError={onImageError} />
             <button
               type="button"
               className="compare-tray-remove"

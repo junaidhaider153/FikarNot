@@ -595,7 +595,16 @@ Deno.serve(async (req) => {
           read: false,
         });
       queueEmail({ to: order.customer_email, ...paymentConfirmed(orderId) });
-      return json(req, { ok: true });
+      return json(req, {
+        ok: true,
+        orderPatch: {
+          id: orderId,
+          status: "processing",
+          paymentStatus: "paid",
+          paymentReference: String(body.providerReference || "").trim() || `manual-${orderId}`,
+          paymentNote: String(body.note || "Verified by staff"),
+        },
+      });
     }
 
     return json(req, { error: "NOT_FOUND", message: "Route not found." }, 404);

@@ -27,7 +27,10 @@ export default function ProductsPage() {
   const [inStock, setInStock] = useState(params.get("stock") === "1");
   const [minRating, setMinRating] = useState(RATINGS.has(Number(params.get("rating"))) ? Number(params.get("rating")) : 0);
 
-  const [priceCap, setPriceCap] = useState(Number(params.get("max")) || 100);
+  const [priceCap, setPriceCap] = useState(() => {
+    const v = Number(params.get("max"));
+    return params.has("max") && Number.isFinite(v) && v >= 10 ? v : null;
+  });
   const dq = useDebounced(q, 300);
 
   useEffect(() => {
@@ -42,7 +45,7 @@ export default function ProductsPage() {
     setSort(SORTS.has(nextSort) ? nextSort : "featured");
     setInStock(nextStock);
     setMinRating(RATINGS.has(nextRating) ? nextRating : 0);
-    if (Number.isFinite(nextMax) && nextMax >= 10) setPriceCap(nextMax);
+    setPriceCap(params.has("max") && Number.isFinite(nextMax) && nextMax >= 10 ? nextMax : null);
     setPage(nextPage);
   }, [params]);
 
@@ -79,7 +82,7 @@ export default function ProductsPage() {
     sort,
     stock: inStock ? 1 : "",
     rating: minRating || "",
-    maxPrice: hasExplicitMax ? priceCap : "",
+    maxPrice: hasExplicitMax && priceCap !== null ? priceCap : "",
     limit: 12,
     offset: Math.max(0, (page - 1) * 12),
   };
@@ -88,15 +91,19 @@ export default function ProductsPage() {
     [dq, category, sort, inStock, minRating, priceCap, page],
   );
   const products = data?.products || [];
-  const maxPrice = Math.max(100, Math.ceil(Number(data?.maxPrice || 100) / 10) * 10);
-  useEffect(() => {
-    if (!hasExplicitMax && data?.maxPrice) setPriceCap(Math.max(100, Math.ceil(Number(data.maxPrice) / 10) * 10));
-  }, [data?.maxPrice, hasExplicitMax]);
+  const maxPrice = Math.max(100, Math.ceil(Number(data?.maxPrice || 25000) / 100) * 100);
+  const effectivePriceCap = priceCap ?? maxPrice;
   const total = Number(data?.total || 0);
   const pageCount = Math.max(1, Math.ceil(total / 12));
   const start = total === 0 ? 0 : (page - 1) * 12 + 1;
   const end = Math.min(page * 12, total);
-  const hasFilters = Boolean(q.trim()) || category !== "all" || sort !== "featured" || inStock || minRating > 0 || priceCap < maxPrice;
+  const hasFilters =
+    Boolean(q.trim()) ||
+    category !== "all" ||
+    sort !== "featured" ||
+    inStock ||
+    minRating > 0 ||
+    (priceCap !== null && priceCap < maxPrice);
 
   const clear = () => {
     setQ("");
@@ -104,7 +111,7 @@ export default function ProductsPage() {
     setSort("featured");
     setInStock(false);
     setMinRating(0);
-    setPriceCap(maxPrice);
+    setPriceCap(null);
     setPage(1);
     setParams({}, { replace: true });
   };
@@ -133,7 +140,7 @@ export default function ProductsPage() {
           setSort(value);
           updateParam("sort", value, "featured");
         }}
-        priceCap={priceCap}
+        priceCap={effectivePriceCap}
         maxPrice={maxPrice}
         setPriceCap={(value) => {
           setPriceCap(value);

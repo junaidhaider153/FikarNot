@@ -2,6 +2,7 @@ import { assertEquals } from "@std/assert";
 import {
   checkoutSchema,
   extractCity,
+  fulfilmentSchema,
   handleOrdersRequest,
   maskPhone,
   normalizePhone,
@@ -112,11 +113,7 @@ Deno.test("orders: normalizePhone, maskPhone, and extractCity helpers", () => {
   assertEquals(extractCity(""), "");
 });
 
-function createMockDb(opts: {
-  order?: Record<string, unknown> | null;
-  items?: Record<string, unknown>[];
-  rateLimitAllowed?: boolean;
-}) {
+function createMockDb(opts: { order?: Record<string, unknown> | null; items?: Record<string, unknown>[]; rateLimitAllowed?: boolean }) {
   const rateLimitAllowed = opts.rateLimitAllowed !== false;
   return {
     rpc: async (fn: string, params: Record<string, unknown>) => {
@@ -187,16 +184,9 @@ Deno.test("orders: /lookup rejects partial phone suffixes", async () => {
 
 Deno.test("orders: /lookup succeeds with normalized exact phone matches", async () => {
   const db = createMockDb({ order: mockOrderRecord, items: [{ product_id: "p-1", product_name: "Silk Scarf", price: 4500, qty: 1 }] });
-  
+
   // Format variants of the exact same number
-  const validInputs = [
-    "03001234567",
-    "+923001234567",
-    "+92 300 1234567",
-    "00923001234567",
-    "923001234567",
-    "0300-1234567",
-  ];
+  const validInputs = ["03001234567", "+923001234567", "+92 300 1234567", "00923001234567", "923001234567", "0300-1234567"];
 
   for (const contact of validInputs) {
     const req = new Request("http://localhost/lookup", {
@@ -261,4 +251,11 @@ Deno.test("orders: /lookup triggers 429 when rate limit is exceeded per order", 
   assertEquals(res.status, 429);
   const body = await res.json();
   assertEquals(body.error, "RATE_LIMITED");
+});
+
+Deno.test("orders: fulfilmentSchema allows https trackingUrl and blocks javascript:/data: URLs", () => {
+  assertEquals(fulfilmentSchema.safeParse({ courier: "TCS", trackingUrl: "https://track.tcs.pk/123" }).success, true);
+  assertEquals(fulfilmentSchema.safeParse({ courier: "TCS", trackingUrl: "" }).success, true);
+  assertEquals(fulfilmentSchema.safeParse({ courier: "TCS", trackingUrl: "javascript:alert(1)" }).success, false);
+  assertEquals(fulfilmentSchema.safeParse({ courier: "TCS", trackingUrl: "data:text/html,<script>1</script>" }).success, false);
 });

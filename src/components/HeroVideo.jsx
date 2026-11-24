@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState } from "react";
+import { FALLBACK_PRODUCT_IMAGE, onImageError } from "../utils/helpers";
 
 /**
  * Full-bleed hero backdrop.
@@ -53,9 +54,10 @@ export function HeroVideo({ src, webm, poster, alt = "" }) {
     <div className="hero-video-layer" aria-hidden="true">
       <img
         className={`hero-video-poster${showVideo && ready ? " is-hidden" : ""}${src ? "" : " is-panning"}`}
-        src={poster}
+        src={poster || FALLBACK_PRODUCT_IMAGE}
         alt={alt}
         fetchPriority="high"
+        onError={onImageError}
       />
       {showVideo && (
         <video

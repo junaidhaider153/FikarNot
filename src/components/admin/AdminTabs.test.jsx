@@ -110,9 +110,11 @@ describe("Modular Admin Tabs", () => {
   it("renders DashboardTab with stat cards and recent orders", () => {
     render(<DashboardTab />);
     expect(screen.getByText("Products live")).toBeTruthy();
+    expect(screen.getByText("Revenue (paid)")).toBeTruthy();
     expect(screen.getByText("Revenue by category")).toBeTruthy();
     expect(screen.getByText("Catalogue mix")).toBeTruthy();
     expect(screen.getByText("FN-9001")).toBeTruthy();
+    expect(screen.getByText("paid")).toBeTruthy();
   });
 
   it("renders ProductsTab with search bar and product rows", () => {

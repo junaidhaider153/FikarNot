@@ -4,6 +4,7 @@ import { useApp, appActions } from "../store/appStore";
 import { authApi } from "../api/authApi";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
 import { Ic } from "../components/icons";
+import { safeHttpUrl } from "../utils/helpers";
 
 export default function LoginPage() {
   const s = useApp();
@@ -91,6 +92,7 @@ export default function LoginPage() {
 
         <div className="auth-tabs" role="tablist">
           <button
+            type="button"
             role="tab"
             aria-selected={mode === "login"}
             className={mode === "login" ? "on" : ""}
@@ -104,6 +106,7 @@ export default function LoginPage() {
             Sign in
           </button>
           <button
+            type="button"
             role="tab"
             aria-selected={mode === "register"}
             className={mode === "register" ? "on" : ""}
@@ -213,8 +216,8 @@ export default function LoginPage() {
                 >
                   {resending ? "Sending…" : "Resend verification"}
                 </button>
-                {devVerificationUrl && (
-                  <a className="btn btn-ghost btn-sm" href={devVerificationUrl}>
+                {safeHttpUrl(devVerificationUrl, { allowRelative: true }) && (
+                  <a className="btn btn-ghost btn-sm" href={safeHttpUrl(devVerificationUrl, { allowRelative: true })}>
                     Open verification link
                   </a>
                 )}

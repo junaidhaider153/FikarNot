@@ -14,7 +14,7 @@ Deno.test("email: buildMime constructs valid multipart MIME message and sanitize
   const mime = buildMime(input, "orders@fikarnot.pk\r\n", 'FikarNot "Store"\r\n');
 
   // Must not have bare CRLF header injections
-  assertStringIncludes(mime, "From: \"FikarNot Store\" <orders@fikarnot.pk>\r\n");
+  assertStringIncludes(mime, 'From: "FikarNot Store" <orders@fikarnot.pk>\r\n');
   assertStringIncludes(mime, "To: customer@example.com Bcc: evil@example.com\r\n");
   assertStringIncludes(mime, "Reply-To: help@fikarnot.pk Injected: yes\r\n");
   // Subject must be encoded as RFC 2047 base64 UTF-8
@@ -37,9 +37,7 @@ Deno.test("emailTemplates: orderConfirmation escapes HTML and handles COD vs man
     customerName: 'Ahmad <img src="x" onerror="alert(1)">',
   };
 
-  const items = [
-    { name: 'Shirt <b>Special</b>', price: 1625, qty: 2 },
-  ];
+  const items = [{ name: "Shirt <b>Special</b>", price: 1625, qty: 2 }];
 
   const emailCod = orderConfirmation(order, items);
   // HTML escaping checks

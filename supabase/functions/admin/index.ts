@@ -215,6 +215,8 @@ const DEFAULT_SITE_SETTINGS_KEYS = new Set([
   "aboutIntro",
   "aboutBody",
   "whatsappNumber",
+  "contactPhone",
+  "storeAddress",
   "instagramUrl",
   "facebookUrl",
   "metaTitle",
@@ -229,7 +231,9 @@ const DEFAULT_SITE_SETTINGS_KEYS = new Set([
   "allowOnlinePayments",
   "allowManualPayments",
   "jazzcashNumber",
+  "jazzcashTitle",
   "easypaisaNumber",
+  "easypaisaTitle",
   "bankName",
   "bankAccountTitle",
   "bankAccountNumber",
@@ -464,7 +468,8 @@ Deno.serve(async (req) => {
         const { data: order } = await admin.from("orders").select("*").eq("id", body.orderId).eq("user_id", caller.id).maybeSingle();
         if (!order || order.status !== "delivered")
           return json(req, { error: "RETURN_NOT_ELIGIBLE", message: "This order is not eligible for a return." }, 409);
-        if (Date.now() - new Date(order.created_at).getTime() > 30 * 86400000)
+        const returnReferenceMs = new Date(order.delivered_at || order.created_at).getTime();
+        if (Date.now() - returnReferenceMs > 30 * 86400000)
           return json(req, { error: "RETURN_WINDOW_EXPIRED", message: "The 30-day return window has expired." }, 409);
         const { data: existing } = await admin
           .from("return_requests")

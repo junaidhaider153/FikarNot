@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 import { useApp, appActions } from "../../store/appStore";
 import { GALLERY } from "../../assets/assets";
-import { fmt, uid } from "../../utils/helpers";
+import { FALLBACK_PRODUCT_IMAGE, fmt, onImageError, uid } from "../../utils/helpers";
 import { Ic } from "../icons";
 import { Modal, Pagination } from "../common";
 import { ImageUploader } from "../ImageUploader";
@@ -19,13 +19,15 @@ export function ProductEditor({ initial, onClose }) {
     stockThreshold: initial?.stockThreshold ?? 10,
     rating: initial?.rating ?? 4.5,
     description: initial?.description || "",
-    images: initial?.images?.length ? initial.images : [initial?.image || GALLERY[0][1]],
+    images: initial?.images?.length ? initial.images : [initial?.image || GALLERY[0]?.[1] || FALLBACK_PRODUCT_IMAGE],
     tags: (initial?.tags || []).join(", "),
     featured: initial?.featured || false,
   }));
   const [errs, setErrs] = useState({});
+  const [saving, setSaving] = useState(false);
   const save = async (e) => {
     e.preventDefault();
+    if (saving) return;
     const er = {};
     if (!f.name.trim()) er.name = "Required";
     if (!f.sku.trim()) er.sku = "Required";
@@ -35,25 +37,30 @@ export function ProductEditor({ initial, onClose }) {
     if (!f.categoryId) er.categoryId = "Required";
     setErrs(er);
     if (Object.keys(er).length) return;
-    const saved = await appActions.upsertProduct({
-      id: initial?.id || "p" + uid(),
-      name: f.name.trim(),
-      sku: f.sku.trim().toUpperCase(),
-      categoryId: f.categoryId,
-      price: +(+f.price).toFixed(2),
-      stock: Math.floor(+f.stock),
-      stockThreshold: Math.floor(+f.stockThreshold),
-      rating: Math.min(5, Math.max(0, +f.rating || 0)),
-      description: f.description.trim(),
-      images: f.images,
-      image: f.images[0] || "",
-      tags: f.tags
-        .split(",")
-        .map((t) => t.trim())
-        .filter(Boolean),
-      featured: !!f.featured,
-    });
-    if (saved) onClose();
+    setSaving(true);
+    try {
+      const saved = await appActions.upsertProduct({
+        id: initial?.id || "p" + uid(),
+        name: f.name.trim(),
+        sku: f.sku.trim().toUpperCase(),
+        categoryId: f.categoryId,
+        price: +(+f.price).toFixed(2),
+        stock: Math.floor(+f.stock),
+        stockThreshold: Math.floor(+f.stockThreshold),
+        rating: Math.min(5, Math.max(0, +f.rating || 0)),
+        description: f.description.trim(),
+        images: f.images,
+        image: f.images[0] || "",
+        tags: f.tags
+          .split(",")
+          .map((t) => t.trim())
+          .filter(Boolean),
+        featured: !!f.featured,
+      });
+      if (saved) onClose();
+    } finally {
+      setSaving(false);
+    }
   };
   return (
     <Modal title={initial ? "Edit product" : "New product"} onClose={onClose} wide>
@@ -108,7 +115,7 @@ export function ProductEditor({ initial, onClose }) {
           </div>
           <div>
             <label className="lbl" htmlFor="pe-price">
-              Price (USD)
+              Price
             </label>
             <input
               id="pe-price"
@@ -179,10 +186,7 @@ export function ProductEditor({ initial, onClose }) {
             <div role="group" aria-labelledby="pe-images-label">
               <ImageUploader images={f.images} onChange={(images) => setF({ ...f, images })} />
             </div>
-            <p className="image-helper">
-              The first image is the primary product image. Uploaded images are resized for this browser-only demo and saved with the
-              product.
-            </p>
+            <p className="image-helper">The first image is the primary product image saved with the product.</p>
           </div>
           <label className="chk f-full">
             <input type="checkbox" checked={f.featured} onChange={(e) => setF({ ...f, featured: e.target.checked })} /> Feature on homepage
@@ -192,8 +196,8 @@ export function ProductEditor({ initial, onClose }) {
           <button type="button" className="btn btn-ghost" onClick={onClose}>
             Cancel
           </button>
-          <button className="btn btn-dark">
-            <Ic n="check" s={15} /> Save product
+          <button className="btn btn-dark" disabled={saving}>
+            <Ic n="check" s={15} /> {saving ? "Saving…" : "Save product"}
           </button>
         </div>
       </form>
@@ -250,7 +254,7 @@ export function ProductsTab() {
               <tr key={p.id}>
                 <td>
                   <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
-                    <img className="thumb" src={p.image} alt="" loading="lazy" />
+                    <img className="thumb" src={p.image || FALLBACK_PRODUCT_IMAGE} alt="" loading="lazy" onError={onImageError} />
                     <div>
                       <b>{p.name}</b>
                       <div className="field-hint">{p.tags.map((t) => "#" + t).join(" ")}</div>

@@ -18,10 +18,12 @@ import { getAnalyticsData, analyticsCsv } from "../../utils/analytics";
 import { Ic } from "../icons";
 
 const STATUS_LABELS = {
+  pending_payment: "Pending payment",
   paid: "Paid",
   processing: "Processing",
   shipped: "Shipped",
   delivered: "Delivered",
+  returned: "Returned",
   cancelled: "Cancelled",
 };
 

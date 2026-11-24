@@ -1,11 +1,5 @@
 import { assertEquals } from "@std/assert";
-import {
-  ALLOWED_VIDEO_TYPES,
-  MAX_VIDEO_BYTES,
-  hexToBytes,
-  validateVideoMetadata,
-  videoMatchesMagicBytes,
-} from "../_shared/video.ts";
+import { ALLOWED_VIDEO_TYPES, MAX_VIDEO_BYTES, hexToBytes, validateVideoMetadata, videoMatchesMagicBytes } from "../_shared/video.ts";
 
 Deno.test("video: ALLOWED_VIDEO_TYPES maps mp4 and webm", () => {
   assertEquals(ALLOWED_VIDEO_TYPES["video/mp4"], "mp4");

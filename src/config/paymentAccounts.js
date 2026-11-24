@@ -72,6 +72,15 @@ export function getPaymentAccounts(siteSettings = {}) {
       number: easypaisaNumber,
       instructions: easypaisaInstructions,
     },
+    jazzcashNumber,
+    jazzcashTitle,
+    easypaisaNumber,
+    easypaisaTitle,
+    bankName,
+    bankAccountTitle,
+    bankAccountNumber,
+    bankIban,
+    bankInstructions,
   };
 }
 
