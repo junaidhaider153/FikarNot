@@ -56,7 +56,8 @@ Legend: ✅ done in this package · 🔧 you must do it (needs your accounts/das
 
 ## Phase 4 — Quality (post-launch)
 
-- ⬜ Split `AdminPage.jsx` (2.2k lines) and slim `appStore.js`; adopt TanStack Query
+- ✅ Modularize `AdminPage.jsx` (~2.8k lines) into dedicated tab components in `src/components/admin/` with test suite
+- ⬜ Slim `appStore.js`; adopt TanStack Query
 - ⬜ Lazy-load Account/Checkout/ProductDetail (AdminPage is already a separate chunk; main bundle is 183 KB gz)
 - ⬜ Accessibility pass, Lighthouse CI
 - ⬜ Delete `legacy/` once comfortable (it stays in git history)

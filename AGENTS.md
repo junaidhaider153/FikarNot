@@ -35,7 +35,8 @@ Authoritative context for Cursor / Copilot / Claude Code / Gemini working in thi
 src/
   api/                 domain wrappers → apiClient.js → Edge Functions
   config/appConfig.js  FEATURES flags, role lists
-  pages/               route components (AdminPage.jsx is ~2.2k lines: split when touched)
+  pages/               route components
+  components/admin/    admin tabs (Products, Orders, Inventory, etc.)
   router/              routes.jsx, ProtectedRoute.jsx
   store/appStore.js    client state
 supabase/
@@ -51,7 +52,7 @@ legacy/                       retired Node+SQLite stack (reference only)
 docs/                         PRD, SRS, TRD, TDD (see errata banners) + REVIEW_AND_STATUS.md, EMAIL_SETUP.md
 ```
 
-🎯 Not yet present: `components/admin/*` tab split.
+✅ Present: `components/admin/*` tab split.
 
 ## 4. Verification (run before finishing any task)
 
