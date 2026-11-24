@@ -12,7 +12,7 @@ Authoritative context for Cursor / Copilot / Claude Code / Gemini working in thi
   - _Auth mail_ (signup confirm, password reset): Supabase Auth → Custom SMTP → Gmail **App Password** (`smtp.gmail.com`, port 465). Not an Edge Function.
   - _Commerce mail_ (order confirmation, payment confirmed, tracking): `_shared/email.ts` via the **Gmail REST API over HTTPS**. ✅
   - **Never use SMTP from an Edge Function.** Supabase blocks outbound ports 25 and 587; raw SMTP on Deno is unproven. Do not add nodemailer. Do not add Resend/SendGrid/etc.
-- **Legacy:** `legacy/` holds the retired Node+SQLite server. Reference only (`legacy/server/lib/gemini.js` is the model for the future AI chat port). Never add features there; it is excluded from lint/format/tests.
+- **Legacy:** the legacy Node+SQLite stack has been retired and deleted; it remains accessible in git history. The modern stack is 100% Supabase + Deno Edge Functions. Never add features there.
 
 ## 2. Hard guardrails
 
@@ -48,7 +48,6 @@ supabase/
     _shared/                  ✅ supabase, cors, http, auth(+MFA), rateLimit, email, emailTemplates, validate
     account|admin|catalog|orders|storage/index.ts
 scripts/                      sitemap + prerender (catalog-source.js), verify-rls.mjs, get-gmail-refresh-token.mjs
-legacy/                       retired Node+SQLite stack (reference only)
 docs/                         PRD, SRS, TRD, TDD (see errata banners) + REVIEW_AND_STATUS.md, EMAIL_SETUP.md
 ```
 

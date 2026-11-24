@@ -23,7 +23,6 @@ npm run verify:rls      # prove the public key cannot read your tables (needs en
 
 - `src/` React app · `supabase/migrations` SQL · `supabase/functions` Edge Functions (`_shared/` holds auth, CORS, rate limiting, email)
 - `supabase/tests` database assertions run in CI · `scripts/` SEO build + ops helpers
-- `legacy/` retired Node + SQLite server (reference only)
 
 ## Documentation
 

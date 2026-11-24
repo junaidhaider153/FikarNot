@@ -5,7 +5,7 @@ import jsxA11y from "eslint-plugin-jsx-a11y";
 import globals from "globals";
 
 export default [
-  { ignores: ["dist/**", "node_modules/**", "legacy/**", "supabase/functions/**"] },
+  { ignores: ["dist/**", "node_modules/**", "supabase/functions/**"] },
   js.configs.recommended,
   {
     // FIX 1: Added .mjs extension so your backup and check scripts are parsed correctly

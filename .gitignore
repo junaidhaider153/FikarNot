@@ -20,6 +20,4 @@ supabase/.branches/
 *.sqlite-wal
 *.sqlite-shm
 *.db
-legacy/server/data/
-legacy/server/config/data/
 coverage/

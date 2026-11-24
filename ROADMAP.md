@@ -60,5 +60,5 @@ Legend: ✅ done in this package · 🔧 you must do it (needs your accounts/das
 - ⬜ Slim `appStore.js`; adopt TanStack Query
 - ✅ Lazy-load Account/Checkout/ProductDetail and non-critical routes; Recharts vendor isolation; initial bundle reduced from 709 kB to 294 kB (88 kB gz)
 - ✅ Accessibility pass & form semantics audit (ARIA attributes, mobile drawer controls, skip-links, and keyboard focus trap)
-- ⬜ Delete `legacy/` once comfortable (it stays in git history)
+- ✅ Delete retired `legacy/` stack (Node+SQLite server, old Dockerfiles, nginx config archived in Git history)
 - ✅ Real product catalogue: replace demo prices with realistic PKR values and updated Pakistani shipping/return policies
