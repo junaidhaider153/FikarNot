@@ -206,6 +206,17 @@ begin
     raise exception 'FAIL: double complete_return modified stock';
   end if;
 
+  -- 13. Bucket security & PKR seed prices (migrations 0009/0011)
+  if exists (
+    select 1 from storage.buckets
+    where id = 'media' and 'image/svg+xml' = any(allowed_mime_types)
+  ) then
+    raise exception 'FAIL: media bucket still allows image/svg+xml';
+  end if;
+  if (select price from public.products where id = 'p1') <> 18500.00 then
+    raise exception 'FAIL: p1 price was not upgraded to PKR';
+  end if;
+
   -- Calling complete_return on non-approved return MUST fail
   r := public.create_order(u, cust, '[{"productId":"p3","qty":1}]', null, cfg);
   update public.orders set status = 'delivered', payment_status = 'paid' where id = r->>'orderId';

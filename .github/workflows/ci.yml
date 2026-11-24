@@ -70,10 +70,12 @@ jobs:
           for f in supabase/migrations/*.sql; do echo "== $f"; psql -v ON_ERROR_STOP=1 -q -d ci -f "$f"; done
       - name: Re-apply the idempotent migrations (must be safe to repeat)
         run: |
-          psql -v ON_ERROR_STOP=1 -q -d ci -f supabase/migrations/0004_enable_rls_all.sql
-          psql -v ON_ERROR_STOP=1 -q -d ci -f supabase/migrations/0005_checkout_hardening.sql
-          psql -v ON_ERROR_STOP=1 -q -d ci -f supabase/migrations/0006_order_lifecycle.sql
-          psql -v ON_ERROR_STOP=1 -q -d ci -f supabase/migrations/0007_atomic_return_restock.sql
-          psql -v ON_ERROR_STOP=1 -q -d ci -f supabase/migrations/0008_atomic_collect_cod.sql
+          for f in supabase/migrations/*.sql; do
+            case "$f" in
+              */0001_*|*/0002_*|*/0003_*) continue ;;
+            esac
+            echo "== reapply $f"
+            psql -v ON_ERROR_STOP=1 -q -d ci -f "$f"
+          done
       - name: Database assertions (RLS lockdown, checkout, coupons, cancel, rate limit)
         run: psql -v ON_ERROR_STOP=1 -d ci -f supabase/tests/assertions.sql
