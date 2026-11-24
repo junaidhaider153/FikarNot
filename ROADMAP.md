@@ -45,20 +45,21 @@ Legend: ✅ done in this package · 🔧 you must do it (needs your accounts/das
 
 ## Phase 3 — Localization, tracking, warehouse operations & hardening
 
-- ✅ Customer mobile phone verification (`03xx-xxxxxxx`, `+923xxxxxxxxx`) at checkout and migration `0010_customer_phone.sql`
+- ✅ Pakistani phone format validation (`03xx-xxxxxxx`, `+923xxxxxxxxx`) at checkout and migration `0010_customer_phone.sql`
 - ✅ 1-Click WhatsApp Order Hub: WhatsApp order confirmation button on storefront and normalized courier WhatsApp dispatch from Admin Order details
 - ✅ Storefront polish: real-time low-stock urgency alerts, account tracking banner, invoice phone display, and Schema.org SEO PKR currency fix
-- ✅ Public & Guest Order Tracking Hub (`/track`): dual-factor verification (Order ID + exact normalized phone/email), rate limited per IP and per order ID, with sensitive customer PII stripped
+- ✅ Public & Guest Order Tracking Hub (`/track`): dual-field contact matching (Order ID + exact normalized phone/email), rate limited per IP and per order ID, with sensitive customer PII stripped
 - ✅ Printable Courier Packing Slips & Thermal Shipping Labels (`/admin/orders/:orderId/packing-slip`): 4×6" flyer label & standard A4 formats, vector Code 39 barcodes, and high-contrast COD vs Prepaid callouts
 - ✅ Hardened Edge Function architecture: isolated `handler.ts` modules and clean unconditional `Deno.serve(handler)` entrypoints across `orders` and `chat`
-- ✅ Media storage bucket XSS security: removed `image/svg+xml` from allowed MIME types in migration 0009 and ci_stub
-- ✅ Full automated test coverage: 15 Vitest test files (74+ tests) + 48 Deno Edge Function tests
+- ✅ Media storage bucket XSS security: removed `image/svg+xml` from allowed MIME types in migrations 0009/0011 and ci_stub
+- ✅ Full automated test coverage: 19 Vitest test files (87 tests) + 50 Deno Edge Function tests
 
 ## Phase 4 — Quality (post-launch)
 
 - ✅ Modularize `AdminPage.jsx` (~2.8k lines) into dedicated tab components in `src/components/admin/` with test suite
+- ✅ Server-authoritative `appStore.bootstrap()` (removed `*.migrate()` / `migrated` checks and demo seed fallbacks, surfacing errors on outage)
 - ⬜ Slim `appStore.js`; adopt TanStack Query
 - ✅ Lazy-load Account/Checkout/ProductDetail and non-critical routes; Recharts vendor isolation; initial bundle reduced from 709 kB to 294 kB (88 kB gz)
 - ✅ Accessibility pass & form semantics audit (ARIA attributes, mobile drawer controls, skip-links, and keyboard focus trap)
 - ✅ Delete retired `legacy/` stack (Node+SQLite server, old Dockerfiles, nginx config archived in Git history)
-- ✅ Real product catalogue: replace demo prices with realistic PKR values and updated Pakistani shipping/return policies
+- ✅ Real product catalogue: replace demo prices with realistic PKR values (`seedData.js` and migration `0011_bucket_svg_fix_and_pkr_prices.sql`) and updated Pakistani shipping/return policies

@@ -1,7 +1,6 @@
 import { useSyncExternalStore } from "react";
-import { seedData } from "../data/seedData";
 import { STORAGE_KEYS } from "../config/storageKeys";
-import { delay, fmt, loadLS, saveLS, uid } from "../utils/helpers";
+import { fmt, loadLS, saveLS, uid } from "../utils/helpers";
 import { getCouponDiscount, isCouponUsable, normalizeCouponCode } from "../utils/coupons";
 import { RETURN_STATUSES, canRequestReturn, normalizeReturnRequest } from "../utils/returns";
 import { authApi } from "../api/authApi";
@@ -20,6 +19,8 @@ let state = {
   users: [],
   orders: [],
   reviews: [],
+  coupons: [],
+  inventoryLog: [],
   cart: [],
   wishlist: [],
   recentlyViewed: [],
@@ -121,39 +122,10 @@ const mergeCart = (base, incoming, products) => {
 
 const normalizeEmail = (value = "") => String(value).trim().toLowerCase();
 
-const ORDER_ID_PREFIX = "FN";
 const makeFallbackSku = (productId) =>
   `FKN-${String(productId || "PROD")
     .replace(/[^a-z0-9]/gi, "")
     .toUpperCase()}`;
-
-const migrateOrderData = (orders, users, emailMigrations) => {
-  let sequence = 0;
-  const usedIds = new Set();
-  return orders.map((order) => {
-    let next = { ...order, customer: { ...(order.customer || {}) } };
-    const rawEmail = normalizeEmail(next.customer.email);
-    const migratedEmail = emailMigrations[rawEmail];
-    if (migratedEmail) {
-      next.customer.email = migratedEmail;
-    }
-    const user =
-      users.find((item) => item.id === next.customer.userId) ||
-      users.find((item) => normalizeEmail(item.email) === normalizeEmail(next.customer.email)) ||
-      users.find((item) => normalizeEmail(item.email) === rawEmail);
-    if (user && !next.customer.userId) next.customer.userId = user.id;
-
-    const normalizedId = String(next.id || "");
-    if (!/^FN-\d{4,}$/i.test(normalizedId) || usedIds.has(normalizedId)) {
-      do {
-        sequence += 1;
-        next.id = `${ORDER_ID_PREFIX}-${String(sequence).padStart(4, "0")}`;
-      } while (usedIds.has(next.id));
-    }
-    usedIds.add(next.id);
-    return next;
-  });
-};
 
 export const useApp = () => useSyncExternalStore(subscribe, () => state);
 export const getState = () => state;
@@ -221,101 +193,25 @@ export const appActions = {
     bootstrapPromise = (async () => {
       setState({ bootError: null });
       try {
-        await delay(400);
-        let data;
-        if (!loadLS(STORAGE_KEYS.seeded, false)) {
-          data = seedData();
-          saveLS(STORAGE_KEYS.products, data.products);
-          saveLS(STORAGE_KEYS.categories, data.categories);
-          saveLS(STORAGE_KEYS.users, data.users);
-          saveLS(STORAGE_KEYS.orders, data.orders);
-          saveLS(STORAGE_KEYS.reviews, data.reviews || []);
-          saveLS(STORAGE_KEYS.coupons, data.coupons || []);
-          saveLS(STORAGE_KEYS.recentlyViewed, {});
-          saveLS(STORAGE_KEYS.customerCarts, {});
-          saveLS(STORAGE_KEYS.customerWishlists, {});
-          saveLS(STORAGE_KEYS.customerNotifications, {});
-          saveLS(STORAGE_KEYS.supportTickets, []);
-          saveLS(STORAGE_KEYS.returnRequests, []);
-          localStorage.removeItem(STORAGE_KEYS.cart);
-          localStorage.removeItem(STORAGE_KEYS.wishlist);
-          saveLS(STORAGE_KEYS.seeded, true);
-        } else {
-          const storedReviews = loadLS(STORAGE_KEYS.reviews, null);
-          data = {
-            products: loadLS(STORAGE_KEYS.products, []),
-            categories: loadLS(STORAGE_KEYS.categories, []),
-            users: loadLS(STORAGE_KEYS.users, []),
-            orders: loadLS(STORAGE_KEYS.orders, []),
-            reviews: Array.isArray(storedReviews) ? storedReviews : seedData().reviews,
-            coupons: loadLS(STORAGE_KEYS.coupons, seedData().coupons || []),
-            supportTickets: loadLS(STORAGE_KEYS.supportTickets, []),
-            returnRequests: loadLS(STORAGE_KEYS.returnRequests, []),
-          };
-          if (!Array.isArray(storedReviews)) saveLS(STORAGE_KEYS.reviews, data.reviews);
-        }
+        // Clear any legacy demo seed caches from browser storage; server is authoritative.
+        localStorage.removeItem(STORAGE_KEYS.seeded);
+        localStorage.removeItem(STORAGE_KEYS.users);
+        localStorage.removeItem(STORAGE_KEYS.orders);
+        localStorage.removeItem(STORAGE_KEYS.session);
 
-        if (!Array.isArray(data.reviews)) data.reviews = [];
-        if (!Array.isArray(data.inventoryLog)) data.inventoryLog = [];
-        if (!Array.isArray(data.coupons)) data.coupons = [];
-        if (!Array.isArray(data.supportTickets)) data.supportTickets = [];
-        if (!Array.isArray(data.returnRequests)) data.returnRequests = [];
-        data.returnRequests = data.returnRequests.map(normalizeReturnRequest);
-        saveLS(STORAGE_KEYS.returnRequests, data.returnRequests);
-        data.coupons = data.coupons.map((coupon) => ({
-          ...coupon,
-          code: normalizeCouponCode(coupon.code),
-          usedCount: Number(coupon.usedCount || 0),
-        }));
-        saveLS(STORAGE_KEYS.coupons, data.coupons);
-
-        let productsChanged = false;
-        const existingSkus = new Set();
-        data.products = data.products.map((product) => {
-          let next = { ...product };
-          const fallbackThreshold = 10;
-          if (!next.sku) {
-            next.sku = makeFallbackSku(next.id);
-            productsChanged = true;
-          }
-          if (!Number.isFinite(+next.stockThreshold) || +next.stockThreshold < 0) {
-            next.stockThreshold = fallbackThreshold;
-            productsChanged = true;
-          }
-          let sku = String(next.sku).trim().toUpperCase();
-          if (existingSkus.has(sku)) {
-            sku = makeFallbackSku(`${next.id}-X`);
-            productsChanged = true;
-          }
-          next.sku = sku;
-          next.stockThreshold = Math.floor(+next.stockThreshold);
-          existingSkus.add(next.sku);
-          return next;
-        });
-        if (productsChanged) saveLS(STORAGE_KEYS.products, data.products);
-
-        // Keep demo branding/accounts consistent for fresh and existing installations.
-        const emailMigrations = {
-          "admin@kiosk.shop": "junaid@fikarnot.shop",
-          "editor@kiosk.shop": "editor@fikarnot.shop",
-          "maya@kiosk.shop": "urwa@fikarnot.shop",
+        const data = {
+          products: [],
+          categories: [],
+          users: [],
+          orders: [],
+          reviews: [],
+          coupons: [],
+          inventoryLog: [],
+          supportTickets: [],
+          returnRequests: [],
+          notifications: [],
         };
-        let usersChanged = false;
-        data.users = data.users.map((user) => {
-          const migratedEmail = emailMigrations[normalizeEmail(user.email)];
-          if (!migratedEmail || normalizeEmail(user.email) === migratedEmail) return user;
-          usersChanged = true;
-          return { ...user, email: migratedEmail };
-        });
-        const migratedOrders = migrateOrderData(data.orders, data.users, emailMigrations);
-        const ordersChanged = JSON.stringify(migratedOrders) !== JSON.stringify(data.orders);
-        data.orders = migratedOrders;
-        if (usersChanged) saveLS(STORAGE_KEYS.users, data.users);
-        if (ordersChanged) saveLS(STORAGE_KEYS.orders, data.orders);
 
-        // Authentication is server-backed. Never keep passwords or role authority in browser storage.
-        data.users = data.users.map(({ password: _password, ...user }) => user);
-        saveLS(STORAGE_KEYS.users, data.users);
         try {
           const site = await siteApi.get();
           if (site?.settings) setState({ siteSettings: site.settings });
@@ -324,100 +220,81 @@ export const appActions = {
         }
 
         const auth = await authApi.me();
-        const session = auth.authenticated ? auth.user : null;
-        if (session && !data.users.some((user) => user.id === session.id)) data.users = [...data.users, session];
-        if (session) data.users = data.users.map((user) => (user.id === session.id ? { ...user, ...session } : user));
+        const session = auth?.authenticated ? auth.user : null;
+        if (session) {
+          data.users = [session];
+        }
         if (session?.role === "admin") {
           try {
             const remoteUsers = await usersApi.list();
-            if (Array.isArray(remoteUsers.users)) data.users = remoteUsers.users;
+            if (Array.isArray(remoteUsers?.users)) data.users = remoteUsers.users;
           } catch (userError) {
-            console.warn("[FikarNot] User API unavailable; using local user cache for this session.", userError);
+            console.warn("[FikarNot] User API unavailable; using active session user.", userError);
           }
         }
-        saveLS(STORAGE_KEYS.session, null);
-        saveLS(STORAGE_KEYS.users, data.users);
 
-        // Module 27: the server is now the source of truth for catalogue + admin inventory.
-        try {
-          let remoteCatalog = await catalogApi.list();
-          if (session && ["admin", "editor"].includes(session.role) && !remoteCatalog.migrated) {
-            await catalogApi.migrate(data.categories, data.products, data.inventoryLog || []);
-            remoteCatalog = await catalogApi.list();
-          }
-          if (Array.isArray(remoteCatalog.categories) && remoteCatalog.categories.length) data.categories = remoteCatalog.categories;
-          if (Array.isArray(remoteCatalog.products) && remoteCatalog.products.length) data.products = remoteCatalog.products;
-          if (Array.isArray(remoteCatalog.inventoryLog)) data.inventoryLog = remoteCatalog.inventoryLog;
-          saveLS(STORAGE_KEYS.categories, data.categories);
-          saveLS(STORAGE_KEYS.products, data.products);
-          saveLS(STORAGE_KEYS.inventoryLog, data.inventoryLog || []);
-        } catch (catalogError) {
-          console.warn("[FikarNot] Catalogue API unavailable; using local cache for this session.", catalogError);
-        }
+        // Catalogue + inventory are always server-authoritative; surface bootError if unreachable.
+        const remoteCatalog = await catalogApi.list();
+        if (Array.isArray(remoteCatalog?.categories)) data.categories = remoteCatalog.categories;
+        if (Array.isArray(remoteCatalog?.products)) data.products = remoteCatalog.products;
+        if (Array.isArray(remoteCatalog?.inventoryLog)) data.inventoryLog = remoteCatalog.inventoryLog;
 
-        // Module 28: orders become server-authoritative. Migrate legacy browser orders once
-        // from a staff session, then read order history/admin orders from SQLite.
-        try {
-          let remoteOrders = await ordersApi.list();
-          if (session && ["admin", "editor"].includes(session.role) && !remoteOrders.migrated) {
-            await ordersApi.migrate(data.orders, data.coupons || []);
-            remoteOrders = await ordersApi.list();
-          }
-          if (remoteOrders.migrated && Array.isArray(remoteOrders.orders)) {
-            data.orders = remoteOrders.orders;
-            saveLS(STORAGE_KEYS.orders, data.orders);
-          }
-          if (Array.isArray(remoteOrders.inventoryLog)) {
-            data.inventoryLog = remoteOrders.inventoryLog;
-            saveLS(STORAGE_KEYS.inventoryLog, data.inventoryLog);
-          }
-        } catch (orderError) {
-          console.warn("[FikarNot] Orders API unavailable; using local order cache for this session.", orderError);
+        const existingSkus = new Set();
+        data.products = data.products.map((product) => {
+          const next = { ...product };
+          if (!next.sku) next.sku = makeFallbackSku(next.id);
+          if (!Number.isFinite(+next.stockThreshold) || +next.stockThreshold < 0) next.stockThreshold = 10;
+          let sku = String(next.sku).trim().toUpperCase();
+          if (existingSkus.has(sku)) sku = makeFallbackSku(`${next.id}-X`);
+          next.sku = sku;
+          next.stockThreshold = Math.floor(+next.stockThreshold);
+          existingSkus.add(next.sku);
+          return next;
+        });
+
+        // Orders are always server-authoritative for authenticated users; surface bootError if unreachable.
+        if (session) {
+          const remoteOrders = await ordersApi.list();
+          if (Array.isArray(remoteOrders?.orders)) data.orders = remoteOrders.orders;
+          if (Array.isArray(remoteOrders?.inventoryLog)) data.inventoryLog = remoteOrders.inventoryLog;
         }
 
         // Public engagement data should still be available to logged-out shoppers.
         try {
           const [publicReviews, publicCoupons] = await Promise.all([engagementApi.listReviews(), engagementApi.listCoupons()]);
-          if (Array.isArray(publicReviews.reviews)) data.reviews = publicReviews.reviews;
-          if (Array.isArray(publicCoupons.coupons)) data.coupons = publicCoupons.coupons;
-          saveLS(STORAGE_KEYS.reviews, data.reviews || []);
-          saveLS(STORAGE_KEYS.coupons, data.coupons || []);
+          if (Array.isArray(publicReviews?.reviews)) data.reviews = publicReviews.reviews;
+          if (Array.isArray(publicCoupons?.coupons)) data.coupons = publicCoupons.coupons;
         } catch (publicEngagementError) {
-          console.warn("[FikarNot] Public engagement API unavailable; using local cache for this session.", publicEngagementError);
+          console.warn("[FikarNot] Public engagement API unavailable.", publicEngagementError);
         }
 
-        // Module 29: engagement domains become server-backed (reviews, coupons, support, returns, notifications).
-        try {
-          let remoteEngagement = await engagementApi.list();
-          if (session && ["admin", "editor"].includes(session.role) && !remoteEngagement.migrated) {
-            const notificationsByUser = loadLS(STORAGE_KEYS.customerNotifications, {});
-            await engagementApi.migrate({
-              reviews: data.reviews || [],
-              coupons: data.coupons || [],
-              supportTickets: data.supportTickets || [],
-              returnRequests: data.returnRequests || [],
-              notificationsByUser,
-            });
-            remoteEngagement = await engagementApi.list();
+        // Authenticated engagement domains (reviews, coupons, support, returns, notifications).
+        if (session) {
+          try {
+            const remoteEngagement = await engagementApi.list();
+            if (Array.isArray(remoteEngagement?.reviews)) data.reviews = remoteEngagement.reviews;
+            if (Array.isArray(remoteEngagement?.coupons)) data.coupons = remoteEngagement.coupons;
+            if (Array.isArray(remoteEngagement?.supportTickets)) data.supportTickets = remoteEngagement.supportTickets;
+            if (Array.isArray(remoteEngagement?.returnRequests)) {
+              data.returnRequests = remoteEngagement.returnRequests.map(normalizeReturnRequest);
+            }
+            if (Array.isArray(remoteEngagement?.notifications)) data.notifications = remoteEngagement.notifications;
+          } catch (engagementError) {
+            console.warn("[FikarNot] Engagement API unavailable.", engagementError);
           }
-          if (Array.isArray(remoteEngagement.reviews)) data.reviews = remoteEngagement.reviews;
-          if (Array.isArray(remoteEngagement.coupons)) data.coupons = remoteEngagement.coupons;
-          if (Array.isArray(remoteEngagement.supportTickets)) data.supportTickets = remoteEngagement.supportTickets;
-          if (Array.isArray(remoteEngagement.returnRequests)) data.returnRequests = remoteEngagement.returnRequests;
-          if (session?.id && Array.isArray(remoteEngagement.notifications)) data.notifications = remoteEngagement.notifications;
-          saveLS(STORAGE_KEYS.reviews, data.reviews || []);
-          saveLS(STORAGE_KEYS.coupons, data.coupons || []);
-          saveLS(STORAGE_KEYS.supportTickets, data.supportTickets || []);
-          saveLS(STORAGE_KEYS.returnRequests, data.returnRequests || []);
-        } catch (engagementError) {
-          console.warn("[FikarNot] Engagement API unavailable; using local cache for this session.", engagementError);
         }
+
+        data.coupons = (data.coupons || []).map((coupon) => ({
+          ...coupon,
+          code: normalizeCouponCode(coupon.code),
+          usedCount: Number(coupon.usedCount || 0),
+        }));
 
         let remoteAccountState = null;
         if (session?.id) {
           try {
             remoteAccountState = await accountApi.getState();
-            if (Array.isArray(remoteAccountState.addresses)) {
+            if (Array.isArray(remoteAccountState?.addresses)) {
               data.users = data.users.map((user) => (user.id === session.id ? { ...user, addresses: remoteAccountState.addresses } : user));
             }
           } catch (accountError) {
@@ -437,7 +314,7 @@ export const appActions = {
         if (session?.id) {
           const savedCart = readAccountBucket(STORAGE_KEYS.customerCarts, session.id);
           const savedWishlist = readAccountBucket(STORAGE_KEYS.customerWishlists, session.id);
-          notifications = readNotifications(session.id);
+          notifications = Array.isArray(data.notifications) ? data.notifications : readNotifications(session.id);
           const remoteCart = Array.isArray(remoteAccountState?.cart) ? remoteAccountState.cart : null;
           const remoteWishlist = Array.isArray(remoteAccountState?.wishlist) ? remoteAccountState.wishlist : null;
           const remoteRecent = Array.isArray(remoteAccountState?.recentlyViewed) ? remoteAccountState.recentlyViewed : null;
@@ -467,14 +344,13 @@ export const appActions = {
         localStorage.removeItem(STORAGE_KEYS.cart);
         localStorage.removeItem(STORAGE_KEYS.wishlist);
         writeAccountBucket(STORAGE_KEYS.recentlyViewed, recentlyViewedKey, recentlyViewed);
-        saveLS(STORAGE_KEYS.inventoryLog, data.inventoryLog);
         const comparison = loadLS(STORAGE_KEYS.comparison, [])
           .filter((id) => data.products.some((product) => product.id === id))
           .slice(0, 3);
         saveLS(STORAGE_KEYS.comparison, comparison);
         setState({ ...data, cart, wishlist, recentlyViewed, comparison, notifications, session, ready: true });
       } catch (error) {
-        setState({ bootError: error?.message || "Failed to load store data" });
+        setState({ bootError: error?.message || "Failed to load store data", ready: false });
       } finally {
         bootstrapPromise = null;
       }
