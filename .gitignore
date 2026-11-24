@@ -1,23 +1,39 @@
+# Dependencies & build output
 node_modules/
-.DS_Store
 dist/
-.vscode/*.log
-server/data/*.sqlite
-server/data/*.sqlite-shm
-server/data/*.sqlite-wal
-server/data/uploads/*
-!server/data/uploads/.gitkeep
-.env
+coverage/
 
-# --- added 2026-11 review ---------------------------------------------------
+# Environment & local secrets
 .env
 .env.*
 !.env.example
+!supabase/functions/.env.example
 supabase/functions/.env
+
+# Supabase CLI temporary state
 supabase/.temp/
 supabase/.branches/
+
+# Local database dumps, SQLite files, and CSV exports
 *.sqlite
 *.sqlite-wal
 *.sqlite-shm
+*.sqlite3
 *.db
-coverage/
+*.dump
+*.bak
+*.csv
+/*.sql
+backup_*.sql
+dump*.sql
+!supabase/migrations/*.sql
+!supabase/maintenance/*.sql
+!supabase/tests/*.sql
+
+# Logs, test artifacts & OS files
+*.log
+.DS_Store
+Thumbs.db
+test-results/
+playwright-report/
+.vitest/

@@ -1,15 +1,4 @@
 dist
 node_modules
 package-lock.json
-legacy
 supabase/migrations
-server
-tests
-deploy
-scripts/backup*
-scripts/check-production-config*
-scripts/clear-demo-data*
-scripts/release-audit*
-scripts/restore-db*
-src/styles.css
-src/components/layout.jsx
