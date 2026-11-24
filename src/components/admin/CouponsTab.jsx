@@ -136,7 +136,7 @@ export function CouponEditor({ initial, onClose }) {
               className="input"
               value={f.description}
               onChange={(e) => setF({ ...f, description: e.target.value })}
-              placeholder="10% off your first order over $50."
+              placeholder="10% off your first order over Rs 3,000."
             />
           </div>
           <label className="chk f-full">

@@ -79,7 +79,7 @@ export default function HomePage() {
 
         <div className="container hero-cinema-inner">
           <div className="hero-cinema-copy">
-            <span className="hero-kicker">{site.heroKicker || "Curated essentials · Free shipping over $75"}</span>
+            <span className="hero-kicker">{site.heroKicker || "Curated essentials · Free shipping across Pakistan over Rs 5,000"}</span>
             <span className="eyebrow">{site.heroEyebrow || "FikarNot — objects for the everyday"}</span>
             <h1 className="h1 hero-cinema-title">
               <span className="hero-title-line">{site.heroTitle || "Everyday essentials,"}</span>
@@ -261,13 +261,13 @@ export default function HomePage() {
               <span className="icw">
                 <Ic n="truck" s={17} />
               </span>
-              Free ship over $75
+              Free ship over Rs 5,000
             </div>
             <div>
               <span className="icw">
                 <Ic n="refresh" s={17} />
               </span>
-              30-day returns
+              7-day easy returns
             </div>
             <div>
               <span className="icw">

@@ -5,7 +5,10 @@ import { Ic } from "../components/icons";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
 
 const FAQS = [
-  ["How much is shipping?", "Standard shipping is $6.95 on orders below $75. Orders of $75 or more qualify for free standard shipping."],
+  [
+    "How much is shipping?",
+    "Standard shipping is Rs 500 on orders below Rs 5,000. Orders of Rs 5,000 or more qualify for free standard delivery across Pakistan.",
+  ],
   [
     "Can I use a coupon at checkout?",
     "Yes. Open checkout and enter a valid promotion code. The cart must meet any minimum-subtotal or expiry rules configured for the coupon.",
@@ -26,7 +29,10 @@ const FAQS = [
     "Where are my cart and wishlist stored?",
     "They are associated with your FikarNot account in the current browser-based project. Logging out clears the active session state and signing back in restores that account's saved data.",
   ],
-  ["Are payments real?", "No. Checkout is a mock payment experience for this personal project. Do not enter real card information."],
+  [
+    "What payment methods are supported?",
+    "We support Cash on Delivery (COD) across Pakistan, as well as direct Bank Transfer (Meezan Bank), JazzCash, and EasyPaisa with proof slip verification.",
+  ],
   [
     "How can I contact FikarNot?",
     "Use the support form below. Signed-in users can also see support status updates through the notification center.",

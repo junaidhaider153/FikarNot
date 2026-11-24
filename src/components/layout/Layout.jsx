@@ -305,12 +305,19 @@ export function Header() {
             <Ic n="cart" s={17} />
             {count > 0 && <span className="count-badge">{count}</span>}
           </Link>
-          <button className="icon-btn dark menu-btn" aria-label="Menu" aria-expanded={open} onClick={() => setOpen(!open)}>
+          <button
+            type="button"
+            className="icon-btn dark menu-btn"
+            aria-label="Toggle navigation menu"
+            aria-expanded={open}
+            aria-controls="mobile-nav"
+            onClick={() => setOpen(!open)}
+          >
             <Ic n={open ? "x" : "menu"} s={18} />
           </button>
         </div>
       </div>
-      <nav className={"mobile-nav" + (open ? " open" : "")} aria-label="Mobile">
+      <nav id="mobile-nav" className={"mobile-nav" + (open ? " open" : "")} aria-label="Mobile">
         <button type="button" className="mobile-theme-toggle" onClick={toggleTheme}>
           <Ic n={theme === "dark" ? "sun" : "moon"} s={15} /> {theme === "dark" ? "Light mode" : "Dark mode"}
         </button>
@@ -340,11 +347,11 @@ export function Header() {
   );
 }
 const DEFAULT_MARQUEE_ITEMS = [
-  "Free shipping over $75",
-  "30-day returns",
-  "Designed in Portland",
-  "Carbon-neutral delivery",
-  "2-year warranty",
+  "Free shipping across Pakistan over Rs 5,000",
+  "Cash on Delivery & Instant Bank / JazzCash Transfer",
+  "7-day easy returns & exchanges",
+  "100% authentic curated essentials",
+  "Dispatched via Trax, TCS & PostEx",
 ];
 
 export function Marquee() {

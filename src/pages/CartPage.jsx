@@ -81,7 +81,7 @@ export default function CartPage() {
             <p>
               {summary.freeShippingUnlocked
                 ? "Nice choice. Your order qualifies for free standard shipping."
-                : "Spend $75 or more and standard shipping is free."}
+                : `Spend ${fmt(summary.amountToFreeShipping || 5000)} more and standard shipping is free.`}
             </p>
           </div>
 
@@ -126,10 +126,10 @@ export default function CartPage() {
               <Ic n="shield" s={15} /> Secure checkout
             </div>
             <div>
-              <Ic n="truck" s={15} /> Free shipping over $75
+              <Ic n="truck" s={15} /> Free shipping over Rs 5,000
             </div>
             <div>
-              <Ic n="check" s={15} /> 30-day returns
+              <Ic n="check" s={15} /> 7-day easy returns
             </div>
           </div>
         </aside>
