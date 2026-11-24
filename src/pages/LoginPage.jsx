@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 import { useApp, appActions } from "../store/appStore";
+import { authApi } from "../api/authApi";
 import { useDocumentMeta } from "../hooks/useDocumentMeta";
 import { Ic } from "../components/icons";
 
@@ -200,7 +201,7 @@ export default function LoginPage() {
                   onClick={async () => {
                     setResending(true);
                     try {
-                      const response = await (await import("../api/authApi")).authApi.resendVerification(verificationNotice);
+                      const response = await authApi.resendVerification(verificationNotice);
                       setDevVerificationUrl(response.devVerificationUrl || "");
                       appActions.toast("A new verification link has been prepared");
                     } catch (error) {

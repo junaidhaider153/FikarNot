@@ -2,30 +2,30 @@ import { lazy, Suspense } from "react";
 import { Route, Routes } from "react-router-dom";
 import HomePage from "../pages/HomePage";
 import ProductsPage from "../pages/ProductsPage";
-import ProductDetailPage from "../pages/ProductDetailPage";
 import CartPage from "../pages/CartPage";
-import CheckoutPage from "../pages/CheckoutPage";
-import LoginPage from "../pages/LoginPage";
-import ForgotPasswordPage from "../pages/ForgotPasswordPage";
-import ResetPasswordPage from "../pages/ResetPasswordPage";
-import VerifyEmailPage from "../pages/VerifyEmailPage";
-import AccountPage from "../pages/AccountPage";
-import WishlistPage from "../pages/WishlistPage";
-import RecentlyViewedPage from "../pages/RecentlyViewedPage";
-import ComparePage from "../pages/ComparePage";
-import NotificationsPage from "../pages/NotificationsPage";
-import HelpCenterPage from "../pages/HelpCenterPage";
-import StoreInfoPage from "../pages/StoreInfoPage";
-import PaymentResultPage from "../pages/PaymentResultPage";
-import InvoicePage from "../pages/InvoicePage";
-import OrderTrackingPage from "../pages/OrderTrackingPage";
-import PackingSlipPage from "../pages/PackingSlipPage";
-import NotFoundPage from "../pages/NotFoundPage";
 import { STAFF_ROLES, ADMIN_ROLES } from "../config/appConfig";
 import { ProtectedRoute } from "./ProtectedRoute";
 
-// Lazy-loaded: pulls the admin UI *and* recharts out of the main bundle so
-// anonymous shoppers never download Studio-only code.
+// Lazy-loaded routes: split non-critical shopper and back-office bundles so
+// the initial payload for landing and browsing stays lightweight.
+const ProductDetailPage = lazy(() => import("../pages/ProductDetailPage"));
+const CheckoutPage = lazy(() => import("../pages/CheckoutPage"));
+const LoginPage = lazy(() => import("../pages/LoginPage"));
+const ForgotPasswordPage = lazy(() => import("../pages/ForgotPasswordPage"));
+const ResetPasswordPage = lazy(() => import("../pages/ResetPasswordPage"));
+const VerifyEmailPage = lazy(() => import("../pages/VerifyEmailPage"));
+const AccountPage = lazy(() => import("../pages/AccountPage"));
+const WishlistPage = lazy(() => import("../pages/WishlistPage"));
+const RecentlyViewedPage = lazy(() => import("../pages/RecentlyViewedPage"));
+const ComparePage = lazy(() => import("../pages/ComparePage"));
+const NotificationsPage = lazy(() => import("../pages/NotificationsPage"));
+const HelpCenterPage = lazy(() => import("../pages/HelpCenterPage"));
+const StoreInfoPage = lazy(() => import("../pages/StoreInfoPage"));
+const PaymentResultPage = lazy(() => import("../pages/PaymentResultPage"));
+const InvoicePage = lazy(() => import("../pages/InvoicePage"));
+const OrderTrackingPage = lazy(() => import("../pages/OrderTrackingPage"));
+const PackingSlipPage = lazy(() => import("../pages/PackingSlipPage"));
+const NotFoundPage = lazy(() => import("../pages/NotFoundPage"));
 const AdminPage = lazy(() => import("../pages/AdminPage"));
 
 function AdminRoute({ tab, roles }) {
@@ -64,84 +64,86 @@ export function Boot({ title = "FikarNot", text = "Setting up your shop — cura
 
 export function AppRoutes() {
   return (
-    <Routes>
-      <Route path="/" element={<HomePage />} />
-      <Route path="/products" element={<ProductsPage />} />
-      <Route path="/product/:id" element={<ProductDetailPage />} />
-      <Route path="/cart" element={<CartPage />} />
-      <Route path="/checkout" element={<CheckoutPage />} />
-      <Route path="/login" element={<LoginPage />} />
-      <Route path="/forgot-password" element={<ForgotPasswordPage />} />
-      <Route path="/reset-password" element={<ResetPasswordPage />} />
-      <Route path="/verify-email" element={<VerifyEmailPage />} />
-      <Route
-        path="/account"
-        element={
-          <ProtectedRoute>
-            <AccountPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route
-        path="/wishlist"
-        element={
-          <ProtectedRoute>
-            <WishlistPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route path="/recently-viewed" element={<RecentlyViewedPage />} />
-      <Route path="/compare" element={<ComparePage />} />
-      <Route
-        path="/notifications"
-        element={
-          <ProtectedRoute>
-            <NotificationsPage />
-          </ProtectedRoute>
-        }
-      />
-      <Route path="/help" element={<HelpCenterPage />} />
-      <Route path="/about" element={<StoreInfoPage page="about" />} />
-      <Route path="/shipping" element={<StoreInfoPage page="shipping" />} />
-      <Route path="/returns" element={<StoreInfoPage page="returns" />} />
-      <Route path="/track" element={<OrderTrackingPage />} />
-      <Route path="/privacy" element={<StoreInfoPage page="privacy" />} />
-      <Route path="/terms" element={<StoreInfoPage page="terms" />} />
-      <Route path="/payment/success" element={<PaymentResultPage success />} />
-      <Route path="/payment/failure" element={<PaymentResultPage />} />
+    <Suspense fallback={<Boot />}>
+      <Routes>
+        <Route path="/" element={<HomePage />} />
+        <Route path="/products" element={<ProductsPage />} />
+        <Route path="/product/:id" element={<ProductDetailPage />} />
+        <Route path="/cart" element={<CartPage />} />
+        <Route path="/checkout" element={<CheckoutPage />} />
+        <Route path="/login" element={<LoginPage />} />
+        <Route path="/forgot-password" element={<ForgotPasswordPage />} />
+        <Route path="/reset-password" element={<ResetPasswordPage />} />
+        <Route path="/verify-email" element={<VerifyEmailPage />} />
+        <Route
+          path="/account"
+          element={
+            <ProtectedRoute>
+              <AccountPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route
+          path="/wishlist"
+          element={
+            <ProtectedRoute>
+              <WishlistPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/recently-viewed" element={<RecentlyViewedPage />} />
+        <Route path="/compare" element={<ComparePage />} />
+        <Route
+          path="/notifications"
+          element={
+            <ProtectedRoute>
+              <NotificationsPage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="/help" element={<HelpCenterPage />} />
+        <Route path="/about" element={<StoreInfoPage page="about" />} />
+        <Route path="/shipping" element={<StoreInfoPage page="shipping" />} />
+        <Route path="/returns" element={<StoreInfoPage page="returns" />} />
+        <Route path="/track" element={<OrderTrackingPage />} />
+        <Route path="/privacy" element={<StoreInfoPage page="privacy" />} />
+        <Route path="/terms" element={<StoreInfoPage page="terms" />} />
+        <Route path="/payment/success" element={<PaymentResultPage success />} />
+        <Route path="/payment/failure" element={<PaymentResultPage />} />
 
-      <Route path="/admin" element={<AdminRoute tab="dashboard" roles={STAFF_ROLES} />} />
-      <Route path="/admin/analytics" element={<AdminRoute tab="analytics" roles={STAFF_ROLES} />} />
-      <Route path="/admin/products" element={<AdminRoute tab="products" roles={STAFF_ROLES} />} />
-      <Route path="/admin/inventory" element={<AdminRoute tab="inventory" roles={STAFF_ROLES} />} />
-      <Route path="/admin/categories" element={<AdminRoute tab="categories" roles={STAFF_ROLES} />} />
-      <Route path="/admin/orders" element={<AdminRoute tab="orders" roles={STAFF_ROLES} />} />
-      <Route path="/admin/coupons" element={<AdminRoute tab="coupons" roles={STAFF_ROLES} />} />
-      <Route path="/admin/reviews" element={<AdminRoute tab="reviews" roles={STAFF_ROLES} />} />
-      <Route path="/admin/support" element={<AdminRoute tab="support" roles={STAFF_ROLES} />} />
-      <Route path="/admin/returns" element={<AdminRoute tab="returns" roles={STAFF_ROLES} />} />
-      <Route path="/admin/security" element={<AdminRoute tab="security" roles={STAFF_ROLES} />} />
-      <Route path="/admin/media" element={<AdminRoute tab="media" roles={ADMIN_ROLES} />} />
-      <Route path="/admin/users" element={<AdminRoute tab="users" roles={ADMIN_ROLES} />} />
-      <Route path="/admin/settings" element={<AdminRoute tab="settings" roles={ADMIN_ROLES} />} />
-      <Route
-        path="/admin/orders/:orderId/packing-slip"
-        element={
-          <ProtectedRoute roles={STAFF_ROLES}>
-            <PackingSlipPage />
-          </ProtectedRoute>
-        }
-      />
+        <Route path="/admin" element={<AdminRoute tab="dashboard" roles={STAFF_ROLES} />} />
+        <Route path="/admin/analytics" element={<AdminRoute tab="analytics" roles={STAFF_ROLES} />} />
+        <Route path="/admin/products" element={<AdminRoute tab="products" roles={STAFF_ROLES} />} />
+        <Route path="/admin/inventory" element={<AdminRoute tab="inventory" roles={STAFF_ROLES} />} />
+        <Route path="/admin/categories" element={<AdminRoute tab="categories" roles={STAFF_ROLES} />} />
+        <Route path="/admin/orders" element={<AdminRoute tab="orders" roles={STAFF_ROLES} />} />
+        <Route path="/admin/coupons" element={<AdminRoute tab="coupons" roles={STAFF_ROLES} />} />
+        <Route path="/admin/reviews" element={<AdminRoute tab="reviews" roles={STAFF_ROLES} />} />
+        <Route path="/admin/support" element={<AdminRoute tab="support" roles={STAFF_ROLES} />} />
+        <Route path="/admin/returns" element={<AdminRoute tab="returns" roles={STAFF_ROLES} />} />
+        <Route path="/admin/security" element={<AdminRoute tab="security" roles={STAFF_ROLES} />} />
+        <Route path="/admin/media" element={<AdminRoute tab="media" roles={ADMIN_ROLES} />} />
+        <Route path="/admin/users" element={<AdminRoute tab="users" roles={ADMIN_ROLES} />} />
+        <Route path="/admin/settings" element={<AdminRoute tab="settings" roles={ADMIN_ROLES} />} />
+        <Route
+          path="/admin/orders/:orderId/packing-slip"
+          element={
+            <ProtectedRoute roles={STAFF_ROLES}>
+              <PackingSlipPage />
+            </ProtectedRoute>
+          }
+        />
 
-      <Route
-        path="/invoice/:orderId"
-        element={
-          <ProtectedRoute>
-            <InvoicePage />
-          </ProtectedRoute>
-        }
-      />
-      <Route path="*" element={<NotFoundPage />} />
-    </Routes>
+        <Route
+          path="/invoice/:orderId"
+          element={
+            <ProtectedRoute>
+              <InvoicePage />
+            </ProtectedRoute>
+          }
+        />
+        <Route path="*" element={<NotFoundPage />} />
+      </Routes>
+    </Suspense>
   );
 }

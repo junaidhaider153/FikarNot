@@ -44,9 +44,9 @@ const renderProductHtml = (baseHtml, product, category) => {
     offers: {
       "@type": "Offer",
       url,
-      priceCurrency: "USD",
+      priceCurrency: "PKR",
       price: Number(product.price).toFixed(2),
-      availability: Number(product.stock) > 0 ? "https://schema.org" : "https://schema.org",
+      availability: Number(product.stock) > 0 ? "https://schema.org/InStock" : "https://schema.org/OutOfStock",
     },
   };
   const breadcrumbLd = {

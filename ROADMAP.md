@@ -58,7 +58,7 @@ Legend: ✅ done in this package · 🔧 you must do it (needs your accounts/das
 
 - ✅ Modularize `AdminPage.jsx` (~2.8k lines) into dedicated tab components in `src/components/admin/` with test suite
 - ⬜ Slim `appStore.js`; adopt TanStack Query
-- ⬜ Lazy-load Account/Checkout/ProductDetail (AdminPage is already a separate chunk; main bundle is 183 KB gz)
+- ✅ Lazy-load Account/Checkout/ProductDetail and non-critical routes; Recharts vendor isolation; initial bundle reduced from 709 kB to 294 kB (88 kB gz)
 - ⬜ Accessibility pass, Lighthouse CI
 - ⬜ Delete `legacy/` once comfortable (it stays in git history)
 - ⬜ Real product catalogue: replace demo prices and external placeholder image URLs
